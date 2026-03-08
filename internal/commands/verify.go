@@ -27,15 +27,13 @@ an attacker might modify the hook to execute malicious commands.`,
 		yellow := color.New(color.FgYellow).SprintFunc()
 		cyan := color.New(color.FgCyan).SprintFunc()
 
-		verbose, _ := cmd.Flags().GetBool("verbose")
-
 		result, err := integrity.VerifyHook()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error verifying hook: %v\n", err)
 			os.Exit(1)
 		}
 
-		if verbose {
+		if verbose > 0 {
 			fmt.Printf("Hook:  %s\n", result.HookPath)
 			fmt.Printf("Hash:  %s\n", result.HashPath)
 			fmt.Println()

@@ -64,7 +64,7 @@ func runCcusage(cmd *cobra.Command, args []string) error {
 	cmdArgs := []string{granularity, "--json", "--since", "20250101"}
 	ccusageCmd.Args = append(ccusageCmd.Args, cmdArgs...)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: %s %s\n", ccusageCmd.Path, strings.Join(cmdArgs, " "))
 	}
 

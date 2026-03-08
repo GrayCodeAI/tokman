@@ -51,7 +51,7 @@ var lsCmd = &cobra.Command{
 		fmt.Print(output)
 
 		// Record to tracker
-		if err := recordCommand("ls", output, output, execTime, true); err != nil && verbose {
+		if err := recordCommand("ls", output, output, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(cmd.OutOrStderr(), "Warning: failed to record: %v\n", err)
 		}
 	},

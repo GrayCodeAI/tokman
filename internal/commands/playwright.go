@@ -37,7 +37,7 @@ func runPlaywright(cmd *cobra.Command, args []string) error {
 		args = []string{"test"}
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: playwright %s\n", strings.Join(args, " "))
 	}
 

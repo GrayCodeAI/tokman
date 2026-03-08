@@ -73,7 +73,7 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(result)
 	timer.Track("env", "tokman env", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Variables: %d -> %d\n", len(env), len(strings.Split(result, "\n"))-1)
 	}
 

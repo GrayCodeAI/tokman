@@ -42,7 +42,7 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	timer := tracking.Start()
 	command := strings.Join(args, " ")
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running and summarizing: %s\n", command)
 	}
 

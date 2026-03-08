@@ -39,7 +39,7 @@ func runCurl(cmd *cobra.Command, args []string) error {
 	curlArgs := []string{"-s"}
 	curlArgs = append(curlArgs, args...)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: curl %s\n", strings.Join(args, " "))
 	}
 

@@ -54,7 +54,7 @@ Example:
 		fmt.Println(rewritten)
 
 		// If verbose, show what happened
-		if verbose && rewritten != fullCmd {
+		if verbose > 0 && rewritten != fullCmd {
 			cyan := color.New(color.FgCyan).SprintFunc()
 			green := color.New(color.FgGreen).SprintFunc()
 			fmt.Fprintf(cmd.ErrOrStderr(), "%s → %s\n", cyan(fullCmd), green(rewritten))

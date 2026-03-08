@@ -34,7 +34,7 @@ var testCmd = &cobra.Command{
 		fmt.Print(filteredOutput)
 
 		// Record to tracker
-		if err := recordCommand("go test", originalOutput, filteredOutput, execTime, true); err != nil && verbose {
+		if err := recordCommand("go test", originalOutput, filteredOutput, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", err)
 		}
 	},
@@ -59,7 +59,7 @@ var buildCmd = &cobra.Command{
 		fmt.Print(filteredOutput)
 
 		// Record to tracker
-		if err := recordCommand("go build", originalOutput, filteredOutput, execTime, err == nil); err != nil && verbose {
+		if err := recordCommand("go build", originalOutput, filteredOutput, execTime, err == nil); err != nil && verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", err)
 		}
 	},

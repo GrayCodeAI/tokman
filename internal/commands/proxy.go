@@ -22,9 +22,7 @@ proxy runs the command as-is while still tracking execution metrics.
 Useful for commands where you need full unfiltered output.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		verbose, _ := cmd.Flags().GetBool("verbose")
-
-		if verbose {
+		if verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Proxy mode: %s\n", strings.Join(args, " "))
 		}
 

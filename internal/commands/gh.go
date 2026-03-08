@@ -55,7 +55,7 @@ func runGh(cmd *cobra.Command, args []string) error {
 func runGhPr(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gh pr %s\n", strings.Join(args, " "))
 	}
 
@@ -81,7 +81,7 @@ func runGhPr(args []string) error {
 func runGhIssue(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gh issue %s\n", strings.Join(args, " "))
 	}
 
@@ -106,7 +106,7 @@ func runGhIssue(args []string) error {
 func runGhRun(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gh run %s\n", strings.Join(args, " "))
 	}
 
@@ -127,7 +127,7 @@ func runGhRun(args []string) error {
 func runGhRepo(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gh repo %s\n", strings.Join(args, " "))
 	}
 
@@ -148,7 +148,7 @@ func runGhRepo(args []string) error {
 func runGhPassthrough(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gh %s\n", strings.Join(args, " "))
 	}
 

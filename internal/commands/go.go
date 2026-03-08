@@ -53,7 +53,7 @@ func runGo(cmd *cobra.Command, args []string) error {
 func runGoTestCmd(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: go test %s\n", strings.Join(args, " "))
 	}
 
@@ -76,7 +76,7 @@ func runGoTestCmd(args []string) error {
 func runGoBuildCmd(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: go build %s\n", strings.Join(args, " "))
 	}
 
@@ -97,7 +97,7 @@ func runGoBuildCmd(args []string) error {
 func runGoVet(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: go vet %s\n", strings.Join(args, " "))
 	}
 
@@ -118,7 +118,7 @@ func runGoVet(args []string) error {
 func runGoPassthrough(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: go %s\n", strings.Join(args, " "))
 	}
 

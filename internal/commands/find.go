@@ -64,7 +64,7 @@ func runFind(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("find %s", strings.Join(args, " ")), "tokman find", originalTokens, filteredTokens)
 
-	if verbose && tokensSaved > 0 {
+	if verbose > 0 && tokensSaved > 0 {
 		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", tokensSaved)
 	}
 

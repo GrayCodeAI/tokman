@@ -60,7 +60,7 @@ func init() {
 func runSmart(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Analyzing: %s\n", filePath)
 	}
 

@@ -65,7 +65,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("diff %s", strings.Join(args, " ")), "tokman diff", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", originalTokens-filteredTokens)
 	}
 

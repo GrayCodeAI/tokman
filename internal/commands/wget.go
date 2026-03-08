@@ -43,7 +43,7 @@ func runWget(cmd *cobra.Command, args []string) error {
 		return runWgetStdout(url, userArgs, timer)
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "wget: %s\n", url)
 	}
 
@@ -81,7 +81,7 @@ func runWget(cmd *cobra.Command, args []string) error {
 }
 
 func runWgetStdout(url string, userArgs []string, timer *tracking.TimedExecution) error {
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "wget: %s -> stdout\n", url)
 	}
 

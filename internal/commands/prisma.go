@@ -38,7 +38,7 @@ func runPrisma(cmd *cobra.Command, args []string) error {
 		args = []string{"--help"}
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: prisma %s\n", strings.Join(args, " "))
 	}
 

@@ -53,7 +53,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 
 	if len(args) == 0 {
 		// Read from stdin
-		if verbose {
+		if verbose > 0 {
 			fmt.Fprintln(os.Stderr, "Reading from stdin")
 		}
 		scanner := bufio.NewScanner(os.Stdin)
@@ -78,7 +78,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 
 	// Detect language from extension
 	lang := detectLanguage(filePath)
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Detected language: %s\n", lang)
 	}
 
@@ -120,7 +120,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(filePath, "tokman read", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		originalLines := len(strings.Split(content, "\n"))
 		filteredLines := len(strings.Split(filtered, "\n"))
 		reduction := 0.0

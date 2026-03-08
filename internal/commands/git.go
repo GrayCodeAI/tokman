@@ -29,11 +29,14 @@ const (
 
 // Global git flags (persisted to all subcommands)
 var (
-	gitDir        string
-	gitWorkTree   string
-	gitDirectory  string // -C flag
-	gitNoPager    bool
-	gitConfigOpts []string // -c key=value options
+	gitDir          string
+	gitWorkTree     string
+	gitDirectory    string // -C flag
+	gitNoPager      bool
+	gitNoOptLocks   bool
+	gitBare         bool
+	gitLiteralPaths bool
+	gitConfigOpts   []string // -c key=value options
 )
 
 var gitCmd = &cobra.Command{
@@ -43,11 +46,14 @@ var gitCmd = &cobra.Command{
 token usage while preserving important information.
 
 Global flags (applied before subcommand):
-  -C, --directory <path>    Run git in specified directory
-  --git-dir <path>          Set the .git directory path
-  --work-tree <path>        Set the working tree path
-  --no-pager                Disable pager
-  -c <key=value>            Set git config option`,
+  -C, --directory <path>      Run git in specified directory
+  --git-dir <path>            Set the .git directory path
+  --work-tree <path>          Set the working tree path
+  --no-pager                  Disable pager
+  --no-optional-locks         Skip optional locks
+  --bare                      Treat repository as bare
+  --literal-pathspecs         Treat pathspecs literally
+  -c <key=value>              Set git config option`,
 }
 
 // buildGitCmd creates a git command with global options prepended
@@ -66,6 +72,15 @@ func buildGitCmd(subCmd string, args ...string) *exec.Cmd {
 	}
 	if gitWorkTree != "" {
 		cmdArgs = append(cmdArgs, "--work-tree", gitWorkTree)
+	}
+	if gitNoOptLocks {
+		cmdArgs = append(cmdArgs, "--no-optional-locks")
+	}
+	if gitBare {
+		cmdArgs = append(cmdArgs, "--bare")
+	}
+	if gitLiteralPaths {
+		cmdArgs = append(cmdArgs, "--literal-pathspecs")
 	}
 	for _, cfg := range gitConfigOpts {
 		cmdArgs = append(cmdArgs, "-c", cfg)
@@ -94,7 +109,7 @@ var gitStatusCmd = &cobra.Command{
 		fmt.Print(output)
 
 		// Record to tracker
-		if err := recordCommand("git status", output, output, execTime, true); err != nil && verbose {
+		if err := recordCommand("git status", output, output, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", err)
 		}
 	},
@@ -120,7 +135,7 @@ var gitDiffCmd = &cobra.Command{
 		fmt.Print(output)
 
 		// Record to tracker
-		if err := recordCommand("git diff", output, output, execTime, true); err != nil && verbose {
+		if err := recordCommand("git diff", output, output, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", err)
 		}
 	},
@@ -135,7 +150,7 @@ var gitLogCmd = &cobra.Command{
 - Full output only with --verbose flag`,
 	Run: func(cmd *cobra.Command, args []string) {
 		startTime := time.Now()
-		output, err := runGitLog(args, verbose)
+		output, err := runGitLog(args, verbose > 0)
 		execTime := time.Since(startTime).Milliseconds()
 
 		if err != nil {
@@ -146,7 +161,7 @@ var gitLogCmd = &cobra.Command{
 		fmt.Print(output)
 
 		// Record to tracker
-		if err := recordCommand("git log", output, output, execTime, true); err != nil && verbose {
+		if err := recordCommand("git log", output, output, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", err)
 		}
 	},
@@ -177,6 +192,9 @@ func init() {
 	gitCmd.PersistentFlags().StringVar(&gitDir, "git-dir", "", "Set the .git directory path")
 	gitCmd.PersistentFlags().StringVar(&gitWorkTree, "work-tree", "", "Set the working tree path")
 	gitCmd.PersistentFlags().BoolVar(&gitNoPager, "no-pager", false, "Disable pager")
+	gitCmd.PersistentFlags().BoolVar(&gitNoOptLocks, "no-optional-locks", false, "Skip optional locks")
+	gitCmd.PersistentFlags().BoolVar(&gitBare, "bare", false, "Treat repository as bare")
+	gitCmd.PersistentFlags().BoolVar(&gitLiteralPaths, "literal-pathspecs", false, "Treat pathspecs literally")
 	gitCmd.PersistentFlags().StringArrayVarP(&gitConfigOpts, "config", "c", nil, "Set git config option (key=value)")
 
 	// Add subcommands
@@ -598,7 +616,7 @@ var gitShowCmd = &cobra.Command{
 	},
 }
 
-func runGitShow(args []string, verbose bool) (string, error) {
+func runGitShow(args []string, verboseLevel int) (string, error) {
 	// Check for blob show (rev:path) or stat-only
 	for _, arg := range args {
 		if strings.Contains(arg, ":") && !strings.HasPrefix(arg, "-") {

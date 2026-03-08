@@ -61,7 +61,7 @@ func runNpx(cmd *cobra.Command, args []string) error {
 func runTscCommand(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx tsc %s\n", strings.Join(args, " "))
 	}
 
@@ -82,7 +82,7 @@ func runTscCommand(args []string) error {
 func runLintCommand(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx eslint %s\n", strings.Join(args, " "))
 	}
 
@@ -103,7 +103,7 @@ func runLintCommand(args []string) error {
 func runPrettierCommand(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx prettier %s\n", strings.Join(args, " "))
 	}
 
@@ -124,7 +124,7 @@ func runPrettierCommand(args []string) error {
 func runPrismaCommand(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx prisma %s\n", strings.Join(args, " "))
 	}
 
@@ -145,7 +145,7 @@ func runPrismaCommand(args []string) error {
 func runNextCommand(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx next %s\n", strings.Join(args, " "))
 	}
 
@@ -166,7 +166,7 @@ func runNextCommand(args []string) error {
 func runNpxPassthrough(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: npx %s\n", strings.Join(args, " "))
 	}
 

@@ -37,7 +37,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 		args = []string{"build"}
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: next %s\n", strings.Join(args, " "))
 	}
 

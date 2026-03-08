@@ -190,7 +190,7 @@ func runLint(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("%s %s", linter, strings.Join(args, " ")), fmt.Sprintf("tokman lint %s", linter), originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", originalTokens-filteredTokens)
 	}
 

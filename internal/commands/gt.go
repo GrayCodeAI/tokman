@@ -58,7 +58,7 @@ func runGt(cmd *cobra.Command, args []string) error {
 func runGtLog(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt log %s\n", strings.Join(args, " "))
 	}
 
@@ -79,7 +79,7 @@ func runGtLog(args []string) error {
 func runGtSubmit(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt submit %s\n", strings.Join(args, " "))
 	}
 
@@ -100,7 +100,7 @@ func runGtSubmit(args []string) error {
 func runGtSync(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt sync %s\n", strings.Join(args, " "))
 	}
 
@@ -121,7 +121,7 @@ func runGtSync(args []string) error {
 func runGtRestack(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt restack %s\n", strings.Join(args, " "))
 	}
 
@@ -142,7 +142,7 @@ func runGtRestack(args []string) error {
 func runGtCreate(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt create %s\n", strings.Join(args, " "))
 	}
 
@@ -163,7 +163,7 @@ func runGtCreate(args []string) error {
 func runGtBranch(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt branch %s\n", strings.Join(args, " "))
 	}
 
@@ -184,7 +184,7 @@ func runGtBranch(args []string) error {
 func runGtPassthrough(args []string) error {
 	timer := tracking.Start()
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: gt %s\n", strings.Join(args, " "))
 	}
 

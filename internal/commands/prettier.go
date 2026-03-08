@@ -76,7 +76,7 @@ func runPrettier(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("prettier %s", strings.Join(args, " ")), "tokman prettier", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", originalTokens-filteredTokens)
 	}
 

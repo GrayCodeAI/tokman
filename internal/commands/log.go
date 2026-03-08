@@ -58,7 +58,7 @@ func runLog(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track("log", "tokman log", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		origLines := len(strings.Split(input, "\n"))
 		filtLines := len(strings.Split(filtered, "\n"))
 		fmt.Fprintf(os.Stderr, "Lines: %d -> %d\n", origLines, filtLines)

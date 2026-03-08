@@ -37,7 +37,7 @@ func runGolangci(cmd *cobra.Command, args []string) error {
 		args = []string{"run"}
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: golangci-lint %s\n", strings.Join(args, " "))
 	}
 

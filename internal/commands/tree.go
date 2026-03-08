@@ -61,7 +61,7 @@ func runTree(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("tree %s", strings.Join(args, " ")), "tokman tree", originalTokens, filteredTokens)
 
-	if verbose && tokensSaved > 0 {
+	if verbose > 0 && tokensSaved > 0 {
 		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", tokensSaved)
 	}
 

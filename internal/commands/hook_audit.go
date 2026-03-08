@@ -27,8 +27,6 @@ Shows statistics about hook invocations including:
 Requires TOKMAN_HOOK_AUDIT=1 environment variable to enable logging.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		since, _ := cmd.Flags().GetInt("since")
-		verbose, _ := cmd.Flags().GetBool("verbose")
-
 		runHookAudit(since, verbose)
 	},
 }
@@ -47,7 +45,7 @@ type AuditEntry struct {
 	RewrittenCmd string
 }
 
-func runHookAudit(sinceDays int, verbose bool) {
+func runHookAudit(sinceDays int, verbose int) {
 	logPath := getAuditLogPath()
 
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
@@ -172,7 +170,7 @@ func runHookAudit(sinceDays int, verbose bool) {
 		fmt.Printf("Top commands: %s\n", cyan(strings.Join(top, ", ")))
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Printf("\nLog: %s\n", logPath)
 	}
 }

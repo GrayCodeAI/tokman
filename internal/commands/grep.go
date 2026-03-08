@@ -74,7 +74,7 @@ func runGrep(cmd *cobra.Command, args []string) error {
 	filteredTokens := filter.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("grep %s %s", pattern, path), "tokman grep", originalTokens, filteredTokens)
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Pattern: %s, Tokens saved: %d\n", pattern, originalTokens-filteredTokens)
 	}
 

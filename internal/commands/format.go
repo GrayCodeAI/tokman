@@ -42,7 +42,7 @@ func runFormat(cmd *cobra.Command, args []string) error {
 
 	// Detect formatter
 	formatter := detectFormatter()
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Detected formatter: %s\n", formatter)
 	}
 
@@ -61,7 +61,7 @@ func runFormat(cmd *cobra.Command, args []string) error {
 		execCmd = exec.Command("prettier", args...)
 	}
 
-	if verbose {
+	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Running: %s %s\n", formatter, strings.Join(args, " "))
 	}
 
