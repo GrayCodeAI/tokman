@@ -5,10 +5,13 @@
 package economics
 
 import (
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 
@@ -610,22 +613,112 @@ func printPeriodTable(periods []PeriodEconomics, verbose bool) {
 	fmt.Println()
 }
 
-// getMonthlyStats retrieves monthly stats from tracker (stub - needs tracker integration)
+// getMonthlyStats retrieves monthly stats from tracker
 func getMonthlyStats(tracker *tracking.Tracker) []MonthStats {
-	// TODO: Implement when tracker has monthly aggregation
-	return []MonthStats{}
+	query := `
+		SELECT 
+			STRFTIME('%Y-%m', timestamp) as month,
+			COUNT(*) as commands,
+			COALESCE(SUM(saved_tokens), 0) as saved,
+			COALESCE(SUM(original_tokens), 0) as original
+		FROM commands
+		GROUP BY STRFTIME('%Y-%m', timestamp)
+		ORDER BY month DESC
+	`
+
+	rows, err := tracker.Query(query)
+	if err != nil {
+		return []MonthStats{}
+	}
+	defer rows.Close()
+
+	var stats []MonthStats
+	for rows.Next() {
+		var s MonthStats
+		var saved, original int
+		if err := rows.Scan(&s.Month, &s.Commands, &saved, &original); err != nil {
+			continue
+		}
+		s.SavedTokens = saved
+		if original > 0 {
+			s.SavingsPct = float64(saved) / float64(original) * 100
+		}
+		stats = append(stats, s)
+	}
+
+	return stats
 }
 
-// getDailyStats retrieves daily stats from tracker (stub - needs tracker integration)
+// getDailyStats retrieves daily stats from tracker
 func getDailyStats(tracker *tracking.Tracker) []DayStats {
-	// TODO: Implement when tracker has daily aggregation
-	return []DayStats{}
+	query := `
+		SELECT 
+			DATE(timestamp) as date,
+			COUNT(*) as commands,
+			COALESCE(SUM(saved_tokens), 0) as saved,
+			COALESCE(SUM(original_tokens), 0) as original
+		FROM commands
+		GROUP BY DATE(timestamp)
+		ORDER BY date DESC
+	`
+
+	rows, err := tracker.Query(query)
+	if err != nil {
+		return []DayStats{}
+	}
+	defer rows.Close()
+
+	var stats []DayStats
+	for rows.Next() {
+		var s DayStats
+		var saved, original int
+		if err := rows.Scan(&s.Date, &s.Commands, &saved, &original); err != nil {
+			continue
+		}
+		s.SavedTokens = saved
+		if original > 0 {
+			s.SavingsPct = float64(saved) / float64(original) * 100
+		}
+		stats = append(stats, s)
+	}
+
+	return stats
 }
 
-// getWeeklyStats retrieves weekly stats from tracker (stub - needs tracker integration)
+// getWeeklyStats retrieves weekly stats from tracker
 func getWeeklyStats(tracker *tracking.Tracker) []WeekStats {
-	// TODO: Implement when tracker has weekly aggregation
-	return []WeekStats{}
+	query := `
+		SELECT 
+			DATE(timestamp, 'weekday 0', '-6 days') as week_start,
+			COUNT(*) as commands,
+			COALESCE(SUM(saved_tokens), 0) as saved,
+			COALESCE(SUM(original_tokens), 0) as original
+		FROM commands
+		GROUP BY DATE(timestamp, 'weekday 0', '-6 days')
+		ORDER BY week_start DESC
+	`
+
+	rows, err := tracker.Query(query)
+	if err != nil {
+		return []WeekStats{}
+	}
+	defer rows.Close()
+
+	var stats []WeekStats
+	for rows.Next() {
+		var s WeekStats
+		var saved, original int
+		if err := rows.Scan(&s.WeekStart, &s.Commands, &saved, &original); err != nil {
+			continue
+		}
+		s.SavedTokens = saved
+		if original > 0 {
+			s.SavingsPct = float64(saved) / float64(original) * 100
+		}
+		stats = append(stats, s)
+	}
+
+	return stats
 }
 
 // formatUSD formats a USD amount
@@ -657,11 +750,154 @@ func formatCPT(cpt float64) string {
 }
 
 func exportJSON(tracker *tracking.Tracker, opts RunOptions) error {
-	// TODO: Implement JSON export
-	return fmt.Errorf("JSON export not yet implemented")
+	// Gather data based on options
+	ccMonthly, _ := ccusage.Fetch(ccusage.Monthly)
+	ccDaily, _ := ccusage.Fetch(ccusage.Daily)
+	ccWeekly, _ := ccusage.Fetch(ccusage.Weekly)
+
+	tmMonthly := getMonthlyStats(tracker)
+	tmDaily := getDailyStats(tracker)
+	tmWeekly := getWeeklyStats(tracker)
+
+	export := struct {
+		GeneratedAt   string            `json:"generated_at"`
+		PricingRatios map[string]float64 `json:"pricing_ratios"`
+		Daily         []PeriodEconomics `json:"daily,omitempty"`
+		Weekly        []PeriodEconomics `json:"weekly,omitempty"`
+		Monthly       []PeriodEconomics `json:"monthly,omitempty"`
+		Summary       *Totals           `json:"summary,omitempty"`
+	}{
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		PricingRatios: map[string]float64{
+			"output":       WeightOutput,
+			"cache_create": WeightCacheCreate,
+			"cache_read":   WeightCacheRead,
+		},
+	}
+
+	// Include requested periods
+	if opts.All || opts.Daily {
+		export.Daily = mergeDaily(ccDaily, tmDaily)
+	}
+	if opts.All || opts.Weekly {
+		export.Weekly = mergeWeekly(ccWeekly, tmWeekly)
+	}
+	if opts.All || opts.Monthly || (!opts.Daily && !opts.Weekly && !opts.All) {
+		export.Monthly = mergeMonthly(ccMonthly, tmMonthly)
+	}
+
+	// Compute summary
+	allPeriods := append(export.Daily, export.Weekly...)
+	allPeriods = append(allPeriods, export.Monthly...)
+	summary := computeTotals(allPeriods)
+	export.Summary = &summary
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(export)
 }
 
 func exportCSV(tracker *tracking.Tracker, opts RunOptions) error {
-	// TODO: Implement CSV export
-	return fmt.Errorf("CSV export not yet implemented")
+	// Gather data
+	ccMonthly, _ := ccusage.Fetch(ccusage.Monthly)
+	ccDaily, _ := ccusage.Fetch(ccusage.Daily)
+	ccWeekly, _ := ccusage.Fetch(ccusage.Weekly)
+
+	tmMonthly := getMonthlyStats(tracker)
+	tmDaily := getDailyStats(tracker)
+	tmWeekly := getWeeklyStats(tracker)
+
+	writer := csv.NewWriter(os.Stdout)
+	defer writer.Flush()
+
+	// Header
+	header := []string{
+		"period_type", "period", "cc_cost", "cc_total_tokens", "cc_input_tokens",
+		"cc_output_tokens", "cc_cache_create", "cc_cache_read",
+		"tm_commands", "tm_saved_tokens", "tm_savings_pct",
+		"weighted_input_cpt", "savings_weighted",
+	}
+	if opts.Verbose {
+		header = append(header, "blended_cpt", "active_cpt", "savings_blended", "savings_active")
+	}
+	writer.Write(header)
+
+	writeRows := func(periodType string, periods []PeriodEconomics) error {
+		for _, p := range periods {
+			row := []string{periodType, p.Label}
+
+			// ccusage fields
+			row = append(row, formatOptionalFloat(p.CCCost))
+			row = append(row, formatOptionalUint(p.CCTotalTokens))
+			row = append(row, formatOptionalUint(p.CCInputTokens))
+			row = append(row, formatOptionalUint(p.CCOutputTokens))
+			row = append(row, formatOptionalUint(p.CCCacheCreateTokens))
+			row = append(row, formatOptionalUint(p.CCCacheReadTokens))
+
+			// tokman fields
+			row = append(row, formatOptionalInt(p.TMCommands))
+			row = append(row, formatOptionalInt(p.TMSavedTokens))
+			row = append(row, formatOptionalFloat(p.TMSavingsPct))
+
+			// weighted metrics
+			row = append(row, formatOptionalFloat(p.WeightedInputCPT))
+			row = append(row, formatOptionalFloat(p.SavingsWeighted))
+
+			// verbose metrics
+			if opts.Verbose {
+				row = append(row, formatOptionalFloat(p.BlendedCPT))
+				row = append(row, formatOptionalFloat(p.ActiveCPT))
+				row = append(row, formatOptionalFloat(p.SavingsBlended))
+				row = append(row, formatOptionalFloat(p.SavingsActive))
+			}
+
+			if err := writer.Write(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Write data based on options
+	if opts.All || opts.Daily {
+		if err := writeRows("daily", mergeDaily(ccDaily, tmDaily)); err != nil {
+			return err
+		}
+	}
+	if opts.All || opts.Weekly {
+		if err := writeRows("weekly", mergeWeekly(ccWeekly, tmWeekly)); err != nil {
+			return err
+		}
+	}
+	if opts.All || opts.Monthly || (!opts.Daily && !opts.Weekly && !opts.All) {
+		if err := writeRows("monthly", mergeMonthly(ccMonthly, tmMonthly)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// formatOptionalFloat formats an optional float for CSV output
+func formatOptionalFloat(v *float64) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%.6f", *v)
+}
+
+// formatOptionalUint formats an optional uint64 for CSV output
+func formatOptionalUint(v *uint64) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+// formatOptionalInt formats an optional int for CSV output
+func formatOptionalInt(v *int) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *v)
 }

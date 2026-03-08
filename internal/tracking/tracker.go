@@ -140,6 +140,12 @@ func (t *Tracker) Close() error {
 	return t.db.Close()
 }
 
+// Query executes a raw SQL query and returns the rows.
+// This is exposed for custom aggregations in the economics package.
+func (t *Tracker) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return t.db.Query(query, args...)
+}
+
 // EstimateTokens provides a heuristic token count.
 // Uses the formula: ceil(text.length / 4.0)
 func EstimateTokens(text string) int {
