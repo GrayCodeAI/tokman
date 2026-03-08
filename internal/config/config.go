@@ -23,8 +23,10 @@ type TrackingConfig struct {
 
 // FilterConfig controls output filtering behavior.
 type FilterConfig struct {
-	NoiseDirs []string `mapstructure:"noise_dirs"`
-	Mode      string   `mapstructure:"mode"` // "minimal" or "aggressive"
+	NoiseDirs    []string `mapstructure:"noise_dirs"`
+	IgnoreFiles  []string `mapstructure:"ignore_files"` // File patterns to ignore (e.g., "*.lock", "*.min.js")
+	Mode         string   `mapstructure:"mode"`         // "minimal" or "aggressive"
+	MaxWidth     int      `mapstructure:"max_width"`    // Max display width (0 = auto)
 }
 
 // HooksConfig controls shell hook behavior.
@@ -53,7 +55,19 @@ func Defaults() *Config {
 				"dist",
 				"build",
 			},
-			Mode: "minimal",
+			IgnoreFiles: []string{
+				"*.lock",
+				"*.min.js",
+				"*.min.css",
+				"*.map",
+				"package-lock.json",
+				"yarn.lock",
+				"pnpm-lock.yaml",
+				"Cargo.lock",
+				"poetry.lock",
+			},
+			Mode:     "minimal",
+			MaxWidth: 0,
 		},
 		Hooks: HooksConfig{
 			ExcludedCommands: []string{},
@@ -78,6 +92,17 @@ func Load(cfgFile string) (*Config, error) {
 	// Environment variable overrides
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("TOKMAN")
+
+	// RTK compatibility aliases (for cross-compatibility)
+	if val := os.Getenv("RTK_DB_PATH"); val != "" {
+		viper.SetDefault("tracking.database_path", val)
+	}
+	if val := os.Getenv("RTK_TELEMETRY_DISABLED"); val != "" {
+		viper.SetDefault("tracking.telemetry", val == "false")
+	}
+	if val := os.Getenv("RTK_AUDIT_DIR"); val != "" {
+		viper.SetDefault("hooks.audit_dir", val)
+	}
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {
