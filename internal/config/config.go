@@ -32,6 +32,8 @@ type FilterConfig struct {
 // HooksConfig controls shell hook behavior.
 type HooksConfig struct {
 	ExcludedCommands []string `mapstructure:"excluded_commands"`
+	AuditDir         string   `mapstructure:"audit_dir"`   // Directory for hook audit logs
+	TeeDir           string   `mapstructure:"tee_dir"`     // Directory for failure tee logs
 }
 
 // Defaults returns the default configuration.
@@ -71,6 +73,8 @@ func Defaults() *Config {
 		},
 		Hooks: HooksConfig{
 			ExcludedCommands: []string{},
+			AuditDir:         "",
+			TeeDir:           "",
 		},
 	}
 }
@@ -102,6 +106,15 @@ func Load(cfgFile string) (*Config, error) {
 	}
 	if val := os.Getenv("RTK_AUDIT_DIR"); val != "" {
 		viper.SetDefault("hooks.audit_dir", val)
+	}
+	if val := os.Getenv("RTK_TEE_DIR"); val != "" {
+		viper.SetDefault("hooks.tee_dir", val)
+	}
+	if val := os.Getenv("RTK_TEE"); val != "" {
+		viper.SetDefault("hooks.tee_enabled", val == "true" || val == "1")
+	}
+	if val := os.Getenv("RTK_HOOK_AUDIT"); val != "" {
+		viper.SetDefault("hooks.audit_enabled", val == "true" || val == "1")
 	}
 
 	// Read config file if it exists
