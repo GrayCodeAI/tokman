@@ -3,6 +3,9 @@ package tracking
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -11,6 +14,103 @@ import (
 // Tracker manages token tracking persistence.
 type Tracker struct {
 	db *sql.DB
+}
+
+// TimedExecution tracks execution time and token savings.
+type TimedExecution struct {
+	startTime time.Time
+	command   string
+	rtkCmd    string
+	once      sync.Once
+}
+
+var (
+	globalTracker *Tracker
+	trackerMu     sync.Mutex
+)
+
+// Start begins a timed execution for tracking.
+func Start() *TimedExecution {
+	return &TimedExecution{
+		startTime: time.Now(),
+	}
+}
+
+// Track records the execution with token savings.
+func (t *TimedExecution) Track(command, rtkCmd string, originalTokens, filteredTokens int) {
+	t.once.Do(func() {
+		execTime := time.Since(t.startTime)
+		saved := originalTokens - filteredTokens
+		if saved < 0 {
+			saved = 0
+		}
+
+		// Get or create global tracker
+		tracker := getGlobalTracker()
+		if tracker == nil {
+			return
+		}
+
+		cwd, _ := os.Getwd()
+		tracker.Record(&CommandRecord{
+			Command:        command,
+			OriginalTokens: originalTokens,
+			FilteredTokens: filteredTokens,
+			SavedTokens:    saved,
+			ProjectPath:    cwd,
+			ExecTimeMs:     execTime.Milliseconds(),
+			Timestamp:      time.Now(),
+			ParseSuccess:   true,
+		})
+	})
+}
+
+// TrackPassthrough records a passthrough command (no filtering).
+func (t *TimedExecution) TrackPassthrough(command, rtkCmd string) {
+	t.once.Do(func() {
+		execTime := time.Since(t.startTime)
+
+		tracker := getGlobalTracker()
+		if tracker == nil {
+			return
+		}
+
+		cwd, _ := os.Getwd()
+		tracker.RecordFallback(command, cwd, "", execTime.Milliseconds())
+	})
+}
+
+// getGlobalTracker returns the global tracker instance.
+func getGlobalTracker() *Tracker {
+	trackerMu.Lock()
+	defer trackerMu.Unlock()
+
+	if globalTracker != nil {
+		return globalTracker
+	}
+
+	// Initialize tracker
+	dbPath := DatabasePath()
+	if dbPath == "" {
+		return nil
+	}
+
+	tracker, err := NewTracker(dbPath)
+	if err != nil {
+		return nil
+	}
+
+	globalTracker = tracker
+	return globalTracker
+}
+
+// DatabasePath returns the default database path.
+func DatabasePath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "tokman", "tracking.db")
 }
 
 // NewTracker creates a new Tracker with the given database path.
@@ -186,10 +286,10 @@ func (t *Tracker) GetRecentCommands(projectPath string, limit int) ([]CommandRec
 
 // GetDailySavings returns token savings grouped by day.
 func (t *Tracker) GetDailySavings(projectPath string, days int) ([]struct {
-	Date       string
-	Saved      int
-	Original   int
-	Commands   int
+	Date     string
+	Saved    int
+	Original int
+	Commands int
 }, error) {
 	query := `
 		SELECT 
