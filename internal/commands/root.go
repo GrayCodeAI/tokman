@@ -108,18 +108,23 @@ func IsDryRun() bool {
 func isOperationalCommand(cmd *cobra.Command) bool {
 	// Meta commands that don't need integrity checks
 	metaCommands := map[string]bool{
-		"init":      true,
-		"verify":    true,
-		"config":    true,
-		"economics": true,
-		"status":    true,
-		"report":    true,
-		"summary":   true,
-		"ccusage":   true,
-		"help":      true,
-		"version":   true,
-		"rewrite":   true,
-		"deps":      true,
+		"init":       true,
+		"verify":     true,
+		"config":     true,
+		"economics":  true,
+		"status":     true,
+		"report":     true,
+		"summary":    true,
+		"ccusage":    true,
+		"help":       true,
+		"version":    true,
+		"rewrite":    true,
+		"deps":       true,
+		"gain":       true,
+		"hook-audit": true,
+		"discover":   true,
+		"learn":      true,
+		"err":        true,
 	}
 
 	// Get the called command name

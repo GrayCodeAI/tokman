@@ -162,7 +162,7 @@ func outputTable(daily []struct {
 	fmt.Println()
 }
 
-func truncate(s string, maxLen int) string {
+func truncateReport(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
