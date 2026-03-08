@@ -20,6 +20,9 @@ var (
 	skipEnv      bool
 )
 
+// Version is set via ldflags during build
+var Version = "dev"
+
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "tokman",
@@ -54,6 +57,9 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	rootCmd.Version = Version
+	rootCmd.SetVersionTemplate("TokMan {{.Version}}\n")
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
 		"config file (default is ~/.config/tokman/config.toml)")
