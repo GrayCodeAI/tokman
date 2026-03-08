@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/GrayCodeAI/tokman/internal/config"
+	"github.com/GrayCodeAI/tokman/internal/integrity"
 	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
@@ -26,6 +27,15 @@ to reduce token usage in LLM interactions.
 
 It acts as a transparent proxy that executes commands, captures their
 output, applies intelligent filtering, and tracks token savings.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Skip integrity check for meta commands
+		if isOperationalCommand(cmd) {
+			if err := integrity.RuntimeCheck(); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -90,4 +100,40 @@ func IsVerbose() bool {
 // IsDryRun returns whether dry-run mode is enabled.
 func IsDryRun() bool {
 	return dryRun
+}
+
+// isOperationalCommand returns true for commands that process CLI output
+// and need runtime integrity verification. Meta commands (init, verify, 
+// config, economics, status, report, summary) are excluded.
+func isOperationalCommand(cmd *cobra.Command) bool {
+	// Meta commands that don't need integrity checks
+	metaCommands := map[string]bool{
+		"init":      true,
+		"verify":    true,
+		"config":    true,
+		"economics": true,
+		"status":    true,
+		"report":    true,
+		"summary":   true,
+		"ccusage":   true,
+		"help":      true,
+		"version":   true,
+		"rewrite":   true,
+		"deps":      true,
+	}
+
+	// Get the called command name
+	name := cmd.Name()
+	if metaCommands[name] {
+		return false
+	}
+
+	// Check parent command for subcommands
+	for p := cmd.Parent(); p != nil; p = p.Parent() {
+		if metaCommands[p.Name()] {
+			return false
+		}
+	}
+
+	return true
 }
