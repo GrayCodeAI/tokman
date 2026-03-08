@@ -57,7 +57,7 @@ func DatabasePath() string {
 	if custom := os.Getenv("TOKMAN_DATABASE_PATH"); custom != "" {
 		return custom
 	}
-	return filepath.Join(DataPath(), "history.db")
+	return filepath.Join(DataPath(), "tracking.db")
 }
 
 // LogPath returns the path to the log file.

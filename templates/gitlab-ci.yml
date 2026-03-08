@@ -1,0 +1,17 @@
+# TokMan GitLab CI Integration
+# Add this to your .gitlab-ci.yml to track token savings
+
+tokman-report:
+  stage: .post
+  image: golang:1.21
+  allow_failure: true
+  script:
+    - go install github.com/GrayCodeAI/tokman/cmd/tokman@latest
+    - tokman report --period daily --output json > tokman-report.json
+    - tokman summary --format markdown
+  artifacts:
+    paths:
+      - tokman-report.json
+    expire_in: 30 days
+  variables:
+    TOKMAN_DATABASE_PATH: $CI_PROJECT_DIR/.tokman/tracking.db

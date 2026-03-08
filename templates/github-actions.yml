@@ -1,0 +1,41 @@
+# TokMan CI/CD Integration
+# Add this workflow to your repository to track token savings
+
+name: TokMan Token Savings
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+jobs:
+  report-savings:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          
+      - name: Install TokMan
+        run: |
+          go install github.com/GrayCodeAI/tokman/cmd/tokman@latest
+          
+      - name: Generate Savings Report
+        run: |
+          tokman report --period daily --output json > tokman-report.json
+          tokman summary --format markdown >> $GITHUB_STEP_SUMMARY
+        env:
+          TOKMAN_DATABASE_PATH: ${{ github.workspace }}/.tokman/tracking.db
+          
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tokman-report
+          path: tokman-report.json
+          retention-days: 30
