@@ -17,7 +17,7 @@ TokMan intercepts CLI commands, filters their output, and tracks token savings i
 
 ```bash
 # Clone and build
-git clone https://github.com/Patel230/tokman.git
+git clone https://github.com/GrayCodeAI/tokman.git
 cd tokman
 go build -o tokman ./cmd/tokman
 
