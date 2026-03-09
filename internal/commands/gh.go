@@ -47,6 +47,10 @@ func runGh(cmd *cobra.Command, args []string) error {
 		return runGhRun(args[1:])
 	case "repo":
 		return runGhRepo(args[1:])
+	case "release":
+		return runGhRelease(args[1:])
+	case "api":
+		return runGhApi(args[1:])
 	default:
 		return runGhPassthrough(args)
 	}
@@ -62,6 +66,9 @@ func runGhPr(args []string) error {
 	// Add --json for structured output if listing
 	if len(args) > 0 && args[0] == "list" {
 		args = append(args, "--json", "number,title,author,headRefName,state")
+	} else if len(args) > 0 && args[0] == "view" {
+		// Add JSON fields for view command
+		args = append(args, "--json", "number,title,author,state,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,commits,files,statusCheckRollup")
 	}
 
 	execCmd := exec.Command("gh", append([]string{"pr"}, args...)...)
@@ -110,11 +117,16 @@ func runGhRun(args []string) error {
 		fmt.Fprintf(os.Stderr, "Running: gh run %s\n", strings.Join(args, " "))
 	}
 
+	// Add JSON output for list command
+	if len(args) > 0 && args[0] == "list" {
+		args = append(args, "--json", "databaseId,displayTitle,status,conclusion,createdAt,event")
+	}
+
 	execCmd := exec.Command("gh", append([]string{"run"}, args...)...)
 	output, err := execCmd.CombinedOutput()
 	raw := string(output)
 
-	filtered := filterGhRunOutput(raw)
+	filtered := filterGhRunOutput(raw, args)
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)
@@ -176,6 +188,33 @@ type GhPR struct {
 	State       string `json:"state"`
 }
 
+type GhPRView struct {
+	Number            int            `json:"number"`
+	Title             string         `json:"title"`
+	Author            string         `json:"author"`
+	State             string         `json:"state"`
+	HeadRefName       string         `json:"headRefName"`
+	BaseRefName       string         `json:"baseRefName"`
+	Additions         int            `json:"additions"`
+	Deletions         int            `json:"deletions"`
+	ChangedFiles      int            `json:"changedFiles"`
+	Mergeable         string         `json:"mergeable"`
+	MergeStateStatus  string         `json:"mergeStateStatus"`
+	Commits           int            `json:"commits"`
+	Files             []GhPRFile     `json:"files"`
+	StatusCheckRollup []GhCheckRun   `json:"statusCheckRollup"`
+}
+
+type GhPRFile struct {
+	Path string `json:"path"`
+}
+
+type GhCheckRun struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+}
+
 func filterGhPrOutput(raw string, args []string) string {
 	// Try JSON parsing for list command
 	if len(args) > 0 && args[0] == "list" {
@@ -199,7 +238,88 @@ func filterGhPrOutput(raw string, args []string) string {
 			return strings.Join(result, "\n")
 		}
 	}
+
+	// Handle pr view command
+	if len(args) > 0 && args[0] == "view" {
+		var pr GhPRView
+		if err := json.Unmarshal([]byte(raw), &pr); err == nil {
+			return formatGhPRView(pr)
+		}
+	}
+
 	return raw
+}
+
+func formatGhPRView(pr GhPRView) string {
+	var result []string
+
+	// Header with PR number and title
+	state := "○"
+	if pr.State == "OPEN" {
+		state = "●"
+	} else if pr.State == "MERGED" {
+		state = "✓"
+	} else if pr.State == "CLOSED" {
+		state = "✗"
+	}
+	result = append(result, fmt.Sprintf("%s PR #%d: %s", state, pr.Number, truncateLine(pr.Title, 60)))
+
+	// Branch info
+	result = append(result, fmt.Sprintf("   %s → %s", pr.HeadRefName, pr.BaseRefName))
+
+	// Author and stats
+	result = append(result, fmt.Sprintf("   by %s | +%d -%d in %d files | %d commits", pr.Author, pr.Additions, pr.Deletions, pr.ChangedFiles, pr.Commits))
+
+	// Merge status
+	mergeStatus := "❓ unknown"
+	if pr.Mergeable == "MERGEABLE" {
+		mergeStatus = "✅ mergeable"
+	} else if pr.Mergeable == "CONFLICTING" {
+		mergeStatus = "❌ conflicts"
+	} else if pr.Mergeable == "UNKNOWN" {
+		mergeStatus = "⏳ checking..."
+	}
+	result = append(result, fmt.Sprintf("   Merge: %s", mergeStatus))
+
+	// CI/Checks
+	if len(pr.StatusCheckRollup) > 0 {
+		passed := 0
+		failed := 0
+		pending := 0
+		for _, check := range pr.StatusCheckRollup {
+			if check.Status == "COMPLETED" {
+				if check.Conclusion == "SUCCESS" {
+					passed++
+				} else if check.Conclusion == "FAILURE" {
+					failed++
+				}
+			} else {
+				pending++
+			}
+		}
+		checks := fmt.Sprintf("   Checks: %d ✅", passed)
+		if failed > 0 {
+			checks += fmt.Sprintf(" %d ❌", failed)
+		}
+		if pending > 0 {
+			checks += fmt.Sprintf(" %d ⏳", pending)
+		}
+		result = append(result, checks)
+	}
+
+	// Files changed (show first 10)
+	if len(pr.Files) > 0 {
+		result = append(result, fmt.Sprintf("   Files (%d):", len(pr.Files)))
+		for i, f := range pr.Files {
+			if i >= 10 {
+				result = append(result, fmt.Sprintf("      ... +%d more", len(pr.Files)-10))
+				break
+			}
+			result = append(result, fmt.Sprintf("      %s", truncateLine(f.Path, 60)))
+		}
+	}
+
+	return strings.Join(result, "\n")
 }
 
 type GhIssue struct {
@@ -234,7 +354,48 @@ func filterGhIssueOutput(raw string, args []string) string {
 	return raw
 }
 
-func filterGhRunOutput(raw string) string {
+type GhRun struct {
+	DatabaseId  int    `json:"databaseId"`
+	DisplayTitle string `json:"displayTitle"`
+	Status       string `json:"status"`
+	Conclusion   string `json:"conclusion"`
+	CreatedAt    string `json:"createdAt"`
+	Event        string `json:"event"`
+}
+
+func filterGhRunOutput(raw string, args []string) string {
+	// Try JSON parsing for list command
+	if len(args) > 0 && args[0] == "list" {
+		var runs []GhRun
+		if err := json.Unmarshal([]byte(raw), &runs); err == nil {
+			var result []string
+			result = append(result, fmt.Sprintf("📋 Workflow Runs (%d):", len(runs)))
+			for i, run := range runs {
+				if i >= 15 {
+					result = append(result, fmt.Sprintf("   ... +%d more", len(runs)-15))
+					break
+				}
+				status := "○"
+				if run.Status == "completed" {
+					if run.Conclusion == "success" {
+						status = "✅"
+					} else if run.Conclusion == "failure" {
+						status = "❌"
+					} else {
+						status = "⚠️"
+					}
+				} else if run.Status == "in_progress" {
+					status = "🔄"
+				} else if run.Status == "queued" {
+					status = "⏳"
+				}
+				result = append(result, fmt.Sprintf("   %s #%d: %s (%s)", status, run.DatabaseId, truncateLine(run.DisplayTitle, 40), run.Event))
+			}
+			return strings.Join(result, "\n")
+		}
+	}
+
+	// Fallback for non-list or parse errors
 	lines := strings.Split(raw, "\n")
 	var result []string
 
@@ -243,12 +404,136 @@ func filterGhRunOutput(raw string) string {
 		if line == "" {
 			continue
 		}
-		// Compact workflow run output
 		result = append(result, truncateLine(line, 100))
 	}
 
 	if len(result) > 20 {
 		return strings.Join(result[:20], "\n") + fmt.Sprintf("\n... (%d more lines)", len(result)-20)
+	}
+	return strings.Join(result, "\n")
+}
+
+func runGhRelease(args []string) error {
+	timer := tracking.Start()
+
+	if verbose > 0 {
+		fmt.Fprintf(os.Stderr, "Running: gh release %s\n", strings.Join(args, " "))
+	}
+
+	// Add JSON output for list command
+	if len(args) > 0 && args[0] == "list" {
+		args = append(args, "--json", "tagName,name,createdAt,isDraft,isPrerelease")
+	}
+
+	execCmd := exec.Command("gh", append([]string{"release"}, args...)...)
+	output, err := execCmd.CombinedOutput()
+	raw := string(output)
+
+	filtered := filterGhReleaseOutput(raw, args)
+	fmt.Println(filtered)
+
+	originalTokens := filter.EstimateTokens(raw)
+	filteredTokens := filter.EstimateTokens(filtered)
+	timer.Track(fmt.Sprintf("gh release %s", strings.Join(args, " ")), "tokman gh release", originalTokens, filteredTokens)
+
+	return err
+}
+
+type GhRelease struct {
+	TagName     string `json:"tagName"`
+	Name        string `json:"name"`
+	CreatedAt   string `json:"createdAt"`
+	IsDraft     bool   `json:"isDraft"`
+	IsPrerelease bool   `json:"isPrerelease"`
+}
+
+func filterGhReleaseOutput(raw string, args []string) string {
+	// Try JSON parsing for list command
+	if len(args) > 0 && args[0] == "list" {
+		var releases []GhRelease
+		if err := json.Unmarshal([]byte(raw), &releases); err == nil {
+			var result []string
+			result = append(result, fmt.Sprintf("📋 Releases (%d):", len(releases)))
+			for i, rel := range releases {
+				if i >= 15 {
+					result = append(result, fmt.Sprintf("   ... +%d more", len(releases)-15))
+					break
+				}
+				status := "✅"
+				if rel.IsDraft {
+					status = "📝"
+				} else if rel.IsPrerelease {
+					status = "🔸"
+				}
+				name := rel.Name
+				if name == "" {
+					name = rel.TagName
+				}
+				result = append(result, fmt.Sprintf("   %s %s (%s)", status, rel.TagName, truncateLine(name, 40)))
+			}
+			return strings.Join(result, "\n")
+		}
+	}
+
+	// Fallback
+	lines := strings.Split(raw, "\n")
+	var result []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			result = append(result, truncateLine(line, 100))
+		}
+	}
+	if len(result) > 20 {
+		return strings.Join(result[:20], "\n") + fmt.Sprintf("\n... (%d more lines)", len(result)-20)
+	}
+	return strings.Join(result, "\n")
+}
+
+func runGhApi(args []string) error {
+	timer := tracking.Start()
+
+	if verbose > 0 {
+		fmt.Fprintf(os.Stderr, "Running: gh api %s\n", strings.Join(args, " "))
+	}
+
+	execCmd := exec.Command("gh", append([]string{"api"}, args...)...)
+	output, err := execCmd.CombinedOutput()
+	raw := string(output)
+
+	// Try to parse as JSON and show structure
+	filtered := filterGhApiOutput(raw)
+	fmt.Println(filtered)
+
+	originalTokens := filter.EstimateTokens(raw)
+	filteredTokens := filter.EstimateTokens(filtered)
+	timer.Track(fmt.Sprintf("gh api %s", strings.Join(args, " ")), "tokman gh api", originalTokens, filteredTokens)
+
+	return err
+}
+
+func filterGhApiOutput(raw string) string {
+	// Try to detect JSON and show compact structure
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		// Use the JSON structure filter
+		schema := tryJSONSchema(trimmed, 10)
+		if schema != "" {
+			return "📋 API Response:\n" + schema
+		}
+	}
+
+	// Fallback: compact output
+	lines := strings.Split(raw, "\n")
+	var result []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			result = append(result, truncateLine(line, 120))
+		}
+	}
+	if len(result) > 30 {
+		return strings.Join(result[:30], "\n") + fmt.Sprintf("\n... (%d more lines)", len(result)-30)
 	}
 	return strings.Join(result, "\n")
 }

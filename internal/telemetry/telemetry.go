@@ -1,0 +1,183 @@
+package telemetry
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+// Configuration
+const (
+	PingIntervalSecs = 23 * 3600 // 23 hours between pings
+)
+
+// TelemetryURL and Token can be set at build time via ldflags.
+var (
+	TelemetryURL   string
+	TelemetryToken string
+)
+
+// StatsProvider defines the interface for getting tracking stats.
+type StatsProvider interface {
+	CountCommandsSince(since time.Time) (int64, error)
+	TopCommands(limit int) ([]string, error)
+	OverallSavingsPct() (float64, error)
+}
+
+// Client handles telemetry ping operations.
+type Client struct {
+	url       string
+	token     string
+	dataDir   string
+	enabled   bool
+	stats     StatsProvider
+}
+
+// NewClient creates a new telemetry client.
+func NewClient(stats StatsProvider) *Client {
+	home, _ := os.UserHomeDir()
+	dataDir := filepath.Join(home, ".local", "share", "tokman")
+
+	return &Client{
+		url:     TelemetryURL,
+		token:   TelemetryToken,
+		dataDir: dataDir,
+		enabled: TelemetryURL != "",
+		stats:   stats,
+	}
+}
+
+// MaybePing sends a telemetry ping if enabled and not already sent today.
+// This is fire-and-forget: errors are silently ignored.
+func (c *Client) MaybePing() {
+	// No URL configured → telemetry disabled
+	if !c.enabled || c.url == "" {
+		return
+	}
+
+	// Check opt-out: environment variable
+	if os.Getenv("TOKMAN_TELEMETRY_DISABLED") == "1" {
+		return
+	}
+
+	// Check opt-out: config file (handled by caller)
+
+	// Check last ping time
+	marker := c.markerPath()
+	if info, err := os.Stat(marker); err == nil {
+		if time.Since(info.ModTime()).Seconds() < PingIntervalSecs {
+			return // Already pinged recently
+		}
+	}
+
+	// Touch marker immediately (before sending) to avoid double-ping
+	c.touchMarker(marker)
+
+	// Send ping in background (never block the CLI)
+	go c.sendPing()
+}
+
+func (c *Client) sendPing() {
+	deviceHash := generateDeviceHash()
+	version := getVersion()
+	osName := runtime.GOOS
+	arch := runtime.GOARCH
+
+	// Get stats from tracking DB
+	var commands24h int64
+	var topCommands []string
+	var savingsPct float64
+
+	if c.stats != nil {
+		commands24h, _ = c.stats.CountCommandsSince(time.Now().Add(-24 * time.Hour))
+		topCommands, _ = c.stats.TopCommands(5)
+		savingsPct, _ = c.stats.OverallSavingsPct()
+	}
+
+	// Build payload (JSON-like structure)
+	payload := fmt.Sprintf(`{"device_hash":"%s","version":"%s","os":"%s","arch":"%s","commands_24h":%d,"top_commands":%s,"savings_pct":%.2f}`,
+		deviceHash, version, osName, arch, commands24h, formatStringSlice(topCommands), savingsPct)
+
+	// Send HTTP POST (with 2-second timeout)
+	// Using curl for simplicity (no external HTTP dependencies)
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		"-H", "Content-Type: application/json",
+		"-H", fmt.Sprintf("X-TokMan-Token: %s", c.token),
+		"-m", "2", // 2-second timeout
+		"-d", payload,
+		c.url,
+	)
+	cmd.Run() // Ignore errors (fire-and-forget)
+}
+
+func (c *Client) markerPath() string {
+	return filepath.Join(c.dataDir, ".telemetry_last_ping")
+}
+
+func (c *Client) touchMarker(path string) {
+	os.MkdirAll(filepath.Dir(path), 0755)
+	os.WriteFile(path, []byte{}, 0644)
+}
+
+// generateDeviceHash creates an anonymous SHA-256 hash of hostname:username.
+func generateDeviceHash() string {
+	hostname, _ := os.Hostname()
+	username := os.Getenv("USER")
+	if username == "" {
+		username = os.Getenv("USERNAME")
+	}
+
+	data := fmt.Sprintf("%s:%s", hostname, username)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
+}
+
+func getVersion() string {
+	// This could be set via ldflags at build time
+	if v := os.Getenv("TOKMAN_VERSION"); v != "" {
+		return v
+	}
+	return "dev"
+}
+
+func formatStringSlice(s []string) string {
+	if len(s) == 0 {
+		return "[]"
+	}
+	quoted := make([]string, len(s))
+	for i, v := range s {
+		quoted[i] = fmt.Sprintf(`"%s"`, v)
+	}
+	return fmt.Sprintf("[%s]", strings.Join(quoted, ","))
+}
+
+// Global client
+var defaultClient *Client
+
+// Init initializes the global telemetry client.
+func Init(stats StatsProvider) {
+	defaultClient = NewClient(stats)
+}
+
+// MaybePing sends a telemetry ping using the global client.
+func MaybePing() {
+	if defaultClient != nil {
+		defaultClient.MaybePing()
+	}
+}
+
+// IsEnabled returns whether telemetry is configured.
+func IsEnabled() bool {
+	return TelemetryURL != ""
+}
+
+// IsOptedOut checks if telemetry is explicitly disabled.
+func IsOptedOut() bool {
+	return os.Getenv("TOKMAN_TELEMETRY_DISABLED") == "1"
+}

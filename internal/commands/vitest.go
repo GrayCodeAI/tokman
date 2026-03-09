@@ -46,6 +46,14 @@ func runVitest(cmd *cobra.Command, args []string) error {
 	raw := string(output)
 
 	filtered := filterVitestOutput(raw)
+	
+	// Add tee hint on failure
+	if err != nil {
+		if hint := TeeOnFailure(raw, "vitest", err); hint != "" {
+			filtered += "\n" + hint
+		}
+	}
+	
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)

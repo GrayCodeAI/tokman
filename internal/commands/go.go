@@ -64,6 +64,14 @@ func runGoTestCmd(args []string) error {
 	raw := string(output)
 
 	filtered := filterGoTestOutput(raw)
+	
+	// Add tee hint on failure
+	if err != nil {
+		if hint := TeeOnFailure(raw, "go_test", err); hint != "" {
+			filtered += "\n" + hint
+		}
+	}
+	
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)
@@ -85,6 +93,14 @@ func runGoBuildCmd(args []string) error {
 	raw := string(output)
 
 	filtered := filterGoBuildOutput(raw)
+	
+	// Add tee hint on failure
+	if err != nil {
+		if hint := TeeOnFailure(raw, "go_build", err); hint != "" {
+			filtered += "\n" + hint
+		}
+	}
+	
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)

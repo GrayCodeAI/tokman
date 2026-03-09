@@ -19,10 +19,11 @@ var cargoCmd = &cobra.Command{
 	Long: `Cargo commands with token-optimized output.
 
 Subcommands:
-  build  - Build with compact output (strip Compiling lines, keep errors)
-  test   - Test with failures-only output
-  check  - Check with compact output
-  clippy - Clippy with warnings grouped by lint rule
+  build   - Build with compact output (strip Compiling lines, keep errors)
+  test    - Test with failures-only output
+  nextest - Nextest test runner with failures-only output
+  check   - Check with compact output
+  clippy  - Clippy with warnings grouped by lint rule
 
 Examples:
   tokman cargo build
@@ -62,10 +63,19 @@ func runCargo(cmd *cobra.Command, args []string) error {
 		filtered = filterCargoBuild(output)
 	case "test":
 		filtered = filterCargoTest(output)
+	case "nextest":
+		filtered = filterCargoNextest(output)
 	case "clippy":
 		filtered = filterCargoClippy(output)
 	default:
 		filtered = output
+	}
+
+	// Add tee hint on failure
+	if err != nil {
+		if hint := TeeOnFailure(output, "cargo_"+subcommand, err); hint != "" {
+			filtered += "\n" + hint
+		}
 	}
 
 	fmt.Print(filtered)
@@ -119,6 +129,47 @@ func filterCargoTest(output string) string {
 			result.WriteString(line + "\n")
 		}
 	}
+	return result.String()
+}
+
+func filterCargoNextest(output string) string {
+	// Nextest has a different output format than cargo test
+	// It shows: "PASS/FAIL test_name [duration]" and a summary line
+	var result strings.Builder
+	var failures []string
+	var summary string
+
+	for _, line := range strings.Split(output, "\n") {
+		// Keep summary line (contains test count and pass/fail stats)
+		if strings.Contains(line, "test result:") || strings.Contains(line, "passed") && strings.Contains(line, "failed") {
+			summary = line
+			continue
+		}
+		// Keep FAIL lines
+		if strings.HasPrefix(line, "FAIL") || strings.Contains(line, "[FAIL]") {
+			failures = append(failures, line)
+		}
+		// Keep error lines
+		if strings.Contains(line, "error") || strings.Contains(line, "Error") {
+			failures = append(failures, line)
+		}
+	}
+
+	// Show failures first
+	if len(failures) > 0 {
+		result.WriteString(fmt.Sprintf("Failures (%d):\n", len(failures)))
+		for _, f := range failures {
+			result.WriteString("  " + truncateLine(f, 80) + "\n")
+		}
+	}
+
+	// Show summary
+	if summary != "" {
+		result.WriteString(summary + "\n")
+	} else if result.Len() == 0 {
+		result.WriteString("✓ all tests passed\n")
+	}
+
 	return result.String()
 }
 

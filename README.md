@@ -10,12 +10,13 @@ TokMan intercepts CLI commands, filters their output, and tracks token savings i
 - 📁 **LS Handler** — Hide noise directories (.git, node_modules, target, etc.)
 - 🐳 **Infrastructure Wrappers** — Docker, kubectl, AWS CLI with filtered output
 - 📦 **Package Managers** — npm, pnpm, pip, cargo with compact output
-- 🧪 **Test Runners** — Go, pytest, vitest, playwright with aggregated results
+- 🧪 **Test Runners** — Go, pytest, vitest, jest, npm test, playwright with aggregated results
 - 🔨 **Build Tools** — Go, cargo, next.js with error-only output
 - 📊 **Token Tracking** — SQLite-based metrics on tokens saved
 - 🔄 **Shell Integration** — Automatic command rewriting via shell hooks
 - 🔐 **Integrity Verification** — SHA-256 hook verification for security
 - 💰 **Economics Analysis** — Compare spending vs savings with quota estimates
+- 💾 **Tee on Failure** — Auto-saves full output when commands fail for debugging
 
 ## Installation
 
@@ -27,6 +28,28 @@ go build -o tokman ./cmd/tokman
 
 # Install to PATH (optional)
 sudo mv tokman /usr/local/bin/
+```
+
+### Docker
+
+```bash
+# Pull from GitHub Container Registry (once published)
+docker pull ghcr.io/graycodeai/tokman:latest
+
+# Or build locally
+docker build -f docker/Dockerfile -t tokman:latest .
+
+# Run with dashboard
+docker run -d -p 8080:8080 -v tokman-data:/home/tokman/.local/share/tokman tokman:latest
+
+# Run with docker-compose
+cd docker && docker-compose up -d
+```
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install GrayCodeAI/tap/tokman
 ```
 
 ## Quick Start
@@ -86,9 +109,12 @@ tokman test ./...
 | `tokman kubectl` | Kubernetes CLI with filtered output |
 | `tokman aws` | AWS CLI with filtered output |
 | `tokman gh` | GitHub CLI with token-optimized output |
+| `tokman gh run list` | GitHub Actions workflow runs (compact) |
+| `tokman gh release list` | GitHub releases (compact) |
+| `tokman gh api` | GitHub API with JSON structure output |
 | `tokman gt` | Graphite stacked PR commands |
 
-### Build & Test Wrappers
+### Test Runners
 
 | Command | Description |
 |---------|-------------|
@@ -102,6 +128,8 @@ tokman test ./...
 | `tokman ruff` | Python linter/formatter compact |
 | `tokman mypy` | Python type checker compact |
 | `tokman vitest` | Vitest with compact output |
+| `tokman jest` | Jest with compact output (90% reduction) |
+| `tokman npm test` | npm test with compact output (90% reduction) |
 | `tokman playwright` | Playwright E2E tests compact |
 
 ### Package Managers
@@ -130,6 +158,8 @@ tokman test ./...
 | `tokman wc` | Word/line/byte count compact |
 | `tokman curl` | Auto-JSON detection |
 | `tokman wget` | Download with compact output |
+| `tokman summary` | Heuristic summary of long output |
+| `tokman count` | Count tokens using tiktoken (OpenAI tokenizer) |
 
 ### Analysis Commands
 
@@ -149,6 +179,36 @@ tokman test ./...
 | `tokman rewrite list` | List all registered rewrites |
 
 ## Shell Integration
+
+### Token Counting (tiktoken)
+
+TokMan includes direct token counting using OpenAI's tiktoken tokenizer:
+
+```bash
+# Count tokens in text
+tokman count "Hello, world!"
+
+# Count tokens from stdin
+cat file.txt | tokman count
+
+# Count tokens in a file
+tokman count file.go
+
+# Use specific model encoding
+tokman count --model gpt-4o "Hello, world!"
+tokman count --model claude-3-sonnet "Hello, world!"
+
+# Compare heuristic vs actual count
+tokman count --compare "Your text here"
+
+# Count multiple files
+tokman count --files *.go
+```
+
+Supported encodings:
+- `cl100k_base` — GPT-4, GPT-3.5-turbo, Claude, text-embedding-ada-002
+- `o200k_base` — GPT-4o, GPT-4o-mini
+- `p50k_base` — GPT-3 (davinci, curie, babbage, ada)
 
 Add to your `.bashrc` or `.zshrc`:
 
@@ -395,9 +455,9 @@ Override with environment variables:
 - [x] ~~Web dashboard for analytics~~
 - [x] ~~Shell completions (bash/zsh/fish)~~
 - [x] ~~CI/CD integration templates~~
-- [ ] LLM API integration (direct token counting)
-- [ ] Homebrew formula
-- [ ] Docker image
+- [x] LLM API integration (direct token counting)
+- [x] Homebrew formula
+- [x] Docker image
 
 ## License
 

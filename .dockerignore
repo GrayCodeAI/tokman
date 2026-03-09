@@ -1,0 +1,51 @@
+# Build artifacts
+tokman
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+testdata/
+.test_coverage/
+
+# Development files
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.md
+LICENSE
+
+# Docker files (prevent recursive copy)
+docker/
+Dockerfile*
+docker-compose*.yml
+
+# CI/CD
+Makefile
+scripts/
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+bin/
+out/
+
+# Documentation
+docs/
+*.md
+!README.md

@@ -40,10 +40,24 @@ FROM commands
 GROUP BY project_path, command;
 `
 
+// CreateParseFailuresTable creates a table for tracking parse failures.
+const CreateParseFailuresTable = `
+CREATE TABLE IF NOT EXISTS parse_failures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_command TEXT NOT NULL,
+    error_message TEXT NOT NULL,
+    fallback_succeeded BOOLEAN DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_parse_failures_timestamp ON parse_failures(timestamp);
+`
+
 // Migrations contains all migration statements in order.
 var Migrations = []string{
 	CreateCommandsTable,
 	CreateSummaryView,
+	CreateParseFailuresTable,
 }
 
 // MigrationHistory tracks applied migrations.

@@ -11,6 +11,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// HistoryRetentionDays is the number of days to retain tracking data.
+// Records older than this are automatically cleaned up on each write.
+const HistoryRetentionDays = 90
+
 // Tracker manages token tracking persistence.
 type Tracker struct {
 	db *sql.DB
@@ -183,7 +187,34 @@ func (t *Tracker) Record(record *CommandRecord) error {
 		record.ID = id
 	}
 
+	// Run cleanup after recording (fire-and-forget, don't block)
+	go t.cleanupOld()
+
 	return nil
+}
+
+// cleanupOld removes records older than HistoryRetentionDays.
+// This is called automatically after each Record operation.
+func (t *Tracker) cleanupOld() {
+	cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
+	_, _ = t.db.Exec(
+		"DELETE FROM commands WHERE timestamp < ?",
+		cutoff.Format(time.RFC3339),
+	)
+}
+
+// CleanupOld manually triggers cleanup of old records.
+// Returns the number of records deleted.
+func (t *Tracker) CleanupOld() (int64, error) {
+	cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
+	result, err := t.db.Exec(
+		"DELETE FROM commands WHERE timestamp < ?",
+		cutoff.Format(time.RFC3339),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to cleanup old records: %w", err)
+	}
+	return result.RowsAffected()
 }
 
 // GetSavings returns the total token savings for a project path.
@@ -217,6 +248,56 @@ func (t *Tracker) GetSavings(projectPath string) (*SavingsSummary, error) {
 	}
 
 	return summary, nil
+}
+
+// CountCommandsSince returns the count of commands executed since the given time.
+func (t *Tracker) CountCommandsSince(since time.Time) (int64, error) {
+	var count int64
+	err := t.db.QueryRow(
+		"SELECT COUNT(*) FROM commands WHERE timestamp >= ?",
+		since.Format(time.RFC3339),
+	).Scan(&count)
+	return count, err
+}
+
+// TopCommands returns the top N commands by execution count.
+func (t *Tracker) TopCommands(limit int) ([]string, error) {
+	rows, err := t.db.Query(
+		`SELECT command FROM commands
+		 GROUP BY command
+		 ORDER BY COUNT(*) DESC
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var commands []string
+	for rows.Next() {
+		var cmd string
+		if err := rows.Scan(&cmd); err != nil {
+			continue
+		}
+		commands = append(commands, cmd)
+	}
+	return commands, nil
+}
+
+// OverallSavingsPct returns the overall savings percentage across all commands.
+func (t *Tracker) OverallSavingsPct() (float64, error) {
+	var saved, original int
+	err := t.db.QueryRow(
+		"SELECT COALESCE(SUM(saved_tokens), 0), COALESCE(SUM(original_tokens), 0) FROM commands",
+	).Scan(&saved, &original)
+	if err != nil {
+		return 0, err
+	}
+	if original == 0 {
+		return 0, nil
+	}
+	return float64(saved) / float64(original) * 100, nil
 }
 
 // GetCommandStats returns statistics grouped by command.
@@ -355,4 +436,115 @@ func (t *Tracker) RecordFallback(command string, projectPath string, output stri
 		Timestamp:      time.Now(),
 		ParseSuccess:   false,
 	})
+}
+
+// ParseFailureRecord represents a single parse failure event.
+type ParseFailureRecord struct {
+	ID               int64     `json:"id"`
+	Timestamp        time.Time `json:"timestamp"`
+	RawCommand       string    `json:"raw_command"`
+	ErrorMessage     string    `json:"error_message"`
+	FallbackSucceeded bool     `json:"fallback_succeeded"`
+}
+
+// ParseFailureSummary represents aggregated parse failure analytics.
+type ParseFailureSummary struct {
+	Total         int64                     `json:"total"`
+	RecoveryRate  float64                   `json:"recovery_rate"`
+	TopCommands   []CommandFailureCount     `json:"top_commands"`
+	RecentFailures []ParseFailureRecord     `json:"recent_failures"`
+}
+
+// CommandFailureCount represents a command and its failure count.
+type CommandFailureCount struct {
+	Command string `json:"command"`
+	Count   int    `json:"count"`
+}
+
+// RecordParseFailure records a parse failure event.
+func (t *Tracker) RecordParseFailure(rawCommand string, errorMessage string, fallbackSucceeded bool) error {
+	_, err := t.db.Exec(
+		`INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded)
+		 VALUES (?, ?, ?, ?)`,
+		time.Now().Format(time.RFC3339),
+		rawCommand,
+		errorMessage,
+		fallbackSucceeded,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record parse failure: %w", err)
+	}
+
+	// Cleanup old records
+	go func() {
+		cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
+		t.db.Exec("DELETE FROM parse_failures WHERE timestamp < ?", cutoff.Format(time.RFC3339))
+	}()
+
+	return nil
+}
+
+// GetParseFailureSummary returns aggregated parse failure analytics.
+func (t *Tracker) GetParseFailureSummary() (*ParseFailureSummary, error) {
+	summary := &ParseFailureSummary{}
+
+	// Get total count
+	err := t.db.QueryRow("SELECT COUNT(*) FROM parse_failures").Scan(&summary.Total)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parse failure count: %w", err)
+	}
+
+	if summary.Total == 0 {
+		return summary, nil
+	}
+
+	// Get recovery rate
+	var succeeded int64
+	err = t.db.QueryRow(
+		"SELECT COUNT(*) FROM parse_failures WHERE fallback_succeeded = 1",
+	).Scan(&succeeded)
+	if err == nil {
+		summary.RecoveryRate = float64(succeeded) / float64(summary.Total) * 100
+	}
+
+	// Get top 10 failing commands
+	rows, err := t.db.Query(
+		`SELECT raw_command, COUNT(*) as cnt
+		 FROM parse_failures
+		 GROUP BY raw_command
+		 ORDER BY cnt DESC
+		 LIMIT 10`,
+	)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cfc CommandFailureCount
+			if err := rows.Scan(&cfc.Command, &cfc.Count); err == nil {
+				summary.TopCommands = append(summary.TopCommands, cfc)
+			}
+		}
+	}
+
+	// Get recent 10 failures
+	rows, err = t.db.Query(
+		`SELECT id, timestamp, raw_command, error_message, fallback_succeeded
+		 FROM parse_failures
+		 ORDER BY timestamp DESC
+		 LIMIT 10`,
+	)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var pfr ParseFailureRecord
+			var ts string
+			var fb int
+			if err := rows.Scan(&pfr.ID, &ts, &pfr.RawCommand, &pfr.ErrorMessage, &fb); err == nil {
+				pfr.Timestamp, _ = time.Parse(time.RFC3339, ts)
+				pfr.FallbackSucceeded = fb == 1
+				summary.RecentFailures = append(summary.RecentFailures, pfr)
+			}
+		}
+	}
+
+	return summary, nil
 }
