@@ -11,18 +11,18 @@ import (
 
 // Configuration defaults
 const (
-	MinTeeSize     = 500              // Minimum output size to tee (bytes)
-	DefaultMaxFiles = 20              // Default max files to keep
-	DefaultMaxSize  = 1 << 20         // Default max file size (1MB)
+	MinTeeSize      = 500     // Minimum output size to tee (bytes)
+	DefaultMaxFiles = 20      // Default max files to keep
+	DefaultMaxSize  = 1 << 20 // Default max file size (1MB)
 )
 
 // Mode controls when tee writes files.
 type Mode int
 
 const (
-	ModeNever     Mode = iota // Never write tee files
-	ModeFailures              // Write only on command failures (default)
-	ModeAlways                // Always write tee files
+	ModeNever    Mode = iota // Never write tee files
+	ModeFailures             // Write only on command failures (default)
+	ModeAlways               // Always write tee files
 )
 
 // Config configures the tee feature.
@@ -133,7 +133,7 @@ func (t *Tee) Write(raw string, commandSlug string, exitCode int) string {
 	// Truncate if needed
 	content := raw
 	if len(raw) > t.config.MaxFileSize {
-		content = fmt.Sprintf("%s\n\n--- truncated at %d bytes ---", 
+		content = fmt.Sprintf("%s\n\n--- truncated at %d bytes ---",
 			raw[:t.config.MaxFileSize], t.config.MaxFileSize)
 	}
 
@@ -219,7 +219,7 @@ func sanitizeSlug(slug string) string {
 func FormatHint(path string) string {
 	home, _ := os.UserHomeDir()
 	display := path
-	
+
 	if home != "" {
 		if strings.HasPrefix(path, home) {
 			display = "~" + strings.TrimPrefix(path, home)

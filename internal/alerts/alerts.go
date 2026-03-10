@@ -15,13 +15,13 @@ import (
 type AlertType string
 
 const (
-	AlertTypeDailyTokenLimit    AlertType = "daily_token_limit"
-	AlertTypeWeeklyTokenLimit   AlertType = "weekly_token_limit"
-	AlertTypeUsageSpike         AlertType = "usage_spike"
-	AlertTypeCostThreshold      AlertType = "cost_threshold"
-	AlertTypeEfficiencyDrop     AlertType = "efficiency_drop"
-	AlertTypeParseFailureRate   AlertType = "parse_failure_rate"
-	AlertTypeCacheHitRate       AlertType = "cache_hit_rate"
+	AlertTypeDailyTokenLimit  AlertType = "daily_token_limit"
+	AlertTypeWeeklyTokenLimit AlertType = "weekly_token_limit"
+	AlertTypeUsageSpike       AlertType = "usage_spike"
+	AlertTypeCostThreshold    AlertType = "cost_threshold"
+	AlertTypeEfficiencyDrop   AlertType = "efficiency_drop"
+	AlertTypeParseFailureRate AlertType = "parse_failure_rate"
+	AlertTypeCacheHitRate     AlertType = "cache_hit_rate"
 )
 
 // AlertSeverity represents the severity level
@@ -35,34 +35,34 @@ const (
 
 // Alert represents a triggered alert
 type Alert struct {
-	ID          string        `json:"id"`
-	Type        AlertType     `json:"type"`
-	Severity    AlertSeverity `json:"severity"`
-	Title       string        `json:"title"`
-	Message     string        `json:"message"`
-	Value       interface{}   `json:"value,omitempty"`
-	Threshold   interface{}   `json:"threshold,omitempty"`
-	Timestamp   time.Time     `json:"timestamp"`
-	Acknowledged bool         `json:"acknowledged"`
-	Resolved    bool          `json:"resolved"`
-	ResolvedAt  *time.Time    `json:"resolved_at,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	ID           string                 `json:"id"`
+	Type         AlertType              `json:"type"`
+	Severity     AlertSeverity          `json:"severity"`
+	Title        string                 `json:"title"`
+	Message      string                 `json:"message"`
+	Value        interface{}            `json:"value,omitempty"`
+	Threshold    interface{}            `json:"threshold,omitempty"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Acknowledged bool                   `json:"acknowledged"`
+	Resolved     bool                   `json:"resolved"`
+	ResolvedAt   *time.Time             `json:"resolved_at,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Config represents alert configuration
 type Config struct {
-	Enabled                bool    `json:"enabled"`
-	DailyTokenLimit        int64   `json:"daily_token_limit"`
-	WeeklyTokenLimit       int64   `json:"weekly_token_limit"`
-	UsageSpikeThreshold    float64 `json:"usage_spike_threshold"`
-	CostThresholdDaily     float64 `json:"cost_threshold_daily"`
-	CostThresholdWeekly    float64 `json:"cost_threshold_weekly"`
-	MinEfficiencyPct       float64 `json:"min_efficiency_pct"`
-	MaxParseFailureRate    float64 `json:"max_parse_failure_rate"`
-	MinCacheHitRate        float64 `json:"min_cache_hit_rate"`
-	CooldownMinutes        int     `json:"cooldown_minutes"`
-	NotificationWebhook    string  `json:"notification_webhook,omitempty"`
-	NotificationEmail      string  `json:"notification_email,omitempty"`
+	Enabled             bool    `json:"enabled"`
+	DailyTokenLimit     int64   `json:"daily_token_limit"`
+	WeeklyTokenLimit    int64   `json:"weekly_token_limit"`
+	UsageSpikeThreshold float64 `json:"usage_spike_threshold"`
+	CostThresholdDaily  float64 `json:"cost_threshold_daily"`
+	CostThresholdWeekly float64 `json:"cost_threshold_weekly"`
+	MinEfficiencyPct    float64 `json:"min_efficiency_pct"`
+	MaxParseFailureRate float64 `json:"max_parse_failure_rate"`
+	MinCacheHitRate     float64 `json:"min_cache_hit_rate"`
+	CooldownMinutes     int     `json:"cooldown_minutes"`
+	NotificationWebhook string  `json:"notification_webhook,omitempty"`
+	NotificationEmail   string  `json:"notification_email,omitempty"`
 }
 
 // DefaultConfig returns default alert configuration
@@ -94,14 +94,14 @@ type Manager struct {
 func NewManager(config Config) *Manager {
 	home, _ := os.UserHomeDir()
 	alertFile := filepath.Join(home, ".tokman", "alerts.json")
-	
+
 	m := &Manager{
 		config:    config,
 		alerts:    []Alert{},
 		alertFile: alertFile,
 		cooldowns: make(map[AlertType]time.Time),
 	}
-	
+
 	m.load()
 	return m
 }
@@ -111,9 +111,9 @@ func (m *Manager) CheckTokenLimit(saved24h, savedTotal int64) []Alert {
 	if !m.config.Enabled {
 		return nil
 	}
-	
+
 	var alerts []Alert
-	
+
 	// Check daily limit
 	if saved24h > m.config.DailyTokenLimit {
 		if alert := m.createAlert(
@@ -127,7 +127,7 @@ func (m *Manager) CheckTokenLimit(saved24h, savedTotal int64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	// Check weekly limit
 	if savedTotal > m.config.WeeklyTokenLimit {
 		if alert := m.createAlert(
@@ -141,7 +141,7 @@ func (m *Manager) CheckTokenLimit(saved24h, savedTotal int64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -150,9 +150,9 @@ func (m *Manager) CheckUsageSpike(currentAvg, baselineAvg float64) []Alert {
 	if !m.config.Enabled || baselineAvg == 0 {
 		return nil
 	}
-	
+
 	var alerts []Alert
-	
+
 	ratio := currentAvg / baselineAvg
 	if ratio > m.config.UsageSpikeThreshold {
 		if alert := m.createAlert(
@@ -161,12 +161,12 @@ func (m *Manager) CheckUsageSpike(currentAvg, baselineAvg float64) []Alert {
 			"Usage Spike Detected",
 			fmt.Sprintf("Current usage (%.1f) is %.1fx higher than baseline (%.1f)", currentAvg, ratio, baselineAvg),
 			currentAvg,
-			baselineAvg * m.config.UsageSpikeThreshold,
+			baselineAvg*m.config.UsageSpikeThreshold,
 		); alert != nil {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -175,9 +175,9 @@ func (m *Manager) CheckCostThreshold(dailyCost, weeklyCost float64) []Alert {
 	if !m.config.Enabled {
 		return nil
 	}
-	
+
 	var alerts []Alert
-	
+
 	if dailyCost > m.config.CostThresholdDaily {
 		if alert := m.createAlert(
 			AlertTypeCostThreshold,
@@ -190,7 +190,7 @@ func (m *Manager) CheckCostThreshold(dailyCost, weeklyCost float64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	if weeklyCost > m.config.CostThresholdWeekly {
 		if alert := m.createAlert(
 			AlertTypeCostThreshold,
@@ -203,7 +203,7 @@ func (m *Manager) CheckCostThreshold(dailyCost, weeklyCost float64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -212,9 +212,9 @@ func (m *Manager) CheckEfficiency(efficiencyPct float64) []Alert {
 	if !m.config.Enabled {
 		return nil
 	}
-	
+
 	var alerts []Alert
-	
+
 	if efficiencyPct < m.config.MinEfficiencyPct {
 		if alert := m.createAlert(
 			AlertTypeEfficiencyDrop,
@@ -227,7 +227,7 @@ func (m *Manager) CheckEfficiency(efficiencyPct float64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -236,9 +236,9 @@ func (m *Manager) CheckParseFailureRate(failureRate float64) []Alert {
 	if !m.config.Enabled {
 		return nil
 	}
-	
+
 	var alerts []Alert
-	
+
 	if failureRate > m.config.MaxParseFailureRate {
 		if alert := m.createAlert(
 			AlertTypeParseFailureRate,
@@ -251,7 +251,7 @@ func (m *Manager) CheckParseFailureRate(failureRate float64) []Alert {
 			alerts = append(alerts, *alert)
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -259,35 +259,35 @@ func (m *Manager) CheckParseFailureRate(failureRate float64) []Alert {
 func (m *Manager) createAlert(alertType AlertType, severity AlertSeverity, title, message string, value, threshold interface{}) *Alert {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Check cooldown
 	if lastTriggered, ok := m.cooldowns[alertType]; ok {
 		if time.Since(lastTriggered) < time.Duration(m.config.CooldownMinutes)*time.Minute {
 			return nil
 		}
 	}
-	
+
 	alert := Alert{
-		ID:         fmt.Sprintf("%s-%d", alertType, time.Now().Unix()),
-		Type:       alertType,
-		Severity:   severity,
-		Title:      title,
-		Message:    message,
-		Value:      value,
-		Threshold:  threshold,
-		Timestamp:  time.Now(),
+		ID:        fmt.Sprintf("%s-%d", alertType, time.Now().Unix()),
+		Type:      alertType,
+		Severity:  severity,
+		Title:     title,
+		Message:   message,
+		Value:     value,
+		Threshold: threshold,
+		Timestamp: time.Now(),
 	}
-	
+
 	m.alerts = append(m.alerts, alert)
 	m.cooldowns[alertType] = time.Now()
-	
+
 	// Keep only last 100 alerts
 	if len(m.alerts) > 100 {
 		m.alerts = m.alerts[len(m.alerts)-100:]
 	}
-	
+
 	m.save()
-	
+
 	return &alert
 }
 
@@ -319,7 +319,7 @@ func (m *Manager) GetActiveLocked() []Alert {
 func (m *Manager) Acknowledge(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	for i := range m.alerts {
 		if m.alerts[i].ID == id {
 			m.alerts[i].Acknowledged = true
@@ -327,7 +327,7 @@ func (m *Manager) Acknowledge(id string) error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("alert not found: %s", id)
 }
 
@@ -335,7 +335,7 @@ func (m *Manager) Acknowledge(id string) error {
 func (m *Manager) Resolve(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	for i := range m.alerts {
 		if m.alerts[i].ID == id {
 			m.alerts[i].Resolved = true
@@ -345,7 +345,7 @@ func (m *Manager) Resolve(id string) error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("alert not found: %s", id)
 }
 
@@ -353,7 +353,7 @@ func (m *Manager) Resolve(id string) error {
 func (m *Manager) ClearResolved() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	var active []Alert
 	cleared := 0
 	for _, a := range m.alerts {
@@ -363,10 +363,10 @@ func (m *Manager) ClearResolved() int {
 			cleared++
 		}
 	}
-	
+
 	m.alerts = active
 	m.save()
-	
+
 	return cleared
 }
 
@@ -389,17 +389,17 @@ func (m *Manager) save() {
 	if m.alertFile == "" {
 		return
 	}
-	
+
 	dir := filepath.Dir(m.alertFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return
 	}
-	
+
 	data, err := json.MarshalIndent(m.alerts, "", "  ")
 	if err != nil {
 		return
 	}
-	
+
 	os.WriteFile(m.alertFile, data, 0644)
 }
 
@@ -408,12 +408,12 @@ func (m *Manager) load() {
 	if m.alertFile == "" {
 		return
 	}
-	
+
 	data, err := os.ReadFile(m.alertFile)
 	if err != nil {
 		return
 	}
-	
+
 	json.Unmarshal(data, &m.alerts)
 }
 
@@ -421,21 +421,21 @@ func (m *Manager) load() {
 func (m *Manager) Stats() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	stats := map[string]interface{}{
-		"total_alerts":     len(m.alerts),
-		"active_alerts":    len(m.GetActive()),
-		"alerts_by_type":   make(map[AlertType]int),
+		"total_alerts":       len(m.alerts),
+		"active_alerts":      len(m.GetActive()),
+		"alerts_by_type":     make(map[AlertType]int),
 		"alerts_by_severity": make(map[AlertSeverity]int),
 	}
-	
+
 	byType := stats["alerts_by_type"].(map[AlertType]int)
 	bySeverity := stats["alerts_by_severity"].(map[AlertSeverity]int)
-	
+
 	for _, a := range m.alerts {
 		byType[a.Type]++
 		bySeverity[a.Severity]++
 	}
-	
+
 	return stats
 }

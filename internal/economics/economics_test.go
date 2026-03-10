@@ -19,10 +19,10 @@ func TestWeightConstants(t *testing.T) {
 
 func TestPeriodEconomics_ComputeWeightedMetrics(t *testing.T) {
 	p := &PeriodEconomics{}
-	
+
 	// Test with nil values (should not panic)
 	p.computeWeightedMetrics()
-	
+
 	// Test with valid values
 	cost := 10.0
 	saved := 1000
@@ -30,16 +30,16 @@ func TestPeriodEconomics_ComputeWeightedMetrics(t *testing.T) {
 	output := uint64(500)
 	cacheCreate := uint64(100)
 	cacheRead := uint64(200)
-	
+
 	p.CCCost = &cost
 	p.TMSavedTokens = &saved
 	p.CCInputTokens = &input
 	p.CCOutputTokens = &output
 	p.CCCacheCreateTokens = &cacheCreate
 	p.CCCacheReadTokens = &cacheRead
-	
+
 	p.computeWeightedMetrics()
-	
+
 	if p.WeightedInputCPT == nil {
 		t.Error("WeightedInputCPT should not be nil after computeWeightedMetrics")
 	}
@@ -50,23 +50,23 @@ func TestPeriodEconomics_ComputeWeightedMetrics(t *testing.T) {
 
 func TestPeriodEconomics_ComputeDualMetrics(t *testing.T) {
 	p := &PeriodEconomics{}
-	
+
 	// Test with nil values (should not panic)
 	p.computeDualMetrics()
-	
+
 	// Test with valid values
 	cost := 10.0
 	saved := 1000
 	total := uint64(5000)
 	active := uint64(3000)
-	
+
 	p.CCCost = &cost
 	p.TMSavedTokens = &saved
 	p.CCTotalTokens = &total
 	p.CCActiveTokens = &active
-	
+
 	p.computeDualMetrics()
-	
+
 	if p.BlendedCPT == nil {
 		t.Error("BlendedCPT should not be nil after computeDualMetrics")
 	}
@@ -85,24 +85,24 @@ func TestComputeTotals(t *testing.T) {
 	cacheCreate := uint64(500)
 	cacheRead := uint64(1500)
 	pct := 50.0
-	
+
 	periods := []PeriodEconomics{
 		{
-			CCCost:            &cost,
-			CCTotalTokens:     &tokens,
-			CCActiveTokens:    &tokens,
-			CCInputTokens:     &input,
-			CCOutputTokens:    &output,
+			CCCost:              &cost,
+			CCTotalTokens:       &tokens,
+			CCActiveTokens:      &tokens,
+			CCInputTokens:       &input,
+			CCOutputTokens:      &output,
 			CCCacheCreateTokens: &cacheCreate,
-			CCCacheReadTokens: &cacheRead,
-			TMCommands:        &cmds,
-			TMSavedTokens:     &saved,
-			TMSavingsPct:      &pct,
+			CCCacheReadTokens:   &cacheRead,
+			TMCommands:          &cmds,
+			TMSavedTokens:       &saved,
+			TMSavingsPct:        &pct,
 		},
 	}
-	
+
 	totals := computeTotals(periods)
-	
+
 	if totals.CCCost != cost {
 		t.Errorf("CCCost = %f, want %f", totals.CCCost, cost)
 	}

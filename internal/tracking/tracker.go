@@ -459,19 +459,19 @@ func (t *Tracker) RecordFallback(command string, projectPath string, output stri
 
 // ParseFailureRecord represents a single parse failure event.
 type ParseFailureRecord struct {
-	ID               int64     `json:"id"`
-	Timestamp        time.Time `json:"timestamp"`
-	RawCommand       string    `json:"raw_command"`
-	ErrorMessage     string    `json:"error_message"`
-	FallbackSucceeded bool     `json:"fallback_succeeded"`
+	ID                int64     `json:"id"`
+	Timestamp         time.Time `json:"timestamp"`
+	RawCommand        string    `json:"raw_command"`
+	ErrorMessage      string    `json:"error_message"`
+	FallbackSucceeded bool      `json:"fallback_succeeded"`
 }
 
 // ParseFailureSummary represents aggregated parse failure analytics.
 type ParseFailureSummary struct {
-	Total         int64                     `json:"total"`
-	RecoveryRate  float64                   `json:"recovery_rate"`
-	TopCommands   []CommandFailureCount     `json:"top_commands"`
-	RecentFailures []ParseFailureRecord     `json:"recent_failures"`
+	Total          int64                 `json:"total"`
+	RecoveryRate   float64               `json:"recovery_rate"`
+	TopCommands    []CommandFailureCount `json:"top_commands"`
+	RecentFailures []ParseFailureRecord  `json:"recent_failures"`
 }
 
 // CommandFailureCount represents a command and its failure count.

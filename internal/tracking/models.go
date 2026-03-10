@@ -20,11 +20,11 @@ type CommandRecord struct {
 
 // SavingsSummary represents aggregated token savings.
 type SavingsSummary struct {
-	TotalCommands  int   `json:"total_commands"`
-	TotalSaved     int   `json:"total_saved"`
-	TotalOriginal  int   `json:"total_original"`
-	TotalFiltered  int   `json:"total_filtered"`
-	ReductionPct   float64 `json:"reduction_percent"`
+	TotalCommands int     `json:"total_commands"`
+	TotalSaved    int     `json:"total_saved"`
+	TotalOriginal int     `json:"total_original"`
+	TotalFiltered int     `json:"total_filtered"`
+	ReductionPct  float64 `json:"reduction_percent"`
 }
 
 // CommandStats represents statistics for a specific command type.

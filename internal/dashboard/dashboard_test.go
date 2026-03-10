@@ -100,9 +100,9 @@ func TestTopCommandsHandler(t *testing.T) {
 
 	// Record various commands
 	commands := []struct {
-		cmd    string
-		saved  int
-		count  int
+		cmd   string
+		saved int
+		count int
 	}{
 		{"ls -la", 100, 3},
 		{"cat file.txt", 200, 2},

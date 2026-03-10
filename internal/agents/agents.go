@@ -190,7 +190,7 @@ func setupClaudeCode() error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create settings.json with tokman integration
 	settings := map[string]interface{}{
 		"env": map[string]string{
@@ -205,7 +205,7 @@ func setupCursor() error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
-	
+
 	settings := map[string]interface{}{
 		"cursor.ai.tokenOptimization": true,
 		"cursor.ai.cacheEnabled":      true,
@@ -218,7 +218,7 @@ func setupCline() error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
-	
+
 	settings := map[string]interface{}{
 		"cline.tokenOptimization": true,
 	}
@@ -230,7 +230,7 @@ func setupContinue() error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
-	
+
 	config := map[string]interface{}{
 		"models": []map[string]interface{}{
 			{
@@ -257,7 +257,7 @@ func setupCodexCLI() error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
-	
+
 	config := map[string]interface{}{
 		"optimization": map[string]interface{}{
 			"cacheEnabled": true,
@@ -274,19 +274,19 @@ func statusClaudeCode() (*AgentStatus, error) {
 		Installed:  detectClaudeCode(),
 		ConfigPath: expandPath("~/.claude/settings.json"),
 	}
-	
+
 	if !status.Installed {
 		return status, nil
 	}
-	
+
 	// Get version
 	if output, err := exec.Command("claude", "--version").Output(); err == nil {
 		status.Version = strings.TrimSpace(string(output))
 	}
-	
+
 	// Check configuration
 	status.Configured = configExists("~/.claude/settings.json")
-	
+
 	return status, nil
 }
 
@@ -296,11 +296,11 @@ func statusCursor() (*AgentStatus, error) {
 		Installed:  detectCursor(),
 		ConfigPath: expandPath("~/.cursor/settings.json"),
 	}
-	
+
 	if status.Installed {
 		status.Configured = configExists("~/.cursor/settings.json")
 	}
-	
+
 	return status, nil
 }
 
@@ -310,11 +310,11 @@ func statusCline() (*AgentStatus, error) {
 		Installed:  detectCline(),
 		ConfigPath: expandPath("~/.vscode/settings.json"),
 	}
-	
+
 	if status.Installed {
 		status.Configured = true
 	}
-	
+
 	return status, nil
 }
 
@@ -324,11 +324,11 @@ func statusContinue() (*AgentStatus, error) {
 		Installed:  detectContinue(),
 		ConfigPath: expandPath("~/.continue/config.json"),
 	}
-	
+
 	if status.Installed {
 		status.Configured = configExists("~/.continue/config.json")
 	}
-	
+
 	return status, nil
 }
 
@@ -338,18 +338,18 @@ func statusAider() (*AgentStatus, error) {
 		Installed:  detectAider(),
 		ConfigPath: expandPath("~/.aider.conf.yml"),
 	}
-	
+
 	if !status.Installed {
 		return status, nil
 	}
-	
+
 	// Get version
 	if output, err := exec.Command("aider", "--version").Output(); err == nil {
 		status.Version = strings.TrimSpace(string(output))
 	}
-	
+
 	status.Configured = configExists("~/.aider.conf.yml")
-	
+
 	return status, nil
 }
 
@@ -359,17 +359,17 @@ func statusCodexCLI() (*AgentStatus, error) {
 		Installed:  detectCodexCLI(),
 		ConfigPath: expandPath("~/.codex/config.json"),
 	}
-	
+
 	if !status.Installed {
 		return status, nil
 	}
-	
+
 	if output, err := exec.Command("codex", "--version").Output(); err == nil {
 		status.Version = strings.TrimSpace(string(output))
 	}
-	
+
 	status.Configured = configExists("~/.codex/config.json")
-	
+
 	return status, nil
 }
 
@@ -403,7 +403,7 @@ func checkVSCodeExtension(name string) bool {
 		filepath.Join(os.Getenv("HOME"), ".vscode", "extensions"),
 		filepath.Join(os.Getenv("HOME"), ".config", "Code", "User", "extensions"),
 	}
-	
+
 	for _, dir := range extDirs {
 		matches, _ := filepath.Glob(filepath.Join(dir, "*"+name+"*"))
 		if len(matches) > 0 {
@@ -479,7 +479,7 @@ pipx install aider-chat`,
 		"codex-cli": `# Install Codex CLI (if available)
 # Check OpenAI's documentation for installation instructions`,
 	}
-	
+
 	if inst, ok := instructions[name]; ok {
 		return inst
 	}
@@ -494,7 +494,7 @@ func GetAgentBinaryPath(name string) string {
 		"aider":       "aider",
 		"codex-cli":   "codex",
 	}
-	
+
 	if bin, ok := binaries[name]; ok {
 		if path, err := exec.LookPath(bin); err == nil {
 			return path
@@ -507,7 +507,7 @@ func GetAgentBinaryPath(name string) string {
 func GetDefaultShellRC() string {
 	shell := os.Getenv("SHELL")
 	home, _ := os.UserHomeDir()
-	
+
 	if strings.Contains(shell, "zsh") {
 		return filepath.Join(home, ".zshrc")
 	} else if strings.Contains(shell, "bash") {

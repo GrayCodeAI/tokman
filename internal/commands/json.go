@@ -58,8 +58,8 @@ func runJSON(cmd *cobra.Command, args []string) error {
 	timer.Track(filePath, "tokman json", originalTokens, filteredTokens)
 
 	if verbose > 0 {
-		fmt.Fprintf(os.Stderr, "Tokens saved: %d (%.1f%%)\n", 
-			originalTokens-filteredTokens, 
+		fmt.Fprintf(os.Stderr, "Tokens saved: %d (%.1f%%)\n",
+			originalTokens-filteredTokens,
 			float64(originalTokens-filteredTokens)/float64(originalTokens)*100)
 	}
 

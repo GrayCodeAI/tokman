@@ -36,17 +36,17 @@ func (f *BodyFilter) Apply(input string, mode Mode) (string, int) {
 	}
 
 	original := len(input)
-	lang := DetectLanguage(input)
-	
+	lang := DetectLanguageFromInput(input)
+
 	var output string
 	switch lang {
-	case "go":
+	case LangGo:
 		output = f.stripGoBodies(input)
-	case "rust":
+	case LangRust:
 		output = f.stripRustBodies(input)
-	case "python":
+	case LangPython:
 		output = f.stripPythonBodies(input)
-	case "javascript", "typescript":
+	case LangJavaScript, LangTypeScript:
 		output = f.stripJSBodies(input)
 	default:
 		output = f.stripGenericBodies(input)
@@ -72,7 +72,7 @@ func (f *BodyFilter) stripGoBodies(input string) string {
 		if f.isFunctionStart(trimmed, "go") && depth == 0 {
 			inFunc = true
 			result = append(result, line)
-			
+
 			// Check if function body is on same line
 			if strings.Contains(line, "{") {
 				depth += strings.Count(line, "{")
@@ -126,12 +126,12 @@ func (f *BodyFilter) stripRustBodies(input string) string {
 		if f.isFunctionStart(trimmed, "rust") && depth == 0 {
 			inFunc = true
 			result = append(result, line)
-			
+
 			// Handle brace on same line
 			if strings.Contains(line, "{") {
 				depth += strings.Count(line, "{")
 				depth -= strings.Count(line, "}")
-				
+
 				if depth > 0 {
 					// Replace with placeholder
 					idx := strings.Index(line, "{")
@@ -147,7 +147,7 @@ func (f *BodyFilter) stripRustBodies(input string) string {
 		if inFunc {
 			depth += strings.Count(line, "{")
 			depth -= strings.Count(line, "}")
-			
+
 			// Also track braces in string contexts (simplified)
 			depth += strings.Count(line, "(")
 			depth -= strings.Count(line, ")")
@@ -174,13 +174,13 @@ func (f *BodyFilter) stripPythonBodies(input string) string {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Check for function/class start
 		if f.isFunctionStart(trimmed, "python") {
 			inFunc = true
 			funcIndent = len(line) - len(strings.TrimLeft(line, " \t"))
 			result = append(result, line)
-			result = append(result, strings.Repeat(" ", funcIndent+4) + "pass  # body stripped")
+			result = append(result, strings.Repeat(" ", funcIndent+4)+"pass  # body stripped")
 			continue
 		}
 
@@ -216,11 +216,11 @@ func (f *BodyFilter) stripJSBodies(input string) string {
 		if f.isFunctionStart(trimmed, "javascript") && depth == 0 {
 			inFunc = true
 			result = append(result, line)
-			
+
 			if strings.Contains(line, "{") {
 				depth += strings.Count(line, "{")
 				depth -= strings.Count(line, "}")
-				
+
 				if depth > 0 {
 					idx := strings.Index(line, "{")
 					result[len(result)-1] = line[:idx+1] + " /* body stripped */ }"
@@ -261,11 +261,11 @@ func (f *BodyFilter) stripGenericBodies(input string) string {
 		if f.isFunctionStart(trimmed, "unknown") && depth == 0 {
 			inFunc = true
 			result = append(result, line)
-			
+
 			if strings.Contains(line, "{") {
 				depth += strings.Count(line, "{")
 				depth -= strings.Count(line, "}")
-				
+
 				if depth > 0 {
 					idx := strings.Index(line, "{")
 					if idx >= 0 {

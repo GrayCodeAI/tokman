@@ -459,7 +459,7 @@ type K8sPodList struct {
 }
 
 type K8sPod struct {
-	Metadata K8sMetadata `json:"metadata"`
+	Metadata K8sMetadata  `json:"metadata"`
 	Status   K8sPodStatus `json:"status"`
 }
 
@@ -469,14 +469,14 @@ type K8sMetadata struct {
 }
 
 type K8sPodStatus struct {
-	Phase             string                   `json:"phase"`
+	Phase             string               `json:"phase"`
 	ContainerStatuses []K8sContainerStatus `json:"containerStatuses"`
 }
 
 type K8sContainerStatus struct {
-	Name        string `json:"name"`
-	RestartCount int   `json:"restartCount"`
-	State       map[string]interface{} `json:"state"`
+	Name         string                 `json:"name"`
+	RestartCount int                    `json:"restartCount"`
+	State        map[string]interface{} `json:"state"`
 }
 
 type K8sServiceList struct {
@@ -484,12 +484,12 @@ type K8sServiceList struct {
 }
 
 type K8sService struct {
-	Metadata K8sMetadata `json:"metadata"`
+	Metadata K8sMetadata    `json:"metadata"`
 	Spec     K8sServiceSpec `json:"spec"`
 }
 
 type K8sServiceSpec struct {
-	Type  string        `json:"type"`
+	Type  string           `json:"type"`
 	Ports []K8sServicePort `json:"ports"`
 }
 

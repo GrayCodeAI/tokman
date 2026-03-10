@@ -64,14 +64,14 @@ func runGoTestCmd(args []string) error {
 	raw := string(output)
 
 	filtered := filterGoTestOutput(raw)
-	
+
 	// Add tee hint on failure
 	if err != nil {
 		if hint := TeeOnFailure(raw, "go_test", err); hint != "" {
 			filtered += "\n" + hint
 		}
 	}
-	
+
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)
@@ -93,14 +93,14 @@ func runGoBuildCmd(args []string) error {
 	raw := string(output)
 
 	filtered := filterGoBuildOutput(raw)
-	
+
 	// Add tee hint on failure
 	if err != nil {
 		if hint := TeeOnFailure(raw, "go_build", err); hint != "" {
 			filtered += "\n" + hint
 		}
 	}
-	
+
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(raw)
@@ -156,12 +156,12 @@ func runGoPassthrough(args []string) error {
 // Filter functions
 
 type GoTestEvent struct {
-	Time    string `json:"Time"`
-	Action  string `json:"Action"`
-	Package string `json:"Package"`
-	Test    string `json:"Test"`
+	Time    string  `json:"Time"`
+	Action  string  `json:"Action"`
+	Package string  `json:"Package"`
+	Test    string  `json:"Test"`
 	Elapsed float64 `json:"Elapsed"`
-	Output  string `json:"Output"`
+	Output  string  `json:"Output"`
 }
 
 func filterGoTestOutput(raw string) string {

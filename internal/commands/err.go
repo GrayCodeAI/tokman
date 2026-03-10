@@ -56,7 +56,7 @@ func runErr(args []string, verbose bool) int {
 
 	// Execute the command
 	execCmd := exec.Command(args[0], args[1:]...)
-	
+
 	// Capture both stdout and stderr
 	stdout, err := execCmd.StdoutPipe()
 	if err != nil {

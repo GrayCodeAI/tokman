@@ -34,11 +34,11 @@ type StatsProvider interface {
 
 // Client handles telemetry ping operations.
 type Client struct {
-	url       string
-	token     string
-	dataDir   string
-	enabled   bool
-	stats     StatsProvider
+	url     string
+	token   string
+	dataDir string
+	enabled bool
+	stats   StatsProvider
 }
 
 // NewClient creates a new telemetry client.

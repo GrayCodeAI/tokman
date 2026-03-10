@@ -63,9 +63,9 @@ func filterPrismaOutputCompact(raw string) string {
 
 	for _, line := range lines {
 		// Skip ASCII art banners
-		if strings.Contains(line, "│") || strings.Contains(line, "─") || 
-		   strings.Contains(line, "╭") || strings.Contains(line, "╰") ||
-		   strings.Contains(line, "▼") || strings.Contains(line, "▲") {
+		if strings.Contains(line, "│") || strings.Contains(line, "─") ||
+			strings.Contains(line, "╭") || strings.Contains(line, "╰") ||
+			strings.Contains(line, "▼") || strings.Contains(line, "▲") {
 			inBanner = true
 			continue
 		}

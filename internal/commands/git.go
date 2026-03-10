@@ -248,7 +248,7 @@ func parsePorcelain(output string) *GitStatus {
 
 		code := line[:2]
 		filePath := strings.TrimSpace(line[3:])
-		
+
 		// Handle renamed files (old -> new)
 		if strings.Contains(filePath, " -> ") {
 			parts := strings.Split(filePath, " -> ")

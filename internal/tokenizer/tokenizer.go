@@ -27,37 +27,37 @@ const (
 // ModelToEncoding maps model names to their encodings.
 var ModelToEncoding = map[string]Encoding{
 	// GPT-4o family
-	"gpt-4o":        O200kBase,
-	"gpt-4o-mini":   O200kBase,
-	"gpt-4o-2024-05-13": O200kBase,
+	"gpt-4o":                 O200kBase,
+	"gpt-4o-mini":            O200kBase,
+	"gpt-4o-2024-05-13":      O200kBase,
 	"gpt-4o-mini-2024-07-18": O200kBase,
 	// GPT-4 family
-	"gpt-4":         Cl100kBase,
-	"gpt-4-turbo":   Cl100kBase,
+	"gpt-4":               Cl100kBase,
+	"gpt-4-turbo":         Cl100kBase,
 	"gpt-4-turbo-preview": Cl100kBase,
 	"gpt-4-0125-preview":  Cl100kBase,
 	"gpt-4-1106-preview":  Cl100kBase,
 	"gpt-4-0613":          Cl100kBase,
 	"gpt-4-0314":          Cl100kBase,
 	// GPT-3.5 family
-	"gpt-3.5-turbo":     Cl100kBase,
+	"gpt-3.5-turbo":      Cl100kBase,
 	"gpt-3.5-turbo-0125": Cl100kBase,
 	"gpt-3.5-turbo-1106": Cl100kBase,
 	"gpt-3.5-turbo-0613": Cl100kBase,
 	"gpt-3.5-turbo-0301": Cl100kBase,
 	// Embedding models
-	"text-embedding-ada-002":     Cl100kBase,
-	"text-embedding-3-small":     Cl100kBase,
-	"text-embedding-3-large":     Cl100kBase,
+	"text-embedding-ada-002": Cl100kBase,
+	"text-embedding-3-small": Cl100kBase,
+	"text-embedding-3-large": Cl100kBase,
 	// Legacy GPT-3
 	"davinci": P50kBase,
 	"curie":   P50kBase,
 	"babbage": P50kBase,
 	"ada":     P50kBase,
 	// Claude (approximation - uses similar tokenization)
-	"claude-3-opus":   Cl100kBase,
-	"claude-3-sonnet": Cl100kBase,
-	"claude-3-haiku":  Cl100kBase,
+	"claude-3-opus":     Cl100kBase,
+	"claude-3-sonnet":   Cl100kBase,
+	"claude-3-haiku":    Cl100kBase,
 	"claude-3.5-sonnet": Cl100kBase,
 	"claude-3.5-haiku":  Cl100kBase,
 }
@@ -189,18 +189,18 @@ func EstimateTokens(text string) int {
 // CompareCounts compares heuristic vs actual token count.
 func CompareCounts(text string) (heuristic, actual int, diff float64) {
 	heuristic = EstimateTokens(text)
-	
+
 	t, err := New(Cl100kBase)
 	if err != nil {
 		return heuristic, heuristic, 0
 	}
-	
+
 	actual = t.Count(text)
-	
+
 	if actual > 0 {
 		diff = float64(heuristic-actual) / float64(actual) * 100
 	}
-	
+
 	return
 }
 

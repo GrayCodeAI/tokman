@@ -11,11 +11,11 @@ import (
 
 // PluginFilter represents a user-defined filter loaded from config.
 type PluginFilter struct {
-	name        string
-	description string
-	patterns    []*regexp.Regexp
+	name         string
+	description  string
+	patterns     []*regexp.Regexp
 	replacements map[string]string
-	enabled     bool
+	enabled      bool
 }
 
 // PluginConfig defines the structure for filter plugins in config.

@@ -189,20 +189,20 @@ type GhPR struct {
 }
 
 type GhPRView struct {
-	Number            int            `json:"number"`
-	Title             string         `json:"title"`
-	Author            string         `json:"author"`
-	State             string         `json:"state"`
-	HeadRefName       string         `json:"headRefName"`
-	BaseRefName       string         `json:"baseRefName"`
-	Additions         int            `json:"additions"`
-	Deletions         int            `json:"deletions"`
-	ChangedFiles      int            `json:"changedFiles"`
-	Mergeable         string         `json:"mergeable"`
-	MergeStateStatus  string         `json:"mergeStateStatus"`
-	Commits           int            `json:"commits"`
-	Files             []GhPRFile     `json:"files"`
-	StatusCheckRollup []GhCheckRun   `json:"statusCheckRollup"`
+	Number            int          `json:"number"`
+	Title             string       `json:"title"`
+	Author            string       `json:"author"`
+	State             string       `json:"state"`
+	HeadRefName       string       `json:"headRefName"`
+	BaseRefName       string       `json:"baseRefName"`
+	Additions         int          `json:"additions"`
+	Deletions         int          `json:"deletions"`
+	ChangedFiles      int          `json:"changedFiles"`
+	Mergeable         string       `json:"mergeable"`
+	MergeStateStatus  string       `json:"mergeStateStatus"`
+	Commits           int          `json:"commits"`
+	Files             []GhPRFile   `json:"files"`
+	StatusCheckRollup []GhCheckRun `json:"statusCheckRollup"`
 }
 
 type GhPRFile struct {
@@ -355,7 +355,7 @@ func filterGhIssueOutput(raw string, args []string) string {
 }
 
 type GhRun struct {
-	DatabaseId  int    `json:"databaseId"`
+	DatabaseId   int    `json:"databaseId"`
 	DisplayTitle string `json:"displayTitle"`
 	Status       string `json:"status"`
 	Conclusion   string `json:"conclusion"`
@@ -440,10 +440,10 @@ func runGhRelease(args []string) error {
 }
 
 type GhRelease struct {
-	TagName     string `json:"tagName"`
-	Name        string `json:"name"`
-	CreatedAt   string `json:"createdAt"`
-	IsDraft     bool   `json:"isDraft"`
+	TagName      string `json:"tagName"`
+	Name         string `json:"name"`
+	CreatedAt    string `json:"createdAt"`
+	IsDraft      bool   `json:"isDraft"`
 	IsPrerelease bool   `json:"isPrerelease"`
 }
 

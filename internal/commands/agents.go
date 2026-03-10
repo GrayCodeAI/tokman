@@ -48,7 +48,7 @@ func agentsListCmd() *cobra.Command {
 
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "NAME\tDISPLAY NAME\tINSTALLED\tCONFIGURED")
-			
+
 			for _, s := range statuses {
 				installed := "no"
 				if s.Installed {
@@ -58,13 +58,13 @@ func agentsListCmd() *cobra.Command {
 				if s.Configured {
 					configured = "yes"
 				}
-				
+
 				agent := agents.GetAgent(s.Name)
 				displayName := s.Name
 				if agent != nil {
 					displayName = agent.DisplayName
 				}
-				
+
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Name, displayName, installed, configured)
 			}
 			w.Flush()
@@ -88,13 +88,13 @@ If no agent is specified, shows status of all detected agents.`,
 					fmt.Fprintf(os.Stderr, "Unknown agent: %s\n", args[0])
 					os.Exit(1)
 				}
-				
+
 				status, err := agent.StatusFunc()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error getting status: %v\n", err)
 					os.Exit(1)
 				}
-				
+
 				printAgentStatus(status)
 			} else {
 				// Show all agents
@@ -121,7 +121,7 @@ This will:
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			agentName := args[0]
-			
+
 			// Check if agent exists
 			agent := agents.GetAgent(agentName)
 			if agent == nil {
@@ -132,7 +132,7 @@ This will:
 				}
 				os.Exit(1)
 			}
-			
+
 			// Check if installed
 			if !agent.DetectFunc() {
 				fmt.Fprintf(os.Stderr, "%s is not installed.\n", agent.DisplayName)
@@ -140,14 +140,14 @@ This will:
 				fmt.Fprintln(os.Stderr, agents.InstallInstructions(agentName))
 				os.Exit(1)
 			}
-			
+
 			// Setup
 			fmt.Printf("Setting up %s for TokMan integration...\n", agent.DisplayName)
 			if err := agents.SetupAgent(agentName); err != nil {
 				fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
 				os.Exit(1)
 			}
-			
+
 			fmt.Printf("Successfully configured %s!\n", agent.DisplayName)
 			fmt.Printf("Config file: %s\n", agent.ConfigPath)
 		},
@@ -163,7 +163,7 @@ func agentsInstallCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			agentName := args[0]
 			agent := agents.GetAgent(agentName)
-			
+
 			if agent == nil {
 				fmt.Fprintf(os.Stderr, "Unknown agent: %s\n", agentName)
 				fmt.Fprintln(os.Stderr, "\nSupported agents:")
@@ -172,7 +172,7 @@ func agentsInstallCmd() *cobra.Command {
 				}
 				os.Exit(1)
 			}
-			
+
 			fmt.Printf("# Installation: %s\n\n", agent.DisplayName)
 			fmt.Println(agents.InstallInstructions(agentName))
 		},

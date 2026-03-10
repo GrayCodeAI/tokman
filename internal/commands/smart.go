@@ -7,23 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-)
 
-// Language represents a programming language.
-type Language string
-
-const (
-	LangRust       Language = "Rust"
-	LangPython     Language = "Python"
-	LangJavaScript Language = "JavaScript"
-	LangTypeScript Language = "TypeScript"
-	LangGo         Language = "Go"
-	LangC          Language = "C"
-	LangCpp        Language = "C++"
-	LangJava       Language = "Java"
-	LangRuby       Language = "Ruby"
-	LangShell      Language = "Shell"
-	LangUnknown    Language = "Code"
+	"github.com/GrayCodeAI/tokman/internal/filter"
 )
 
 var smartModel string
@@ -78,7 +63,7 @@ func runSmart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func detectSmartLanguage(filePath string) Language {
+func detectSmartLanguage(filePath string) filter.Language {
 	ext := strings.ToLower(filePath)
 	if idx := strings.LastIndex(ext, "."); idx >= 0 {
 		ext = ext[idx+1:]
@@ -86,31 +71,33 @@ func detectSmartLanguage(filePath string) Language {
 
 	switch ext {
 	case "rs":
-		return LangRust
+		return filter.LangRust
 	case "py":
-		return LangPython
+		return filter.LangPython
 	case "js", "jsx", "mjs":
-		return LangJavaScript
+		return filter.LangJavaScript
 	case "ts", "tsx":
-		return LangTypeScript
+		return filter.LangTypeScript
 	case "go":
-		return LangGo
+		return filter.LangGo
 	case "c":
-		return LangC
+		return filter.LangC
 	case "cpp", "cc", "cxx":
-		return LangCpp
+		return filter.LangCpp
 	case "java":
-		return LangJava
+		return filter.LangJava
 	case "rb":
-		return LangRuby
+		return filter.LangRuby
 	case "sh", "bash", "zsh":
-		return LangShell
+		return filter.LangShell
+	case "sql":
+		return filter.LangSQL
 	default:
-		return LangUnknown
+		return filter.LangUnknown
 	}
 }
 
-func analyzeCode(content string, lang Language) CodeSummary {
+func analyzeCode(content string, lang filter.Language) CodeSummary {
 	lines := strings.Split(content, "\n")
 	totalLines := len(lines)
 
@@ -183,17 +170,19 @@ func analyzeCode(content string, lang Language) CodeSummary {
 	return CodeSummary{line1: line1, line2: line2}
 }
 
-func extractImports(content string, lang Language) []string {
+func extractImports(content string, lang filter.Language) []string {
 	var pattern string
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		pattern = `(?m)^use\s+([a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)?)`
-	case LangPython:
+	case filter.LangPython:
 		pattern = `(?m)^(?:from\s+(\S+)|import\s+(\S+))`
-	case LangJavaScript, LangTypeScript:
+	case filter.LangJavaScript, filter.LangTypeScript:
 		pattern = `(?:import.*from\s+['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\))`
-	case LangGo:
+	case filter.LangGo:
 		pattern = `(?m)^\s*"([^"]+)"$`
+	case filter.LangJava:
+		pattern = `(?m)^import\s+`
 	default:
 		return nil
 	}
@@ -226,27 +215,31 @@ func extractImports(content string, lang Language) []string {
 	return imports
 }
 
-func isStdImport(name string, lang Language) bool {
+func isStdImport(name string, lang filter.Language) bool {
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		return name == "std" || name == "core" || name == "alloc"
-	case LangPython:
+	case filter.LangPython:
 		return name == "os" || name == "sys" || name == "re" || name == "json" || name == "typing"
+	case filter.LangJava:
+		return strings.HasPrefix(name, "java.") || strings.HasPrefix(name, "javax.") || strings.HasPrefix(name, "jak.")
 	}
 	return false
 }
 
-func extractFunctions(content string, lang Language) []string {
+func extractFunctions(content string, lang filter.Language) []string {
 	var pattern string
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		pattern = `(?:pub\s+)?(?:async\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangPython:
+	case filter.LangPython:
 		pattern = `def\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangJavaScript, LangTypeScript:
+	case filter.LangJavaScript, filter.LangTypeScript:
 		pattern = `(?:async\s+)?function\s+([a-zA-Z_][a-zA-Z0-9_]*)|(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:async\s+)?\(`
-	case LangGo:
+	case filter.LangGo:
 		pattern = `func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)`
+	case filter.LangJava:
+		pattern = `(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:synchronized\s+)?(?:abstract\s+)?(?:final\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s+\w+\s*\(`
 	default:
 		return nil
 	}
@@ -272,18 +265,18 @@ func extractFunctions(content string, lang Language) []string {
 	return functions
 }
 
-func extractStructs(content string, lang Language) []string {
+func extractStructs(content string, lang filter.Language) []string {
 	var pattern string
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		pattern = `(?:pub\s+)?(?:struct|enum)\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangPython:
+	case filter.LangPython:
 		pattern = `class\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangTypeScript:
+	case filter.LangTypeScript:
 		pattern = `(?:interface|class|type)\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangGo:
+	case filter.LangGo:
 		pattern = `type\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+struct`
-	case LangJava:
+	case filter.LangJava:
 		pattern = `(?:public\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)`
 	default:
 		return nil
@@ -304,12 +297,12 @@ func extractStructs(content string, lang Language) []string {
 	return structs
 }
 
-func extractTraits(content string, lang Language) []string {
+func extractTraits(content string, lang filter.Language) []string {
 	var pattern string
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		pattern = `(?:pub\s+)?trait\s+([a-zA-Z_][a-zA-Z0-9_]*)`
-	case LangTypeScript:
+	case filter.LangTypeScript:
 		pattern = `interface\s+([a-zA-Z_][a-zA-Z0-9_]*)`
 	default:
 		return nil
@@ -330,7 +323,7 @@ func extractTraits(content string, lang Language) []string {
 	return traits
 }
 
-func detectPatterns(content string, lang Language) []string {
+func detectPatterns(content string, lang filter.Language) []string {
 	var patterns []string
 
 	// Common patterns
@@ -339,7 +332,7 @@ func detectPatterns(content string, lang Language) []string {
 	}
 
 	switch lang {
-	case LangRust:
+	case filter.LangRust:
 		if strings.Contains(content, "impl") && strings.Contains(content, "for") {
 			patterns = append(patterns, "trait impl")
 		}
@@ -352,14 +345,14 @@ func detectPatterns(content string, lang Language) []string {
 		if strings.Contains(content, "#[test]") {
 			patterns = append(patterns, "tests")
 		}
-	case LangPython:
+	case filter.LangPython:
 		if strings.Contains(content, "@dataclass") {
 			patterns = append(patterns, "dataclass")
 		}
 		if strings.Contains(content, "def __init__") {
 			patterns = append(patterns, "OOP")
 		}
-	case LangJavaScript, LangTypeScript:
+	case filter.LangJavaScript, filter.LangTypeScript:
 		if strings.Contains(content, "useState") || strings.Contains(content, "useEffect") {
 			patterns = append(patterns, "React hooks")
 		}

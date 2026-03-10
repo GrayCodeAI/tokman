@@ -22,7 +22,7 @@ type Metrics struct {
 
 // Period represents period data with key (date/month/week) and metrics
 type Period struct {
-	Key     string  // "2026-01-30" (daily), "2026-01" (monthly), "2026-01-20" (weekly ISO monday)
+	Key     string // "2026-01-30" (daily), "2026-01" (monthly), "2026-01-20" (weekly ISO monday)
 	Metrics Metrics
 }
 

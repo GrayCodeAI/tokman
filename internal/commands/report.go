@@ -87,8 +87,8 @@ func outputJSON(daily []struct {
 	Commands int
 }, stats []tracking.CommandStats, recent []tracking.CommandRecord) {
 	report := map[string]interface{}{
-		"daily_savings":  daily,
-		"command_stats":  stats,
+		"daily_savings":   daily,
+		"command_stats":   stats,
 		"recent_commands": recent,
 	}
 

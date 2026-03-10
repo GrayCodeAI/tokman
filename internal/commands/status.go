@@ -15,7 +15,7 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show token savings summary",
-	Long: `Display a summary of token savings for the current project.`,
+	Long:  `Display a summary of token savings for the current project.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := GetConfig()
 		if err != nil {

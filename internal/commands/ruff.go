@@ -43,11 +43,11 @@ type RuffFix struct {
 }
 
 type RuffDiagnostic struct {
-	Code        string       `json:"code"`
-	Message     string       `json:"message"`
-	Location    RuffLocation `json:"location"`
-	Filename    string       `json:"filename"`
-	Fix         *RuffFix     `json:"fix"`
+	Code     string       `json:"code"`
+	Message  string       `json:"message"`
+	Location RuffLocation `json:"location"`
+	Filename string       `json:"filename"`
+	Fix      *RuffFix     `json:"fix"`
 }
 
 func runRuff(cmd *cobra.Command, args []string) error {
@@ -316,4 +316,3 @@ func filterRuffFormat(output string) string {
 
 	return result.String()
 }
-

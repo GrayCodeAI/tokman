@@ -134,7 +134,7 @@ func IsDryRun() bool {
 }
 
 // isOperationalCommand returns true for commands that process CLI output
-// and need runtime integrity verification. Meta commands (init, verify, 
+// and need runtime integrity verification. Meta commands (init, verify,
 // config, economics, status, report, summary) are excluded.
 func isOperationalCommand(cmd *cobra.Command) bool {
 	// Meta commands that don't need integrity checks

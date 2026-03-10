@@ -55,25 +55,25 @@ func init() {
 
 // DiscoveredCommand represents a discovered command pattern
 type DiscoveredCommand struct {
-	Command     string `json:"command"`
-	Count       int    `json:"count"`
-	Category    string `json:"category"`
-	CouldSave   bool   `json:"could_save"`
-	Example     string `json:"example,omitempty"`
+	Command   string `json:"command"`
+	Count     int    `json:"count"`
+	Category  string `json:"category"`
+	CouldSave bool   `json:"could_save"`
+	Example   string `json:"example,omitempty"`
 }
 
 // DiscoverResult represents the discovery results
 type DiscoverResult struct {
-	Project          string             `json:"project,omitempty"`
-	TotalCommands    int                `json:"total_commands"`
-	MissedSavings    int                `json:"missed_savings"`
-	Opportunities    []DiscoveredCommand `json:"opportunities"`
-	UnsupportedCmds  []DiscoveredCommand `json:"unsupported_commands,omitempty"`
+	Project         string              `json:"project,omitempty"`
+	TotalCommands   int                 `json:"total_commands"`
+	MissedSavings   int                 `json:"missed_savings"`
+	Opportunities   []DiscoveredCommand `json:"opportunities"`
+	UnsupportedCmds []DiscoveredCommand `json:"unsupported_commands,omitempty"`
 }
 
 func runDiscover() error {
 	verbose := false // discoverCmd is not initialized yet, use default
-	
+
 	green := color.New(color.FgGreen).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
@@ -134,7 +134,7 @@ func runDiscover() error {
 
 	for _, stat := range stats {
 		totalCommands += stat.ExecutionCount
-		
+
 		// Check if this command was already using tokman
 		if strings.HasPrefix(stat.Command, "tokman ") {
 			continue // Already optimized
@@ -242,7 +242,7 @@ func truncate(s string, maxLen int) string {
 func getGitCommandHistory(sinceDays int) ([]string, error) {
 	since := fmt.Sprintf("--since=%d days ago", sinceDays)
 	cmd := exec.Command("git", "log", since, "--all", "--pretty=format:%s", "--grep=")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err

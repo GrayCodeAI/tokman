@@ -9,12 +9,12 @@ import (
 
 // Config represents the main configuration structure.
 type Config struct {
-	Tracking   TrackingConfig   `mapstructure:"tracking"`
-	Filter     FilterConfig     `mapstructure:"filter"`
-	Hooks      HooksConfig      `mapstructure:"hooks"`
-	Dashboard  DashboardConfig  `mapstructure:"dashboard"`
-	Alerts     AlertsConfig     `mapstructure:"alerts"`
-	Export     ExportConfig     `mapstructure:"export"`
+	Tracking  TrackingConfig  `mapstructure:"tracking"`
+	Filter    FilterConfig    `mapstructure:"filter"`
+	Hooks     HooksConfig     `mapstructure:"hooks"`
+	Dashboard DashboardConfig `mapstructure:"dashboard"`
+	Alerts    AlertsConfig    `mapstructure:"alerts"`
+	Export    ExportConfig    `mapstructure:"export"`
 }
 
 // TrackingConfig controls token tracking behavior.
@@ -26,17 +26,17 @@ type TrackingConfig struct {
 
 // FilterConfig controls output filtering behavior.
 type FilterConfig struct {
-	NoiseDirs    []string `mapstructure:"noise_dirs"`
-	IgnoreFiles  []string `mapstructure:"ignore_files"` // File patterns to ignore (e.g., "*.lock", "*.min.js")
-	Mode         string   `mapstructure:"mode"`         // "minimal" or "aggressive"
-	MaxWidth     int      `mapstructure:"max_width"`    // Max display width (0 = auto)
+	NoiseDirs   []string `mapstructure:"noise_dirs"`
+	IgnoreFiles []string `mapstructure:"ignore_files"` // File patterns to ignore (e.g., "*.lock", "*.min.js")
+	Mode        string   `mapstructure:"mode"`         // "minimal" or "aggressive"
+	MaxWidth    int      `mapstructure:"max_width"`    // Max display width (0 = auto)
 }
 
 // HooksConfig controls shell hook behavior.
 type HooksConfig struct {
 	ExcludedCommands []string `mapstructure:"excluded_commands"`
-	AuditDir         string   `mapstructure:"audit_dir"`   // Directory for hook audit logs
-	TeeDir           string   `mapstructure:"tee_dir"`     // Directory for failure tee logs
+	AuditDir         string   `mapstructure:"audit_dir"` // Directory for hook audit logs
+	TeeDir           string   `mapstructure:"tee_dir"`   // Directory for failure tee logs
 }
 
 // DashboardConfig controls dashboard behavior.

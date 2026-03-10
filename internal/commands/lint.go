@@ -51,10 +51,10 @@ type EslintMessage struct {
 }
 
 type EslintResult struct {
-	FilePath     string         `json:"filePath"`
+	FilePath     string          `json:"filePath"`
 	Messages     []EslintMessage `json:"messages"`
-	ErrorCount   int            `json:"errorCount"`
-	WarningCount int            `json:"warningCount"`
+	ErrorCount   int             `json:"errorCount"`
+	WarningCount int             `json:"warningCount"`
 }
 
 // Pylint JSON structures
@@ -71,10 +71,10 @@ type PylintDiagnostic struct {
 }
 
 var pythonLinters = map[string]bool{
-	"ruff":    true,
-	"pylint":  true,
-	"mypy":    true,
-	"flake8":  true,
+	"ruff":   true,
+	"pylint": true,
+	"mypy":   true,
+	"flake8": true,
 }
 
 func runLint(cmd *cobra.Command, args []string) error {
@@ -267,8 +267,8 @@ func filterEslintJSON(output string) string {
 
 	// Group by file
 	type fileResult struct {
-		path    string
-		count   int
+		path     string
+		count    int
 		messages []EslintMessage
 	}
 	var byFile []fileResult

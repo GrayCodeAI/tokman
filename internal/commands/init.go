@@ -22,6 +22,7 @@ var (
 	initAutoPatch bool
 	initNoPatch   bool
 	initUninstall bool
+	initMode      string
 )
 
 // Embedded hook script
@@ -226,6 +227,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initAutoPatch, "auto-patch", false, "Auto-patch settings.json without prompting")
 	initCmd.Flags().BoolVar(&initNoPatch, "no-patch", false, "Skip settings.json patching (show manual instructions)")
 	initCmd.Flags().BoolVar(&initUninstall, "uninstall", false, "Remove TokMan from ~/.claude/")
+	initCmd.Flags().StringVar(&initMode, "mode", "minimal", "Filter mode: none, minimal, aggressive")
 }
 
 func runLocalInit() {

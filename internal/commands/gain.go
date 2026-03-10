@@ -15,16 +15,16 @@ import (
 )
 
 var (
-	gainProject bool
-	gainGraph   bool
-	gainHistory bool
-	gainQuota   bool
-	gainTier    string
-	gainDaily   bool
-	gainWeekly  bool
-	gainMonthly bool
-	gainAll     bool
-	gainFormat  string
+	gainProject  bool
+	gainGraph    bool
+	gainHistory  bool
+	gainQuota    bool
+	gainTier     string
+	gainDaily    bool
+	gainWeekly   bool
+	gainMonthly  bool
+	gainAll      bool
+	gainFormat   string
 	gainFailures bool
 )
 
@@ -65,24 +65,24 @@ func init() {
 
 // GainSummary represents the summary statistics
 type GainSummary struct {
-	TotalCommands  int
-	TotalInput     int
-	TotalOutput    int
-	TotalSaved     int
-	AvgSavingsPct  float64
-	TotalTimeMs    int64
-	AvgTimeMs      int64
-	ByCommand      []CommandBreakdown
-	ByDay          []DayBreakdown
+	TotalCommands int
+	TotalInput    int
+	TotalOutput   int
+	TotalSaved    int
+	AvgSavingsPct float64
+	TotalTimeMs   int64
+	AvgTimeMs     int64
+	ByCommand     []CommandBreakdown
+	ByDay         []DayBreakdown
 }
 
 // CommandBreakdown represents stats for a single command
 type CommandBreakdown struct {
-	Command  string
-	Count    int
-	Saved    int
-	AvgPct   float64
-	AvgTime  int64
+	Command string
+	Count   int
+	Saved   int
+	AvgPct  float64
+	AvgTime int64
 }
 
 // DayBreakdown represents stats for a single day

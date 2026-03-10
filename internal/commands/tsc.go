@@ -34,13 +34,13 @@ func init() {
 }
 
 type TsError struct {
-	File          string
-	Line          string
-	Col           string
-	Severity      string
-	Code          string
-	Message       string
-	ContextLines  []string
+	File         string
+	Line         string
+	Col          string
+	Severity     string
+	Code         string
+	Message      string
+	ContextLines []string
 }
 
 func runTsc(cmd *cobra.Command, args []string) error {

@@ -189,10 +189,15 @@ func parseAuditLine(line string) *AuditEntry {
 		return nil
 	}
 	return &AuditEntry{
-		Timestamp:    parts[0],
-		Action:       parts[1],
-		OriginalCmd:  parts[2],
-		RewrittenCmd: func() string { if len(parts) > 3 { return parts[3] }; return "-" }(),
+		Timestamp:   parts[0],
+		Action:      parts[1],
+		OriginalCmd: parts[2],
+		RewrittenCmd: func() string {
+			if len(parts) > 3 {
+				return parts[3]
+			}
+			return "-"
+		}(),
 	}
 }
 

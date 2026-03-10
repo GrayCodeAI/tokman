@@ -93,14 +93,14 @@ func runNpmTest(args []string) error {
 	output := stdout.String() + stderr.String()
 
 	filtered := filterNpmTestOutput(output)
-	
+
 	// Add tee hint on failure
 	if err != nil {
 		if hint := TeeOnFailure(output, "npm_test", err); hint != "" {
 			filtered += "\n" + hint
 		}
 	}
-	
+
 	fmt.Println(filtered)
 
 	originalTokens := filter.EstimateTokens(output)

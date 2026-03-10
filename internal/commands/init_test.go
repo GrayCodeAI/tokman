@@ -179,10 +179,10 @@ func TestInsertHookEntry(t *testing.T) {
 
 func TestRemoveTokmanBlock(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         string
-		wantContent   string
-		wantMigrated  bool
+		name         string
+		input        string
+		wantContent  string
+		wantMigrated bool
 	}{
 		{
 			name:         "no block",
@@ -238,9 +238,9 @@ No closing marker`,
 
 func TestRemoveTokmanMdReference(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   string
+		name  string
+		input string
+		want  string
 	}{
 		{
 			name:  "single line reference",
@@ -378,7 +378,7 @@ func TestGetTokmanSlim(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && 
+	return len(s) > 0 && len(substr) > 0 &&
 		(s == substr || len(s) > len(substr) && containsAt(s, substr))
 }
 

@@ -22,9 +22,9 @@ import (
 // API pricing ratios (verified Feb 2026, consistent across Claude models <=200K context)
 // Source: https://docs.anthropic.com/en/docs/about-claude/models
 const (
-	WeightOutput      = 5.0   // Output = 5x input
-	WeightCacheCreate = 1.25  // Cache write = 1.25x input
-	WeightCacheRead   = 0.1   // Cache read = 0.1x input
+	WeightOutput      = 5.0  // Output = 5x input
+	WeightCacheCreate = 1.25 // Cache write = 1.25x input
+	WeightCacheRead   = 0.1  // Cache read = 0.1x input
 )
 
 // PeriodEconomics represents economics data for a single time period
@@ -32,28 +32,28 @@ type PeriodEconomics struct {
 	Label string
 
 	// ccusage metrics (Option for graceful degradation)
-	CCCost        *float64
-	CCTotalTokens *uint64
+	CCCost         *float64
+	CCTotalTokens  *uint64
 	CCActiveTokens *uint64 // input + output only (excluding cache)
 
 	// Per-type token breakdown
-	CCInputTokens        *uint64
-	CCOutputTokens       *uint64
-	CCCacheCreateTokens  *uint64
-	CCCacheReadTokens    *uint64
+	CCInputTokens       *uint64
+	CCOutputTokens      *uint64
+	CCCacheCreateTokens *uint64
+	CCCacheReadTokens   *uint64
 
 	// tokman metrics
-	TMCommands     *int
-	TMSavedTokens  *int
-	TMSavingsPct   *float64
+	TMCommands    *int
+	TMSavedTokens *int
+	TMSavingsPct  *float64
 
 	// Primary metric (weighted input CPT)
 	WeightedInputCPT *float64 // Derived input CPT using API ratios
 	SavingsWeighted  *float64 // saved * weighted_input_cpt (PRIMARY)
 
 	// Legacy metrics (verbose mode only)
-	BlendedCPT    *float64 // cost / total_tokens (diluted by cache)
-	ActiveCPT     *float64 // cost / active_tokens (OVERESTIMATES)
+	BlendedCPT     *float64 // cost / total_tokens (diluted by cache)
+	ActiveCPT      *float64 // cost / active_tokens (OVERESTIMATES)
 	SavingsBlended *float64 // saved * blended_cpt (UNDERESTIMATES)
 	SavingsActive  *float64 // saved * active_cpt (OVERESTIMATES)
 }
@@ -760,12 +760,12 @@ func exportJSON(tracker *tracking.Tracker, opts RunOptions) error {
 	tmWeekly := getWeeklyStats(tracker)
 
 	export := struct {
-		GeneratedAt   string            `json:"generated_at"`
+		GeneratedAt   string             `json:"generated_at"`
 		PricingRatios map[string]float64 `json:"pricing_ratios"`
-		Daily         []PeriodEconomics `json:"daily,omitempty"`
-		Weekly        []PeriodEconomics `json:"weekly,omitempty"`
-		Monthly       []PeriodEconomics `json:"monthly,omitempty"`
-		Summary       *Totals           `json:"summary,omitempty"`
+		Daily         []PeriodEconomics  `json:"daily,omitempty"`
+		Weekly        []PeriodEconomics  `json:"weekly,omitempty"`
+		Monthly       []PeriodEconomics  `json:"monthly,omitempty"`
+		Summary       *Totals            `json:"summary,omitempty"`
 	}{
 		GeneratedAt: time.Now().Format(time.RFC3339),
 		PricingRatios: map[string]float64{

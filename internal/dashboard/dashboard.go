@@ -16,36 +16,36 @@ import (
 
 // AlertConfig holds alert threshold configuration
 type AlertConfig struct {
-	DailyTokenLimit    int64   `json:"daily_token_limit"`
-	WeeklyTokenLimit   int64   `json:"weekly_token_limit"`
+	DailyTokenLimit     int64   `json:"daily_token_limit"`
+	WeeklyTokenLimit    int64   `json:"weekly_token_limit"`
 	UsageSpikeThreshold float64 `json:"usage_spike_threshold"` // multiplier for spike detection
-	Enabled            bool    `json:"enabled"`
+	Enabled             bool    `json:"enabled"`
 }
 
 // Config holds dashboard configuration
 type Config struct {
-	Port              int         `json:"port"`
-	Bind              string      `json:"bind"`
-	UpdateInterval    int         `json:"update_interval"`
-	Theme             string      `json:"theme"`
-	Alerts            AlertConfig `json:"alerts"`
-	EnableExport      bool        `json:"enable_export"`
-	HistoryRetention  int         `json:"history_retention"`
+	Port             int         `json:"port"`
+	Bind             string      `json:"bind"`
+	UpdateInterval   int         `json:"update_interval"`
+	Theme            string      `json:"theme"`
+	Alerts           AlertConfig `json:"alerts"`
+	EnableExport     bool        `json:"enable_export"`
+	HistoryRetention int         `json:"history_retention"`
 }
 
 // DefaultConfig returns default dashboard configuration
 var defaultConfig = Config{
 	Port:             8080,
 	Bind:             "localhost",
-	UpdateInterval:    30000,
+	UpdateInterval:   30000,
 	Theme:            "dark",
 	EnableExport:     true,
 	HistoryRetention: 90,
 	Alerts: AlertConfig{
-		DailyTokenLimit:    1000000,
-		WeeklyTokenLimit:   5000000,
+		DailyTokenLimit:     1000000,
+		WeeklyTokenLimit:    5000000,
 		UsageSpikeThreshold: 2.0,
-		Enabled:            true,
+		Enabled:             true,
 	},
 }
 
@@ -156,11 +156,11 @@ func statsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		savedTotal, _ := tracker.TokensSavedTotal()
 
 		response := map[string]interface{}{
-			"tokens_saved":   stats.TotalSaved,
-			"commands_count": stats.TotalCommands,
-			"original":       stats.TotalOriginal,
-			"filtered":       stats.TotalFiltered,
-			"tokens_saved_24h": saved24h,
+			"tokens_saved":       stats.TotalSaved,
+			"commands_count":     stats.TotalCommands,
+			"original":           stats.TotalOriginal,
+			"filtered":           stats.TotalFiltered,
+			"tokens_saved_24h":   saved24h,
 			"tokens_saved_total": savedTotal,
 		}
 		json.NewEncoder(w).Encode(response)
@@ -498,7 +498,7 @@ func llmStatusHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				response["total_cache_create"] = totalCacheCreate
 				response["total_cache_read"] = totalCacheRead
 				response["monthly_data"] = monthly
-				
+
 				// Set provider based on ccusage availability (Claude Code uses ccusage)
 				response["provider"] = "Claude Code"
 				response["provider_model"] = "Detected from usage"
@@ -540,10 +540,10 @@ func dailyBreakdownHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		result := make([]map[string]interface{}, len(periods))
 		for i, p := range periods {
 			entry := map[string]interface{}{
-				"date":          p.Label,
-				"tokens_saved":  p.TMSavedTokens,
-				"commands":      p.TMCommands,
-				"savings_pct":   p.TMSavingsPct,
+				"date":         p.Label,
+				"tokens_saved": p.TMSavedTokens,
+				"commands":     p.TMCommands,
+				"savings_pct":  p.TMSavingsPct,
 			}
 			// Add ccusage data if available
 			if p.CCCost != nil {
@@ -648,12 +648,12 @@ func sessionStatsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				continue
 			}
 			result = append(result, map[string]interface{}{
-				"session_id":    sessionID,
-				"start_time":    startTime,
-				"end_time":      endTime,
-				"commands":      commands,
-				"tokens_saved":  saved,
-				"project":       projectPath,
+				"session_id":   sessionID,
+				"start_time":   startTime,
+				"end_time":     endTime,
+				"commands":     commands,
+				"tokens_saved": saved,
+				"project":      projectPath,
 			})
 		}
 
@@ -730,12 +730,12 @@ func alertsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		saved24h, _ := tracker.TokensSaved24h()
 		if saved24h > cfg.DailyTokenLimit {
 			alerts = append(alerts, map[string]interface{}{
-				"type":        "daily_limit",
-				"severity":    "warning",
-				"message":     fmt.Sprintf("Daily token savings (%d) exceeded limit (%d)", saved24h, cfg.DailyTokenLimit),
-				"value":       saved24h,
-				"threshold":   cfg.DailyTokenLimit,
-				"timestamp":   time.Now().Format(time.RFC3339),
+				"type":      "daily_limit",
+				"severity":  "warning",
+				"message":   fmt.Sprintf("Daily token savings (%d) exceeded limit (%d)", saved24h, cfg.DailyTokenLimit),
+				"value":     saved24h,
+				"threshold": cfg.DailyTokenLimit,
+				"timestamp": time.Now().Format(time.RFC3339),
 			})
 		}
 
@@ -773,12 +773,12 @@ func alertsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 							if lhRows.Scan(&lastHourCount); err == nil {
 								if float64(lastHourCount) > avgCount*cfg.UsageSpikeThreshold && avgCount > 0 {
 									alerts = append(alerts, map[string]interface{}{
-										"type":        "usage_spike",
-										"severity":    "info",
-										"message":     fmt.Sprintf("Usage spike detected: %d commands in last hour vs %.1f avg", lastHourCount, avgCount),
-										"value":       lastHourCount,
-										"average":     avgCount,
-										"timestamp":   time.Now().Format(time.RFC3339),
+										"type":      "usage_spike",
+										"severity":  "info",
+										"message":   fmt.Sprintf("Usage spike detected: %d commands in last hour vs %.1f avg", lastHourCount, avgCount),
+										"value":     lastHourCount,
+										"average":   avgCount,
+										"timestamp": time.Now().Format(time.RFC3339),
 									})
 								}
 							}
@@ -868,13 +868,13 @@ func modelBreakdownHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		models := []map[string]interface{}{}
 		for _, m := range monthly {
 			models = append(models, map[string]interface{}{
-				"period":         m.Key,
-				"total_cost":     m.Metrics.TotalCost,
-				"input_tokens":   m.Metrics.InputTokens,
-				"output_tokens":  m.Metrics.OutputTokens,
-				"cache_read":     m.Metrics.CacheReadTokens,
-				"cache_create":   m.Metrics.CacheCreationTokens,
-				"total_tokens":   m.Metrics.TotalTokens,
+				"period":        m.Key,
+				"total_cost":    m.Metrics.TotalCost,
+				"input_tokens":  m.Metrics.InputTokens,
+				"output_tokens": m.Metrics.OutputTokens,
+				"cache_read":    m.Metrics.CacheReadTokens,
+				"cache_create":  m.Metrics.CacheCreationTokens,
+				"total_tokens":  m.Metrics.TotalTokens,
 			})
 		}
 
@@ -962,10 +962,10 @@ func reportHandler(tracker *tracking.Tracker) http.HandlerFunc {
 			estimatedSavings := float64(totalSaved) * 3.0 / 1_000_000 // $3/1M tokens
 
 			response["summary"] = map[string]interface{}{
-				"period_days":        days,
-				"tokens_saved":       totalSaved,
-				"commands_processed": totalCommands,
-				"efficiency_pct":     efficiency,
+				"period_days":          days,
+				"tokens_saved":         totalSaved,
+				"commands_processed":   totalCommands,
+				"efficiency_pct":       efficiency,
 				"estimated_cost_saved": estimatedSavings,
 			}
 
@@ -996,9 +996,9 @@ func reportHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				var count, saved int
 				if rows.Scan(&path, &count, &saved); err == nil {
 					projects = append(projects, map[string]interface{}{
-						"project":       filepath.Base(path),
-						"commands":      count,
-						"tokens_saved":  saved,
+						"project":      filepath.Base(path),
+						"commands":     count,
+						"tokens_saved": saved,
 					})
 				}
 			}
@@ -1054,12 +1054,12 @@ func cacheMetricsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		}
 
 		response := map[string]interface{}{
-			"total_original":    stats.TotalOriginal,
-			"total_filtered":    stats.TotalFiltered,
-			"total_saved":       stats.TotalSaved,
-			"efficiency_pct":    efficiency,
-			"commands_count":    stats.TotalCommands,
-			"hourly_pattern":    hourlyPattern,
+			"total_original": stats.TotalOriginal,
+			"total_filtered": stats.TotalFiltered,
+			"total_saved":    stats.TotalSaved,
+			"efficiency_pct": efficiency,
+			"commands_count": stats.TotalCommands,
+			"hourly_pattern": hourlyPattern,
 		}
 
 		// Add ccusage cache stats if available

@@ -61,7 +61,7 @@ func filterGolangciOutput(raw string) string {
 	}
 
 	lines := strings.Split(raw, "\n")
-	
+
 	// Group by linter
 	byLinter := make(map[string][]string)
 	var errors []string

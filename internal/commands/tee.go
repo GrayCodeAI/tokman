@@ -2,7 +2,7 @@ package commands
 
 import (
 	"os/exec"
-	
+
 	"github.com/GrayCodeAI/tokman/internal/tee"
 )
 
@@ -12,7 +12,7 @@ func TeeOnFailure(raw string, commandSlug string, err error) string {
 	if err == nil {
 		return ""
 	}
-	
+
 	// Get exit code from exec.ExitError if possible
 	exitCode := 1 // Default to failure
 	if exitErr, ok := err.(*exec.ExitError); ok {
@@ -20,7 +20,7 @@ func TeeOnFailure(raw string, commandSlug string, err error) string {
 			exitCode = exitErr.ExitCode()
 		}
 	}
-	
+
 	return tee.WriteAndHint(raw, commandSlug, exitCode)
 }
 

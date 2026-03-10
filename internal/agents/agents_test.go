@@ -6,11 +6,11 @@ import (
 
 func TestDetectAll(t *testing.T) {
 	statuses := DetectAll()
-	
+
 	if len(statuses) == 0 {
 		t.Error("Expected at least one agent status")
 	}
-	
+
 	// Check that all agents have required fields
 	for _, s := range statuses {
 		if s.Name == "" {
@@ -32,7 +32,7 @@ func TestGetAgent(t *testing.T) {
 	if agent.DisplayName != "Claude Code" {
 		t.Errorf("Expected display name 'Claude Code', got '%s'", agent.DisplayName)
 	}
-	
+
 	// Test getting unknown agent
 	agent = GetAgent("unknown-agent")
 	if agent != nil {
@@ -57,7 +57,7 @@ func TestInstallInstructions(t *testing.T) {
 	if inst == "No installation instructions available." {
 		t.Error("Expected specific instructions for aider")
 	}
-	
+
 	// Test unknown agent
 	inst = InstallInstructions("unknown")
 	if inst != "No installation instructions available." {
@@ -73,7 +73,7 @@ func TestExpandPath(t *testing.T) {
 		{"~/.claude", ".claude"},
 		{"/absolute/path", "/absolute/path"},
 	}
-	
+
 	for _, tt := range tests {
 		result := expandPath(tt.input)
 		if tt.input[0] == '~' {
@@ -96,7 +96,7 @@ func TestAllAgentsList(t *testing.T) {
 	if len(AllAgents) < 6 {
 		t.Errorf("Expected at least 6 agents, got %d", len(AllAgents))
 	}
-	
+
 	// Check each agent has required fields
 	for _, agent := range AllAgents {
 		if agent.Name == "" {

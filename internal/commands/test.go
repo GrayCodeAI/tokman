@@ -72,11 +72,11 @@ func init() {
 
 // TestSuite represents aggregated test results
 type TestSuite struct {
-	Package  string
-	Passed   int
-	Failed   int
-	Skipped  int
-	Duration time.Duration
+	Package     string
+	Passed      int
+	Failed      int
+	Skipped     int
+	Duration    time.Duration
 	FailedTests []string
 }
 
@@ -104,7 +104,7 @@ func runGoTest(args []string) (string, string, error) {
 // parseTestOutput parses go test -v output
 func parseTestOutput(output string) []TestSuite {
 	lines := strings.Split(output, "\n")
-	
+
 	var suites []TestSuite
 	var currentSuite *TestSuite
 	var currentPkg string
@@ -197,7 +197,7 @@ func formatTestSummary(suites []TestSuite, hasFailure bool) string {
 	if hasFailure {
 		result.WriteString(bold("\n❌ Test Failures:\n"))
 		result.WriteString(strings.Repeat("─", 40) + "\n")
-		
+
 		for _, suite := range suites {
 			if suite.Failed > 0 {
 				result.WriteString(fmt.Sprintf("\n%s %s\n", red("Package:"), cyan(suite.Package)))

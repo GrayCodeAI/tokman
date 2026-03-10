@@ -426,10 +426,10 @@ func runAwsCfnListStacks(extraArgs []string) error {
 
 	var cfnResp struct {
 		StackSummaries []struct {
-			StackName    string `json:"StackName"`
-			StackStatus  string `json:"StackStatus"`
+			StackName       string `json:"StackName"`
+			StackStatus     string `json:"StackStatus"`
 			LastUpdatedTime string `json:"LastUpdatedTime"`
-			CreationTime string `json:"CreationTime"`
+			CreationTime    string `json:"CreationTime"`
 		} `json:"StackSummaries"`
 	}
 
@@ -481,11 +481,11 @@ func runAwsCfnDescribeStacks(extraArgs []string) error {
 
 	var cfnResp struct {
 		Stacks []struct {
-			StackName    string `json:"StackName"`
-			StackStatus  string `json:"StackStatus"`
+			StackName       string `json:"StackName"`
+			StackStatus     string `json:"StackStatus"`
 			LastUpdatedTime string `json:"LastUpdatedTime"`
-			CreationTime string `json:"CreationTime"`
-			Outputs []struct {
+			CreationTime    string `json:"CreationTime"`
+			Outputs         []struct {
 				OutputKey   string `json:"OutputKey"`
 				OutputValue string `json:"OutputValue"`
 			} `json:"Outputs"`

@@ -9,13 +9,13 @@ var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 var (
 	// OSC sequences (Operating System Command)
 	oscPattern = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`)
-	
+
 	// CSI sequences (Control Sequence Introducer)
 	csiPattern = regexp.MustCompile(`\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]`)
-	
+
 	// SGR sequences (Select Graphic Rendition) - most common
 	sgrPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	
+
 	// Link escape sequences (used by modern terminals)
 	linkPattern = regexp.MustCompile(`\x1b]8;;[^\x1b]*\x1b\\`)
 )
@@ -36,18 +36,18 @@ func (f *ANSIFilter) Name() string {
 // Apply strips ANSI sequences and returns token savings.
 func (f *ANSIFilter) Apply(input string, mode Mode) (string, int) {
 	original := len(input)
-	
+
 	// Strip all ANSI sequences
 	output := ansiPattern.ReplaceAllString(input, "")
 	output = oscPattern.ReplaceAllString(output, "")
 	output = csiPattern.ReplaceAllString(output, "")
 	output = sgrPattern.ReplaceAllString(output, "")
 	output = linkPattern.ReplaceAllString(output, "")
-	
+
 	// Calculate tokens saved (ANSI codes don't count as meaningful tokens)
 	bytesSaved := original - len(output)
 	tokensSaved := bytesSaved / 4 // heuristic
-	
+
 	return output, tokensSaved
 }
 

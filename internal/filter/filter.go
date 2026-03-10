@@ -6,8 +6,29 @@ import "strings"
 type Mode string
 
 const (
+	ModeNone       Mode = "none"
 	ModeMinimal    Mode = "minimal"
 	ModeAggressive Mode = "aggressive"
+)
+
+var allModes = []Mode{ModeNone, ModeMinimal, ModeAggressive}
+
+// Language represents a programming language for filtering
+type Language string
+
+const (
+	LangRust       Language = "rust"
+	LangPython     Language = "python"
+	LangJavaScript Language = "javascript"
+	LangTypeScript Language = "typescript"
+	LangGo         Language = "go"
+	LangC          Language = "c"
+	LangCpp        Language = "cpp"
+	LangJava       Language = "java"
+	LangRuby       Language = "ruby"
+	LangShell      Language = "sh"
+	LangSQL        Language = "sql"
+	LangUnknown    Language = "unknown"
 )
 
 // Filter defines the interface for output filters.
@@ -26,15 +47,19 @@ type Engine struct {
 
 // NewEngine creates a new filter engine with all registered filters.
 func NewEngine(mode Mode) *Engine {
+	filters := []Filter{
+		NewANSIFilter(),
+		NewCommentFilter(),
+		NewImportFilter(),
+		NewLogAggregator(),
+	}
+	if mode == ModeAggressive {
+		filters = append(filters, NewBodyFilter())
+	}
+
 	return &Engine{
-		filters: []Filter{
-			NewANSIFilter(),
-			NewCommentFilter(),
-			NewImportFilter(),
-			NewBodyFilter(),       // aggressive mode only
-			NewLogAggregator(),
-		},
-		mode: mode,
+		filters: filters,
+		mode:    mode,
 	}
 }
 
@@ -48,7 +73,7 @@ func (e *Engine) Process(input string) (string, int) {
 		if e.mode == ModeMinimal && filter.Name() == "body" {
 			continue
 		}
-		
+
 		filtered, saved := filter.Apply(output, e.mode)
 		output = filtered
 		totalSaved += saved
@@ -57,10 +82,38 @@ func (e *Engine) Process(input string) (string, int) {
 	return output, totalSaved
 }
 
-// ProcessWithLang processes input with language-specific optimization.
+// ModeNone = raw passthrough
 func (e *Engine) ProcessWithLang(input string, lang string) (string, int) {
 	// Language-specific processing can be added here
 	return e.Process(input)
+}
+
+// DetectLanguageFromInput detects language from input content
+func DetectLanguageFromInput(input string) Language {
+	if strings.Contains(input, "package ") || strings.Contains(input, "func ") {
+		return LangGo
+	}
+	if strings.Contains(input, "fn ") || strings.Contains(input, "pub fn") {
+		return LangRust
+	}
+	if strings.Contains(input, "def ") || strings.Contains(input, "class ") {
+		if strings.Contains(input, ":") && !strings.Contains(input, "{") {
+			return LangPython
+		}
+		if strings.Contains(input, "import ") {
+			return LangPython
+		}
+	}
+	if strings.Contains(input, "function ") || strings.Contains(input, "const ") {
+		if strings.Contains(input, ":") {
+			return LangTypeScript
+		}
+		return LangJavaScript
+	}
+	if strings.Contains(input, "SELECT") || strings.Contains(input, "FROM") || strings.Contains(input, "WHERE") || strings.Contains(input, "INSERT") || strings.Contains(input, "UPDATE") {
+		return LangSQL
+	}
+	return LangUnknown
 }
 
 // SetMode changes the filter mode.
@@ -92,13 +145,13 @@ func IsCode(output string) bool {
 		"pub fn", "pub struct", "pub async",
 		"//", "/*", "#!", "package main",
 	}
-	
+
 	for _, indicator := range codeIndicators {
 		if strings.Contains(output, indicator) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

@@ -13,14 +13,14 @@ import (
 )
 
 var proxyCmd = &cobra.Command{
-	Use:   "proxy <command> [args...]",
+	Use:   "proxy -- <command> [args...]",
 	Short: "Execute command without filtering but track usage",
 	Long: `Execute a command without applying any output filtering.
 
 Unlike other TokMan commands that filter output to reduce tokens,
 proxy runs the command as-is while still tracking execution metrics.
 Useful for commands where you need full unfiltered output.`,
-	Args: cobra.MinimumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if verbose > 0 {
 			fmt.Fprintf(os.Stderr, "Proxy mode: %s\n", strings.Join(args, " "))

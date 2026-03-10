@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	readLevel     string
-	readMaxLines  int
-	readLineNums  bool
+	readLevel    string
+	readMaxLines int
+	readLineNums bool
 )
 
 // readCmd represents the read command
@@ -76,8 +76,8 @@ func runRead(cmd *cobra.Command, args []string) error {
 		content = string(data)
 	}
 
-	// Detect language from extension
-	lang := detectLanguage(filePath)
+	// Detect language from extension and content
+	lang := detectLanguage(filePath, content)
 	if verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Detected language: %s\n", lang)
 	}
@@ -96,7 +96,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 		tokensSaved = 0
 	} else {
 		engine := filter.NewEngine(mode)
-		filtered, tokensSaved = engine.ProcessWithLang(content, lang)
+		filtered, tokensSaved = engine.ProcessWithLang(content, string(lang))
 	}
 
 	// Apply max lines if specified
@@ -134,45 +134,54 @@ func runRead(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// detectLanguage returns the language from file extension
-func detectLanguage(path string) string {
+// detectLanguage returns the language from file extension with content fallback
+func detectLanguage(path string, content string) filter.Language {
+	lang := detectLanguageFromExtension(path)
+	if lang != filter.LangUnknown {
+		return lang
+	}
+	return filter.DetectLanguageFromInput(content)
+}
+
+// detectLanguageFromExtension returns the language from file extension
+func detectLanguageFromExtension(path string) filter.Language {
 	if path == "stdin" {
-		return "unknown"
+		return filter.LangUnknown
 	}
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".go":
-		return "go"
+		return filter.LangGo
 	case ".rs":
-		return "rust"
+		return filter.LangRust
 	case ".py", ".pyw":
-		return "python"
+		return filter.LangPython
 	case ".js", ".mjs", ".cjs":
-		return "javascript"
+		return filter.LangJavaScript
 	case ".ts", ".tsx":
-		return "typescript"
+		return filter.LangTypeScript
 	case ".java":
-		return "java"
+		return filter.LangJava
 	case ".c", ".h":
-		return "c"
+		return filter.LangC
 	case ".cpp", ".cc", ".cxx", ".hpp", ".hh":
-		return "cpp"
+		return filter.LangCpp
 	case ".rb":
-		return "ruby"
+		return filter.LangRuby
 	case ".sh", ".bash", ".zsh":
-		return "bash"
-	case ".yaml", ".yml":
-		return "yaml"
-	case ".toml":
-		return "toml"
-	case ".json":
-		return "json"
-	case ".md":
-		return "markdown"
+		return filter.LangShell
 	case ".sql":
-		return "sql"
+		return filter.LangSQL
+	case ".yaml", ".yml":
+		return filter.LangUnknown
+	case ".toml":
+		return filter.LangUnknown
+	case ".json":
+		return filter.LangUnknown
+	case ".md":
+		return filter.LangUnknown
 	default:
-		return "unknown"
+		return filter.LangUnknown
 	}
 }
 

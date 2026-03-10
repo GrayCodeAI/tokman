@@ -26,18 +26,18 @@ func (f *LogAggregator) Name() string {
 // Apply aggregates log output and returns token savings.
 func (f *LogAggregator) Apply(input string, mode Mode) (string, int) {
 	original := len(input)
-	
+
 	// Check if this looks like log output
 	if !f.isLogOutput(input) {
 		return input, 0
 	}
-	
+
 	// Apply aggregations
 	output := f.aggregate(input)
-	
+
 	bytesSaved := original - len(output)
 	tokensSaved := bytesSaved / 4
-	
+
 	return output, tokensSaved
 }
 
@@ -47,7 +47,7 @@ func (f *LogAggregator) isLogOutput(input string) bool {
 	if len(lines) < 3 {
 		return false
 	}
-	
+
 	// Check for log patterns
 	logIndicators := 0
 	for _, line := range lines {
@@ -58,7 +58,7 @@ func (f *LogAggregator) isLogOutput(input string) bool {
 			}
 		}
 	}
-	
+
 	// If more than 20% of lines have timestamps, it's likely log output
 	return float64(logIndicators)/float64(len(lines)) > 0.2
 }
@@ -80,15 +80,15 @@ func (f *LogAggregator) deduplicateLines(input string) string {
 	if len(lines) == 0 {
 		return input
 	}
-	
+
 	var result []string
 	var prev string
 	count := 1
-	
+
 	for i, line := range lines {
 		// Strip timestamps for comparison
 		normalized := f.stripTimestamp(line)
-		
+
 		if normalized == prev && normalized != "" {
 			count++
 		} else {
@@ -103,7 +103,7 @@ func (f *LogAggregator) deduplicateLines(input string) string {
 			prev = line
 			count = 1
 		}
-		
+
 		// Handle last line
 		if i == len(lines)-1 {
 			if count > 1 {
@@ -113,7 +113,7 @@ func (f *LogAggregator) deduplicateLines(input string) string {
 			}
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -136,26 +136,26 @@ func (f *LogAggregator) aggregateTestResults(input string) string {
 			break
 		}
 	}
-	
+
 	if !hasTestOutput {
 		return input
 	}
-	
+
 	lines := strings.Split(input, "\n")
 	var result []string
 	var testSuites []testSuite
 	currentSuite := testSuite{}
 	inTestOutput := false
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Detect test suite boundaries
 		if strings.Contains(trimmed, "test result:") ||
 			strings.Contains(trimmed, "PASS") ||
 			strings.Contains(trimmed, "FAIL") {
 			inTestOutput = true
-			
+
 			// Parse test results
 			if strings.Contains(trimmed, "passed") {
 				currentSuite.Passed = f.extractNumber(trimmed, "passed")
@@ -167,14 +167,14 @@ func (f *LogAggregator) aggregateTestResults(input string) string {
 				currentSuite.Ignored = f.extractNumber(trimmed, "ignored")
 				currentSuite.Ignored += f.extractNumber(trimmed, "skipped")
 			}
-			
+
 			// Check for failure
 			if strings.Contains(trimmed, "FAILED") || strings.Contains(trimmed, "FAIL") {
 				currentSuite.Failed++
 			}
-			
+
 			// Finalize suite
-			if strings.Contains(trimmed, "test result:") || 
+			if strings.Contains(trimmed, "test result:") ||
 				(strings.Contains(trimmed, "PASS") && !strings.Contains(trimmed, "passed")) {
 				testSuites = append(testSuites, currentSuite)
 				currentSuite = testSuite{}
@@ -183,19 +183,19 @@ func (f *LogAggregator) aggregateTestResults(input string) string {
 			result = append(result, line)
 		}
 	}
-	
+
 	// Generate summary
 	if len(testSuites) > 0 {
 		totalPassed := 0
 		totalFailed := 0
 		totalIgnored := 0
-		
+
 		for _, suite := range testSuites {
 			totalPassed += suite.Passed
 			totalFailed += suite.Failed
 			totalIgnored += suite.Ignored
 		}
-		
+
 		// If no failures, show compact summary
 		if totalFailed == 0 && totalPassed > 0 {
 			summary := "✓ " + strconv.Itoa(totalPassed) + " passed"
@@ -206,12 +206,12 @@ func (f *LogAggregator) aggregateTestResults(input string) string {
 			result = append(result, "", summary)
 		} else {
 			// Show failures in detail
-			summary := "✗ " + strconv.Itoa(totalFailed) + " failed, " + 
+			summary := "✗ " + strconv.Itoa(totalFailed) + " failed, " +
 				strconv.Itoa(totalPassed) + " passed"
 			result = append(result, "", summary)
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -227,11 +227,11 @@ func (f *LogAggregator) aggregateBuildOutput(input string) string {
 	var result []string
 	warningCount := 0
 	errorCount := 0
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		lower := strings.ToLower(trimmed)
-		
+
 		// Count warnings and errors
 		if strings.Contains(lower, "warning:") {
 			warningCount++
@@ -241,22 +241,22 @@ func (f *LogAggregator) aggregateBuildOutput(input string) string {
 			}
 			continue
 		}
-		
+
 		if strings.Contains(lower, "error:") {
 			errorCount++
 			result = append(result, line)
 			continue
 		}
-		
+
 		result = append(result, line)
 	}
-	
+
 	// Add summary if we condensed warnings
 	if warningCount > 3 {
-		result = append(result, "", 
+		result = append(result, "",
 			"... and "+strconv.Itoa(warningCount-3)+" more warnings")
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -282,33 +282,33 @@ func Aggregate(input string) string {
 // GroupLines groups lines by common prefix or pattern.
 func GroupLines(input string) string {
 	lines := strings.Split(input, "\n")
-	
+
 	// Group by first word/pattern
 	groups := make(map[string][]string)
 	var order []string
-	
+
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		// Extract key (first word or pattern)
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
 		}
-		
+
 		key := fields[0]
 		if len(key) > 20 {
 			key = key[:20]
 		}
-		
+
 		if _, exists := groups[key]; !exists {
 			order = append(order, key)
 		}
 		groups[key] = append(groups[key], line)
 	}
-	
+
 	// Reconstruct with groups
 	var result []string
 	for _, key := range order {
@@ -319,6 +319,6 @@ func GroupLines(input string) string {
 			result = append(result, lines[0])
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }

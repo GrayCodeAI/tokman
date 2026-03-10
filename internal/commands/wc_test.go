@@ -125,15 +125,15 @@ func TestFormatMultiLine(t *testing.T) {
 		contains []string
 	}{
 		{
-			name:  "full mode multiple files",
-			lines: []string{"      30      96     978 src/main.go", "      50     120    1500 src/lib.go", "      80     216    2478 total"},
-			mode:  WcModeFull,
+			name:     "full mode multiple files",
+			lines:    []string{"      30      96     978 src/main.go", "      50     120    1500 src/lib.go", "      80     216    2478 total"},
+			mode:     WcModeFull,
 			contains: []string{"30L 96W 978B", "50L 120W 1500B", "Σ 80L 216W 2478B"},
 		},
 		{
-			name:  "lines mode multiple files",
-			lines: []string{"      30 src/main.go", "      50 src/lib.go", "      80 total"},
-			mode:  WcModeLines,
+			name:     "lines mode multiple files",
+			lines:    []string{"      30 src/main.go", "      50 src/lib.go", "      80 total"},
+			mode:     WcModeLines,
 			contains: []string{"30 main.go", "50 lib.go", "Σ 80"},
 		},
 	}
@@ -237,4 +237,3 @@ func TestIsNumeric(t *testing.T) {
 		})
 	}
 }
-

@@ -27,12 +27,12 @@ type TokmanRule struct {
 
 // Classification represents the result of classifying a command
 type Classification struct {
-	Supported     bool
-	TokManCmd     string
-	Category      string
-	SavingsPct    float64
-	Status        TokmanStatus
-	BaseCommand   string // For unsupported commands
+	Supported   bool
+	TokManCmd   string
+	Category    string
+	SavingsPct  float64
+	Status      TokmanStatus
+	BaseCommand string // For unsupported commands
 }
 
 var (
@@ -182,11 +182,11 @@ func ClassifyCommand(cmd string) Classification {
 		}
 
 		return Classification{
-			Supported: true,
-			TokManCmd: rule.TokManCmd,
-			Category:  rule.Category,
+			Supported:  true,
+			TokManCmd:  rule.TokManCmd,
+			Category:   rule.Category,
 			SavingsPct: savings,
-			Status:    status,
+			Status:     status,
 		}
 	}
 
@@ -475,10 +475,10 @@ func GetMapping(command string) (CommandMapping, bool) {
 	class := ClassifyCommand(command)
 	if class.Supported {
 		return CommandMapping{
-			Original:   command,
-			TokManCmd:  class.TokManCmd,
-			Enabled:    true,
-			PassArgs:   true,
+			Original:  command,
+			TokManCmd: class.TokManCmd,
+			Enabled:   true,
+			PassArgs:  true,
 		}, true
 	}
 	return CommandMapping{}, false
@@ -489,10 +489,10 @@ func ListRewrites() []CommandMapping {
 	var rewrites []CommandMapping
 	for _, rule := range rules {
 		rewrites = append(rewrites, CommandMapping{
-			Original:   rule.RewritePrefixes[0],
-			TokManCmd:  rule.TokManCmd,
-			Enabled:    true,
-			PassArgs:   true,
+			Original:  rule.RewritePrefixes[0],
+			TokManCmd: rule.TokManCmd,
+			Enabled:   true,
+			PassArgs:  true,
 		})
 	}
 	return rewrites
@@ -500,10 +500,10 @@ func ListRewrites() []CommandMapping {
 
 // CommandMapping defines how a command should be rewritten (legacy API)
 type CommandMapping struct {
-	Original   string
-	TokManCmd  string
-	Enabled    bool
-	PassArgs   bool
+	Original  string
+	TokManCmd string
+	Enabled   bool
+	PassArgs  bool
 }
 
 // Registry is kept for backward compatibility (legacy API)

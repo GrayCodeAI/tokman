@@ -2,26 +2,28 @@ package commands
 
 import (
 	"testing"
+
+	"github.com/GrayCodeAI/tokman/internal/filter"
 )
 
 func TestDetectSmartLanguage(t *testing.T) {
 	tests := []struct {
 		filePath string
-		expected Language
+		expected filter.Language
 	}{
-		{"main.go", LangGo},
-		{"lib.rs", LangRust},
-		{"script.py", LangPython},
-		{"index.js", LangJavaScript},
-		{"app.ts", LangTypeScript},
-		{"component.tsx", LangTypeScript},
-		{"main.c", LangC},
-		{"utils.cpp", LangCpp},
-		{"App.java", LangJava},
-		{"gem.rb", LangRuby},
-		{"run.sh", LangShell},
-		{"unknown.xyz", LangUnknown},
-		{"noextension", LangUnknown},
+		{"main.go", filter.LangGo},
+		{"lib.rs", filter.LangRust},
+		{"script.py", filter.LangPython},
+		{"index.js", filter.LangJavaScript},
+		{"app.ts", filter.LangTypeScript},
+		{"component.tsx", filter.LangTypeScript},
+		{"main.c", filter.LangC},
+		{"utils.cpp", filter.LangCpp},
+		{"App.java", filter.LangJava},
+		{"gem.rb", filter.LangRuby},
+		{"run.sh", filter.LangShell},
+		{"unknown.xyz", filter.LangUnknown},
+		{"noextension", filter.LangUnknown},
 	}
 
 	for _, tt := range tests {
@@ -41,7 +43,7 @@ func main() {}
 func helper() string { return "" }
 func (s *Struct) method() {}
 `
-	functions := extractFunctions(content, LangGo)
+	functions := extractFunctions(content, filter.LangGo)
 
 	if len(functions) < 2 {
 		t.Errorf("expected at least 2 functions, got %d: %v", len(functions), functions)
@@ -60,7 +62,7 @@ func TestExtractFunctions_Rust(t *testing.T) {
 pub fn public_func() {}
 async fn async_func() {}
 `
-	functions := extractFunctions(content, LangRust)
+	functions := extractFunctions(content, filter.LangRust)
 
 	// Should exclude main
 	for _, fn := range functions {
@@ -80,7 +82,7 @@ def helper():
 def test_something():
     pass
 `
-	functions := extractFunctions(content, LangPython)
+	functions := extractFunctions(content, filter.LangPython)
 
 	// test_ functions should be filtered out
 	for _, fn := range functions {
@@ -99,7 +101,7 @@ type Server struct {
     Port int
 }
 `
-	structs := extractStructs(content, LangGo)
+	structs := extractStructs(content, filter.LangGo)
 
 	if len(structs) != 2 {
 		t.Errorf("expected 2 structs, got %d: %v", len(structs), structs)
@@ -116,7 +118,7 @@ enum Status {
     Inactive,
 }
 `
-	structs := extractStructs(content, LangRust)
+	structs := extractStructs(content, filter.LangRust)
 
 	if len(structs) != 2 {
 		t.Errorf("expected 2 structs/enums, got %d: %v", len(structs), structs)
@@ -134,7 +136,7 @@ class Service {
 
 type ID = string;
 `
-	structs := extractStructs(content, LangTypeScript)
+	structs := extractStructs(content, filter.LangTypeScript)
 
 	if len(structs) != 3 {
 		t.Errorf("expected 3 interface/class/type, got %d: %v", len(structs), structs)
@@ -150,7 +152,7 @@ import (
     "github.com/GrayCodeAI/tokman/internal/config"
 )
 `
-	imports := extractImports(content, LangGo)
+	imports := extractImports(content, filter.LangGo)
 
 	if len(imports) == 0 {
 		t.Error("expected imports to be extracted")
@@ -175,7 +177,7 @@ func TestExtractImports_Rust(t *testing.T) {
 use serde::Deserialize;
 use tokio::runtime;
 `
-	imports := extractImports(content, LangRust)
+	imports := extractImports(content, filter.LangRust)
 
 	if len(imports) == 0 {
 		t.Error("expected imports to be extracted")
@@ -186,31 +188,31 @@ func TestDetectPatterns(t *testing.T) {
 	tests := []struct {
 		name     string
 		content  string
-		lang     Language
+		lang     filter.Language
 		contains string
 	}{
 		{
 			name:     "async pattern",
 			content:  "async fn run() { await something(); }",
-			lang:     LangRust,
+			lang:     filter.LangRust,
 			contains: "async",
 		},
 		{
 			name:     "derive pattern",
 			content:  "#[derive(Debug, Clone)]\nstruct Config {}",
-			lang:     LangRust,
+			lang:     filter.LangRust,
 			contains: "derive",
 		},
 		{
 			name:     "React hooks",
 			content:  "const [state, setState] = useState(0);\nuseEffect(() => {}, []);",
-			lang:     LangTypeScript,
+			lang:     filter.LangTypeScript,
 			contains: "React hooks",
 		},
 		{
 			name:     "Python dataclass",
 			content:  "@dataclass\nclass Config:\n    name: str",
-			lang:     LangPython,
+			lang:     filter.LangPython,
 			contains: "dataclass",
 		},
 	}
@@ -245,7 +247,7 @@ type Config struct {
     Name string
 }
 `
-	summary := analyzeCode(content, LangGo)
+	summary := analyzeCode(content, filter.LangGo)
 
 	if summary.line1 == "" {
 		t.Error("expected non-empty line1")

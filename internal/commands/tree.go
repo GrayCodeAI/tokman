@@ -37,13 +37,13 @@ func runTree(cmd *cobra.Command, args []string) error {
 
 	// Build tree command
 	treeArgs := append([]string{}, args...)
-	
+
 	c := exec.Command("tree", treeArgs...)
-	
+
 	var stdout, stderr bytes.Buffer
 	c.Stdout = &stdout
 	c.Stderr = &stderr
-	
+
 	err := c.Run()
 	output := stdout.String()
 	if output == "" && stderr.Len() > 0 {
