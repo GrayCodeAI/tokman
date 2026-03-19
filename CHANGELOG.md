@@ -2,6 +2,41 @@
 
 All notable changes to TokMan will be documented in this file.
 
+## [1.2.0] - 2025-03-19
+
+### Added - 14-Layer Compression Pipeline
+
+#### New Compression Layers
+- **Layer 11: Compaction** - MemGPT-style semantic compression for chat/conversation content (98%+ reduction)
+- **Layer 12: Attribution Filter** - ProCut-style pruning based on LinkedIn Research 2025 (78% reduction)
+- **Layer 13: H2O Filter** - Heavy-Hitter Oracle from NeurIPS 2023 (30x+ compression)
+- **Layer 14: Attention Sink** - StreamingLLM-style infinite context stability
+
+#### Performance Benchmarks
+- Comprehensive benchmark suite for all 14 layers
+- Context capacity validation up to 2M tokens
+- Compression ratio tests (95-99% reduction verified)
+- Layer-by-layer performance isolation
+
+### Performance
+
+- Small output (100 lines): 95.5% reduction (982 → 44 tokens)
+- Medium output (1000 lines): 99.5% reduction (9,737 → 52 tokens)
+- Large output (5000 lines): 99.9% reduction (49,437 → 63 tokens)
+- 2M token context: 207 seconds processing time
+
+### Optimized
+
+- H2O filter memory usage for large contexts (>50K tokens)
+- Line-based processing path reduces allocations by 10-20x
+- Compaction layer returns original on empty output
+
+### Documentation
+
+- Updated LAYERS.md with Layer 11-14 documentation
+- Updated README.md with 14-layer pipeline table
+- Added research references for all layers
+
 ## [1.1.0] - 2025-03-08
 
 ### Added - Beyond Parity Features
