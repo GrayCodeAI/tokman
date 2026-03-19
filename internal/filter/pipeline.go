@@ -57,6 +57,9 @@ type PipelineCoordinator struct {
 	
 	// Optional: Neural Layer (when LLM enabled)
 	llmFilter *LLMAwareFilter
+	
+	// Layer 11: Compaction Layer (AdaL-style semantic compression)
+	compactionLayer *CompactionLayer
 }
 
 // PipelineConfig holds configuration for the compression pipeline
@@ -94,6 +97,14 @@ type PipelineConfig struct {
 	EnableEvaluator   bool
 	EnableGist        bool
 	EnableHierarchical bool
+	
+	// Layer 11: Compaction (AdaL-style semantic compression)
+	EnableCompaction        bool
+	CompactionThreshold     int
+	CompactionPreserveTurns int
+	CompactionMaxTokens     int
+	CompactionStateSnapshot bool
+	CompactionAutoDetect    bool
 }
 
 // NewPipelineCoordinator creates a new 10-layer pipeline coordinator.
@@ -179,6 +190,29 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 		})
 	}
 	
+	// Layer 11: Compaction Layer (AdaL-style semantic compression)
+	if cfg.EnableCompaction {
+		compactionCfg := CompactionConfig{
+			Enabled:              true,
+			ThresholdTokens:      cfg.CompactionThreshold,
+			PreserveRecentTurns:  cfg.CompactionPreserveTurns,
+			MaxSummaryTokens:     cfg.CompactionMaxTokens,
+			StateSnapshotFormat:  cfg.CompactionStateSnapshot,
+			AutoDetect:           cfg.CompactionAutoDetect,
+			CacheEnabled:         true,
+		}
+		if compactionCfg.ThresholdTokens == 0 {
+			compactionCfg.ThresholdTokens = 2000
+		}
+		if compactionCfg.PreserveRecentTurns == 0 {
+			compactionCfg.PreserveRecentTurns = 5
+		}
+		if compactionCfg.MaxSummaryTokens == 0 {
+			compactionCfg.MaxSummaryTokens = 500
+		}
+		p.compactionLayer = NewCompactionLayer(compactionCfg)
+	}
+	
 	return p
 }
 
@@ -239,6 +273,11 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	// Optional: Neural Layer (LLM-based compression)
 	if p.llmFilter != nil {
 		output = p.processLayerNeural(output, stats)
+	}
+	
+	// Layer 11: Compaction Layer (AdaL-style semantic compression)
+	if p.compactionLayer != nil {
+		output = p.processLayer11(output, stats)
 	}
 	
 	// Layer 10: Budget Enforcement (Strict token limits)
@@ -320,6 +359,13 @@ func (p *PipelineCoordinator) processLayer9(input string, stats *PipelineStats) 
 func (p *PipelineCoordinator) processLayerNeural(input string, stats *PipelineStats) string {
 	output, saved := p.llmFilter.Apply(input, p.config.Mode)
 	stats.LayerStats["neural"] = LayerStat{TokensSaved: saved}
+	return output
+}
+
+// Layer 11: Compaction (AdaL-style semantic compression)
+func (p *PipelineCoordinator) processLayer11(input string, stats *PipelineStats) string {
+	output, saved := p.compactionLayer.Apply(input, p.config.Mode)
+	stats.LayerStats["11_compaction"] = LayerStat{TokensSaved: saved}
 	return output
 }
 
