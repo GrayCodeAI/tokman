@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"bufio"
 	"math"
 	"strings"
 	"unicode"
@@ -105,53 +106,56 @@ type scoredSegment struct {
 	lines   int
 }
 
-// segmentOutput splits output into logical segments
+// segmentOutput splits output into logical segments using streaming
+// for memory efficiency with large contexts
 func (f *SemanticFilter) segmentOutput(input string) []segment {
-	lines := strings.Split(input, "\n")
-	if len(lines) == 0 {
-		return nil
-	}
-	
 	var segments []segment
-	var currentSegment []string
-	segmentStart := 0
+	var currentSegment strings.Builder
+	var prevLine string
+	lineInSegment := 0
 	
-	for i, line := range lines {
-		// Check for segment boundaries
-		isBoundary := f.isSegmentBoundary(line, lines, i)
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		line := scanner.Text()
 		
-		if isBoundary && len(currentSegment) > 0 {
+		// Check for segment boundaries (streaming-compatible)
+		isBoundary := f.isSegmentBoundaryStreaming(line, prevLine)
+		
+		if isBoundary && currentSegment.Len() > 0 {
 			// Save current segment
-			content := strings.Join(currentSegment, "\n")
 			segments = append(segments, segment{
-				content: content,
-				lines:   i - segmentStart,
+				content: currentSegment.String(),
+				lines:   lineInSegment,
 			})
-			currentSegment = nil
-			segmentStart = i
+			currentSegment.Reset()
+			lineInSegment = 0
 		}
 		
-		currentSegment = append(currentSegment, line)
+		if currentSegment.Len() > 0 {
+			currentSegment.WriteString("\n")
+		}
+		currentSegment.WriteString(line)
+		lineInSegment++
+		prevLine = line
 	}
 	
 	// Add final segment
-	if len(currentSegment) > 0 {
-		content := strings.Join(currentSegment, "\n")
+	if currentSegment.Len() > 0 {
 		segments = append(segments, segment{
-			content: content,
-			lines:   len(lines) - segmentStart,
+			content: currentSegment.String(),
+			lines:   lineInSegment,
 		})
 	}
 	
 	return segments
 }
 
-// isSegmentBoundary determines if a line is a segment boundary
-func (f *SemanticFilter) isSegmentBoundary(line string, lines []string, idx int) bool {
+// isSegmentBoundaryStreaming determines if a line is a segment boundary (streaming version)
+func (f *SemanticFilter) isSegmentBoundaryStreaming(line, prevLine string) bool {
 	trimmed := strings.TrimSpace(line)
 	
 	// Empty lines are often boundaries (but not consecutive ones)
-	if trimmed == "" && idx > 0 && strings.TrimSpace(lines[idx-1]) != "" {
+	if trimmed == "" && prevLine != "" && strings.TrimSpace(prevLine) != "" {
 		return true
 	}
 	
@@ -179,6 +183,15 @@ func (f *SemanticFilter) isSegmentBoundary(line string, lines []string, idx int)
 	}
 	
 	return false
+}
+
+// isSegmentBoundary is the legacy method for backward compatibility with tests
+func (f *SemanticFilter) isSegmentBoundary(line string, lines []string, idx int) bool {
+	prevLine := ""
+	if idx > 0 {
+		prevLine = lines[idx-1]
+	}
+	return f.isSegmentBoundaryStreaming(line, prevLine)
 }
 
 // scoreSegment calculates information density for a segment

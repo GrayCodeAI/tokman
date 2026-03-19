@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"bufio"
 	"container/heap"
 	"strings"
 )
@@ -112,67 +113,98 @@ func (h *H2OFilter) Apply(input string, mode Mode) (string, int) {
 
 // applyLineBased processes content line-by-line for memory efficiency
 // Used for large contexts (>50K tokens) to reduce memory overhead
+// Uses streaming to avoid allocating full string slice
 func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) (string, int) {
-	lines := strings.Split(input, "\n")
-	n := len(lines)
+	// First pass: count lines and collect line indices (streaming)
+	lineCount := 0
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		lineCount++
+	}
 	
+	n := lineCount
 	if n < h.config.SinkSize+h.config.RecentSize+10 {
 		return input, 0
 	}
 	
-	// Calculate line importance scores
-	scores := make([]float64, n)
-	for i, line := range lines {
-		scores[i] = h.scoreLine(line, i, n)
-	}
-	
-	// Build keep set: sinks + recent + heavy hitters
-	keep := make(map[int]bool)
-	
-	// Always keep first N lines (sinks)
-	for i := 0; i < h.config.SinkSize && i < n; i++ {
-		keep[i] = true
-	}
-	
-	// Always keep last N lines (recent)
+	// Second pass: score lines and store minimal data
+	// Only store scores for middle section (not sinks or recent)
 	recentStart := n - h.config.RecentSize
 	if recentStart < h.config.SinkSize {
 		recentStart = h.config.SinkSize
 	}
-	for i := recentStart; i < n; i++ {
-		keep[i] = true
+	
+	// Collect scores for middle section only
+	type lineScore struct {
+		index int
+		score float64
+		text  string
+	}
+	middleLines := make([]lineScore, 0, recentStart-h.config.SinkSize)
+	
+	lineIdx := 0
+	scanner = bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if lineIdx >= h.config.SinkSize && lineIdx < recentStart {
+			if len(strings.TrimSpace(line)) > 0 {
+				middleLines = append(middleLines, lineScore{
+					index: lineIdx,
+					score: h.scoreLine(line, lineIdx, n),
+					text:  line,
+				})
+			}
+		}
+		lineIdx++
 	}
 	
-	// Find heavy hitter lines using heap
+	// Build keep set for middle lines using heap
 	hh := &tokenHeap{}
 	heap.Init(hh)
 	
-	for i := h.config.SinkSize; i < recentStart; i++ {
-		if len(strings.TrimSpace(lines[i])) > 0 {
-			heap.Push(hh, &scoredToken{
-				index: i,
-				score: scores[i],
-			})
-		}
+	for _, ls := range middleLines {
+		heap.Push(hh, &scoredToken{
+			index: ls.index,
+			score: ls.score,
+		})
 	}
 	
-	// Extract top heavy hitters
+	// Extract heavy hitter indices
+	keepMiddle := make(map[int]bool)
 	heavyHitterCount := h.config.HeavyHitterSize
 	for hh.Len() > 0 && heavyHitterCount > 0 {
 		st := heap.Pop(hh).(*scoredToken)
-		keep[st.index] = true
+		keepMiddle[st.index] = true
 		heavyHitterCount--
 	}
 	
-	// Build output
+	// Third pass: build output (streaming)
 	var result strings.Builder
-	for i, line := range lines {
-		if keep[i] {
-			if result.Len() > 0 {
+	result.Grow(originalTokens * 4 / 10) // Pre-allocate ~40% of original
+	
+	lineIdx = 0
+	scanner = bufio.NewScanner(strings.NewReader(input))
+	first := true
+	for scanner.Scan() {
+		line := scanner.Text()
+		keep := false
+		
+		if lineIdx < h.config.SinkSize {
+			keep = true // Sink
+		} else if lineIdx >= recentStart {
+			keep = true // Recent
+		} else if keepMiddle[lineIdx] {
+			keep = true // Heavy hitter
+		}
+		
+		if keep {
+			if !first {
 				result.WriteString("\n")
 			}
 			result.WriteString(line)
+			first = false
 		}
+		lineIdx++
 	}
 	
 	output := result.String()
