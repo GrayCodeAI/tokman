@@ -30,6 +30,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(treeCmd)
+	treeCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 }
 
 func runTree(cmd *cobra.Command, args []string) error {
