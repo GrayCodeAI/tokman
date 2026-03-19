@@ -31,6 +31,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(psqlCmd)
+	psqlCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 }
 
 var (

@@ -35,6 +35,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(awsCmd)
+	awsCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 }
 
 func runAws(cmd *cobra.Command, args []string) error {
