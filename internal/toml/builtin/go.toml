@@ -1,0 +1,70 @@
+# Go CLI filter
+schema_version = 1
+
+[go_build]
+match_command = "^go(\\s+build)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "error:.*",
+    "undefined:",
+    "cannot find",
+    "cannot use",
+]
+on_empty = "Build completed"
+
+[go_test]
+match_command = "^go(\\s+test)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+    "^PASS$",
+    "^ok\\s+",
+]
+keep_lines_matching = [
+    "FAIL\\s+",
+    "--- FAIL:",
+    "panic:",
+    "Error:.*",
+    "expected",
+    "got",
+]
+head = 20
+tail = 50
+max_lines = 100
+
+[go_mod]
+match_command = "^go(\\s+mod)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^go: downloading",
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "go: added",
+    "go: removed",
+    "go: updated",
+    "go: found",
+    "Error:.*",
+]
+max_lines = 50
+
+[go_vet]
+match_command = "^go(\\s+vet)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\s*$"]
+keep_lines_matching = [
+    ".*\\.go:\\d+:",
+    "Error:.*",
+]
+on_empty = "No issues"
+
+[go_fmt]
+match_command = "^go(\\s+fmt)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\s*$"]
+on_empty = "Formatted"

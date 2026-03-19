@@ -1,0 +1,77 @@
+# NPM CLI filter
+schema_version = 1
+
+[npm_install]
+match_command = "^npm(\\s+install)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^npm WARN",
+    "^\\x1b\\[",
+    "^up to date",
+    "^audited \\d+ packages",
+    "^found \\d+ vulnerabilities",
+    "^\\+ .*",
+    "^$",
+]
+on_empty = "Packages installed"
+
+[npm_test]
+match_command = "^npm(\\s+test)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^PASS\\s+",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "FAIL.*",
+    "Error:.*",
+    "Tests:.*",
+    "Snapshots:.*",
+    "Time:.*",
+]
+head = 20
+tail = 20
+
+[npm_run]
+match_command = "^npm(\\s+run)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\x1b\\[",
+    "^\\s*$",
+]
+max_lines = 100
+
+[npm_list]
+match_command = "^npm(\\s+list)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^├──",
+    "^└──",
+    "^│",
+]
+head = 50
+max_lines = 100
+
+[yarn_install]
+match_command = "^yarn(\\s+install)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^yarn install",
+    "^success",
+    "^Done in",
+    "^\\x1b\\[",
+    "^$",
+]
+on_empty = "Yarn install completed"
+
+[yarn_test]
+match_command = "^yarn(\\s+test)?(\\s+.*)?$"
+strip_ansi = true
+keep_lines_matching = [
+    "FAIL.*",
+    "Error:.*",
+    "Tests:.*",
+    "PASS.*",
+]
+head = 20
+tail = 20

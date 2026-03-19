@@ -1,0 +1,68 @@
+# Kubectl CLI filter
+schema_version = 1
+
+[kubectl_get_pods]
+match_command = "^kubectl(\\s+get)?\\s+pods?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^NAME\\s+READY"]
+head = 100
+max_lines = 100
+
+[kubectl_get_all]
+match_command = "^kubectl(\\s+get)?\\s+all(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^NAME\\s+",
+    "^pod/",
+    "^service/",
+    "^deployment/",
+    "^replicaset/",
+]
+head = 50
+max_lines = 100
+
+[kubectl_describe]
+match_command = "^kubectl(\\s+describe)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Labels:.*",
+    "^Annotations:.*",
+    "^CreationTimestamp:.*",
+    "^Resource Version:.*",
+    "^UID:.*",
+    "^$",
+]
+head = 50
+max_lines = 100
+
+[kubectl_logs]
+match_command = "^kubectl(\\s+logs)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\x1b\\[",
+    "^$",
+]
+tail = 100
+max_lines = 200
+
+[kubectl_apply]
+match_command = "^kubectl(\\s+apply)?(\\s+.*)?$"
+strip_ansi = true
+keep_lines_matching = [
+    "created",
+    "configured",
+    "unchanged",
+    "Error:.*",
+]
+max_lines = 50
+on_empty = "Resources applied"
+
+[kubectl_delete]
+match_command = "^kubectl(\\s+delete)?(\\s+.*)?$"
+strip_ansi = true
+keep_lines_matching = [
+    "deleted",
+    "Error:.*",
+]
+max_lines = 50
+on_empty = "Resources deleted"

@@ -108,6 +108,11 @@ func getGlobalTracker() *Tracker {
 	return globalTracker
 }
 
+// GetGlobalTracker returns the global tracker instance (exported for external use).
+func GetGlobalTracker() *Tracker {
+	return getGlobalTracker()
+}
+
 // DatabasePath returns the default database path.
 func DatabasePath() string {
 	home, err := os.UserHomeDir()

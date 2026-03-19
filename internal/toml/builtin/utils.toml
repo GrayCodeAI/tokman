@@ -1,0 +1,98 @@
+# Utility command filters
+schema_version = 1
+
+[ls]
+match_command = "^ls(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^node_modules$",
+    "^\\.git$",
+    "^__pycache__$",
+    "^\\.venv$",
+    "^dist$",
+    "^build$",
+    "^target$",
+    "^\\.next$",
+    "^\\.DS_Store$",
+    "^\\x1b\\[",
+]
+head = 100
+max_lines = 100
+
+[find]
+match_command = "^find(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "/node_modules/",
+    "/\\.git/",
+    "/__pycache__/",
+    "/target/",
+    "/build/",
+    "/dist/",
+    "/\\.venv/",
+    "/\\.next/",
+    "\\.pyc$",
+    "\\.class$",
+    "\\.o$",
+    "^\\x1b\\[",
+]
+head = 100
+max_lines = 200
+
+[tree]
+match_command = "^tree(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "node_modules",
+    "\\.git",
+    "__pycache__",
+    "target",
+    "build",
+    "dist",
+    "\\.venv",
+    "\\.next",
+    "^\\x1b\\[",
+]
+head = 50
+max_lines = 100
+
+[grep]
+match_command = "^grep(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "Binary file",
+    "^\\x1b\\[",
+]
+head = 100
+max_lines = 200
+
+[cat]
+match_command = "^cat(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+head = 200
+max_lines = 300
+
+[head_cmd]
+match_command = "^head(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 50
+
+[tail_cmd]
+match_command = "^tail(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 50
+
+[wc]
+match_command = "^wc(\\s+.*)?$"
+strip_ansi = true
+max_lines = 10
+
+[jq]
+match_command = "^jq(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+head = 100
+max_lines = 200

@@ -54,7 +54,8 @@ Global flags (applied before subcommand):
   --bare                      Treat repository as bare
   --literal-pathspecs         Treat pathspecs literally
   -c <key=value>              Set git config option`,
-	TraverseChildren: true, // Allow flags between 'git' and subcommand
+	TraverseChildren:      true, // Allow flags between 'git' and subcommand
+	FParseErrWhitelist:    cobra.FParseErrWhitelist{UnknownFlags: true},
 }
 
 // buildGitCmd creates a git command with global options prepended
@@ -94,6 +95,44 @@ func buildGitCmd(subCmd string, args ...string) *exec.Cmd {
 	return exec.Command("git", cmdArgs...)
 }
 
+// extractGitArgs extracts git-specific args from the args list
+// (filters out tokman-specific flags)
+func extractGitArgs(args []string) []string {
+	var gitArgs []string
+	skipNext := false
+	for _, arg := range args {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		// Skip tokman-specific flags that take values
+		if arg == "--query" {
+			skipNext = true
+			continue
+		}
+		// Skip tokman-specific boolean flags
+		if strings.HasPrefix(arg, "--ultra-compact") ||
+			arg == "-u" ||
+			strings.HasPrefix(arg, "--verbose") ||
+			arg == "-v" ||
+			strings.HasPrefix(arg, "-vv") ||
+			strings.HasPrefix(arg, "-vvv") ||
+			arg == "--dry-run" ||
+			arg == "--llm" ||
+			arg == "--skip-env" {
+			continue
+		}
+		// Skip tokman flags with values
+		if strings.HasPrefix(arg, "--query=") ||
+			strings.HasPrefix(arg, "--config=") ||
+			strings.HasPrefix(arg, "-c=") {
+			continue
+		}
+		gitArgs = append(gitArgs, arg)
+	}
+	return gitArgs
+}
+
 var gitStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show working tree status (filtered)",
@@ -123,6 +162,7 @@ var gitDiffCmd = &cobra.Command{
 - Stats summary first
 - Diff hunks limited to 30 lines each
 - ANSI colors stripped`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
 		startTime := time.Now()
 		output, err := runGitDiff(args)
@@ -142,6 +182,10 @@ var gitDiffCmd = &cobra.Command{
 	},
 }
 
+var (
+	gitLogCount int
+)
+
 var gitLogCmd = &cobra.Command{
 	Use:   "log [args...]",
 	Short: "Show commit logs (filtered)",
@@ -149,9 +193,18 @@ var gitLogCmd = &cobra.Command{
 - Default: oneline format
 - Commit count limited to 20
 - Full output only with --verbose flag`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
+		// Extract non-flag args (everything that's not a tokman flag)
+		gitArgs := extractGitArgs(args)
+		
+		// If -n flag was set via Cobra, add it to gitArgs
+		if gitLogCount > 0 {
+			gitArgs = append([]string{fmt.Sprintf("-n%d", gitLogCount)}, gitArgs...)
+		}
+		
 		startTime := time.Now()
-		output, err := runGitLog(args, verbose > 0)
+		output, err := runGitLog(gitArgs, verbose > 0)
 		execTime := time.Since(startTime).Milliseconds()
 
 		if err != nil {
@@ -170,13 +223,14 @@ var gitLogCmd = &cobra.Command{
 
 // GitStatus represents parsed git status output
 type GitStatus struct {
-	Branch     string
-	Ahead      int
-	Behind     int
-	Staged     []GitFile
-	Modified   []GitFile
-	Untracked  []GitFile
-	Conflicted []GitFile
+	Branch         string
+	TrackingBranch string // e.g., "origin/main"
+	Ahead          int
+	Behind         int
+	Staged         []GitFile
+	Modified       []GitFile
+	Untracked      []GitFile
+	Conflicted     []GitFile
 }
 
 // GitFile represents a file in git status
@@ -211,6 +265,9 @@ func init() {
 	gitCmd.AddCommand(gitFetchCmd)
 	gitCmd.AddCommand(gitStashCmd)
 	gitCmd.AddCommand(gitWorktreeCmd)
+
+	// Git log specific flags
+	gitLogCmd.Flags().IntVarP(&gitLogCount, "number", "n", 0, "Number of commits to show")
 }
 
 // runGitStatus executes git status with porcelain parsing
@@ -238,7 +295,7 @@ func parsePorcelain(output string) *GitStatus {
 	for i, line := range lines {
 		if i == 0 {
 			// Branch line: "## main...origin/main [ahead 2, behind 1]"
-			status.Branch, status.Ahead, status.Behind = parseBranchLine(line)
+			status.Branch, status.TrackingBranch, status.Ahead, status.Behind = parseBranchLine(line)
 			continue
 		}
 
@@ -284,14 +341,14 @@ func parsePorcelain(output string) *GitStatus {
 	return status
 }
 
-// parseBranchLine extracts branch name and ahead/behind counts
-func parseBranchLine(line string) (branch string, ahead, behind int) {
+// parseBranchLine extracts branch name, tracking branch, and ahead/behind counts
+func parseBranchLine(line string) (branch, tracking string, ahead, behind int) {
 	// Remove "## " prefix
 	line = strings.TrimPrefix(line, "## ")
 
 	// Check for detached HEAD
 	if strings.HasPrefix(line, "HEAD detached") {
-		return "HEAD detached", 0, 0
+		return "HEAD detached", "", 0, 0
 	}
 
 	// Check for initial branch (no tracking)
@@ -304,20 +361,26 @@ func parseBranchLine(line string) (branch string, ahead, behind int) {
 		} else {
 			branch = strings.TrimSpace(line)
 		}
-		return branch, ahead, behind
+		return branch, "", ahead, behind
 	}
 
 	// Normal branch with tracking: "main...origin/main [ahead 2, behind 1]"
 	parts := strings.SplitN(line, "...", 2)
 	branch = strings.Fields(parts[0])[0] // Handle "main (no branch)"
 
-	if len(parts) > 1 && strings.Contains(parts[1], "[") {
-		// Extract ahead/behind
-		abParts := strings.SplitN(parts[1], "[", 2)
-		ahead, behind = parseAheadBehind(abParts[1])
+	if len(parts) > 1 {
+		// Extract tracking branch (remove [ahead/behind] if present)
+		trackingPart := parts[1]
+		if strings.Contains(trackingPart, "[") {
+			abParts := strings.SplitN(trackingPart, "[", 2)
+			tracking = strings.TrimSpace(abParts[0])
+			ahead, behind = parseAheadBehind(abParts[1])
+		} else {
+			tracking = strings.TrimSpace(trackingPart)
+		}
 	}
 
-	return branch, ahead, behind
+	return branch, tracking, ahead, behind
 }
 
 // parseAheadBehind parses "ahead 2, behind 1]" format
@@ -422,59 +485,70 @@ func formatStatus(status *GitStatus) string {
 
 // formatStatusUltraCompact returns ultra-compact ASCII-only output
 func formatStatusUltraCompact(status *GitStatus) string {
-	var parts []string
-
-	// Branch
-	branch := status.Branch
-	if status.Ahead > 0 || status.Behind > 0 {
-		branch += fmt.Sprintf(" [a%d b%d]", status.Ahead, status.Behind)
-	}
-	parts = append(parts, branch)
-
-	// Summary counts
-	if len(status.Staged) > 0 {
-		parts = append(parts, fmt.Sprintf("S:%d", len(status.Staged)))
-	}
-	if len(status.Modified) > 0 {
-		parts = append(parts, fmt.Sprintf("M:%d", len(status.Modified)))
-	}
-	if len(status.Untracked) > 0 {
-		parts = append(parts, fmt.Sprintf("U:%d", len(status.Untracked)))
-	}
-	if len(status.Conflicted) > 0 {
-		parts = append(parts, fmt.Sprintf("C:%d", len(status.Conflicted)))
-	}
-
 	var buf strings.Builder
-	buf.WriteString(strings.Join(parts, " "))
-	buf.WriteString("\n")
 
-	// File list (limited to 10 files total)
-	allFiles := make([]string, 0)
-	for _, f := range status.Staged {
-		allFiles = append(allFiles, fmt.Sprintf("S %s", f.Path))
-	}
-	for _, f := range status.Modified {
-		allFiles = append(allFiles, fmt.Sprintf("M %s", f.Path))
-	}
-	for _, f := range status.Untracked {
-		allFiles = append(allFiles, fmt.Sprintf("? %s", f.Path))
-	}
-	for _, f := range status.Conflicted {
-		allFiles = append(allFiles, fmt.Sprintf("! %s", f.Path))
+	// Branch line with tracking
+	branch := status.Branch
+	if status.TrackingBranch != "" {
+		buf.WriteString(fmt.Sprintf("* %s...%s\n", branch, status.TrackingBranch))
+	} else if status.Ahead > 0 || status.Behind > 0 {
+		// Show tracking with ahead/behind
+		buf.WriteString(fmt.Sprintf("* %s [a%d b%d]\n", branch, status.Ahead, status.Behind))
+	} else {
+		buf.WriteString(fmt.Sprintf("* %s\n", branch))
 	}
 
-	maxFiles := 10
-	for i, f := range allFiles {
-		if i >= maxFiles {
-			buf.WriteString(fmt.Sprintf("... +%d more\n", len(allFiles)-maxFiles))
-			break
+	// Staged files: section header + max 3 files
+	if len(status.Staged) > 0 {
+		buf.WriteString(fmt.Sprintf("+ Staged: %d files\n", len(status.Staged)))
+		for i, f := range status.Staged {
+			if i >= 3 {
+				buf.WriteString(fmt.Sprintf("   ... +%d more\n", len(status.Staged)-3))
+				break
+			}
+			buf.WriteString(fmt.Sprintf("   %s\n", f.Path))
 		}
-		buf.WriteString(f + "\n")
+	}
+
+	// Modified files
+	if len(status.Modified) > 0 {
+		buf.WriteString(fmt.Sprintf("~ Modified: %d files\n", len(status.Modified)))
+		for i, f := range status.Modified {
+			if i >= 3 {
+				buf.WriteString(fmt.Sprintf("   ... +%d more\n", len(status.Modified)-3))
+				break
+			}
+			buf.WriteString(fmt.Sprintf("   %s\n", f.Path))
+		}
+	}
+
+	// Untracked files
+	if len(status.Untracked) > 0 {
+		buf.WriteString(fmt.Sprintf("? Untracked: %d files\n", len(status.Untracked)))
+		for i, f := range status.Untracked {
+			if i >= 3 {
+				buf.WriteString(fmt.Sprintf("   ... +%d more\n", len(status.Untracked)-3))
+				break
+			}
+			buf.WriteString(fmt.Sprintf("   %s\n", f.Path))
+		}
+	}
+
+	// Conflicted files
+	if len(status.Conflicted) > 0 {
+		buf.WriteString(fmt.Sprintf("! Conflicted: %d files\n", len(status.Conflicted)))
+		for i, f := range status.Conflicted {
+			if i >= 3 {
+				buf.WriteString(fmt.Sprintf("   ... +%d more\n", len(status.Conflicted)-3))
+				break
+			}
+			buf.WriteString(fmt.Sprintf("   %s\n", f.Path))
+		}
 	}
 
 	// Clean state
-	if len(allFiles) == 0 {
+	if len(status.Staged) == 0 && len(status.Modified) == 0 &&
+		len(status.Untracked) == 0 && len(status.Conflicted) == 0 {
 		buf.WriteString("clean\n")
 	}
 
@@ -578,13 +652,38 @@ func gray(s string) string {
 
 // runGitLog executes git log with filtering
 func runGitLog(args []string, fullOutput bool) (string, error) {
-	// Default args if none provided
-	logArgs := args
-	if len(logArgs) == 0 && !fullOutput {
-		// Use oneline format with count limit
-		logArgs = []string{"--oneline", "-n", "20"}
-	} else if len(logArgs) == 0 {
-		logArgs = []string{"-n", "20"}
+	// Check if user specified -n or --count
+	hasCount := false
+	for _, arg := range args {
+		if arg == "-n" || strings.HasPrefix(arg, "-n") || strings.HasPrefix(arg, "--count") {
+			hasCount = true
+			break
+		}
+	}
+
+	// Check if user specified custom format
+	hasFormat := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--format") || strings.HasPrefix(arg, "--pretty") {
+			hasFormat = true
+			break
+		}
+	}
+
+	// Build log args with compact format by default
+	var logArgs []string
+	
+	if !hasFormat && !fullOutput {
+		// Use compact format with timestamp and author
+		logArgs = []string{"--format=%h %s (%ar) <%an>"}
+	}
+	
+	// Add user args
+	logArgs = append(logArgs, args...)
+	
+	// Add default count if not specified
+	if !hasCount && len(logArgs) > 0 {
+		logArgs = append(logArgs, "-n", "20")
 	}
 
 	cmd := buildGitCmd("log", logArgs...)
@@ -946,6 +1045,7 @@ func runGitPull(args []string) (string, error) {
 var gitBranchCmd = &cobra.Command{
 	Use:   "branch [args...]",
 	Short: "List or manage branches (compact output)",
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
 		startTime := time.Now()
 		output, err := runGitBranch(args)

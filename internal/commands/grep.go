@@ -20,17 +20,18 @@ var (
 )
 
 var grepCmd = &cobra.Command{
-	Use:   "grep <pattern> [path]",
+	Use:   "grep [args...]",
 	Short: "Compact grep - strips whitespace, truncates, groups by file",
 	Long: `Compact grep with token-optimized output.
 
 Strips whitespace, truncates long lines, and groups results by file.
+Passes native grep/ripgrep flags through.
 
 Examples:
-  tokman grep "TODO" .
+  tokman grep -r "TODO" .
   tokman grep "func " . -t go
-  tokman grep "error" . --max-len 60 --max 20`,
-	Args: cobra.MinimumNArgs(1),
+  tokman grep -r "error" . --max-len 60 --max 20`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	RunE: runGrep,
 }
 
@@ -44,19 +45,13 @@ func init() {
 func runGrep(cmd *cobra.Command, args []string) error {
 	timer := tracking.Start()
 
-	pattern := args[0]
-	path := "."
-	if len(args) > 1 {
-		path = args[1]
-	}
+	// Use standard grep with all args passed through
+	grepArgs := append([]string{}, args...)
+	
+	// Add --color=never to avoid ANSI codes
+	grepArgs = append([]string{"--color=never"}, grepArgs...)
 
-	// Build ripgrep command
-	rgArgs := []string{"--json", pattern, path}
-	if grepFileType != "" {
-		rgArgs = append([]string{"-t", grepFileType}, rgArgs...)
-	}
-
-	c := exec.Command("rg", rgArgs...)
+	c := exec.Command("grep", grepArgs...)
 
 	var stdout, stderr bytes.Buffer
 	c.Stdout = &stdout
@@ -64,21 +59,58 @@ func runGrep(cmd *cobra.Command, args []string) error {
 
 	err := c.Run()
 	output := stdout.String()
+	
+	// Grep returns exit code 1 when no matches - that's not an error for us
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			// No matches found - not an error
+			if output == "" {
+				fmt.Println("(no matches)")
+				return nil
+			}
+		} else {
+			// Real error
+			return fmt.Errorf("grep failed: %w\n%s", err, stderr.String())
+		}
+	}
 
-	// Parse and compact ripgrep JSON output
-	filtered := compactGrepOutput(output, grepMaxLen, grepMax)
+	// Compact output for minimal tokens
+	filtered := compactGrepOutputSimple(output, grepMaxLen, grepMax)
 
 	fmt.Print(filtered)
 
 	originalTokens := filter.EstimateTokens(output)
 	filteredTokens := filter.EstimateTokens(filtered)
-	timer.Track(fmt.Sprintf("grep %s %s", pattern, path), "tokman grep", originalTokens, filteredTokens)
+	timer.Track(fmt.Sprintf("grep %s", strings.Join(args, " ")), "tokman grep", originalTokens, filteredTokens)
 
 	if verbose > 0 {
-		fmt.Fprintf(os.Stderr, "Pattern: %s, Tokens saved: %d\n", pattern, originalTokens-filteredTokens)
+		fmt.Fprintf(os.Stderr, "Tokens saved: %d\n", originalTokens-filteredTokens)
 	}
 
-	return err
+	return nil
+}
+
+func compactGrepOutputSimple(output string, maxLen, maxResults int) string {
+	var result strings.Builder
+	count := 0
+
+	for _, line := range strings.Split(output, "\n") {
+		if count >= maxResults {
+			result.WriteString(fmt.Sprintf("... (%d more)\n", count-maxResults+1))
+			break
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		// Truncate long lines
+		if len(line) > maxLen {
+			line = line[:maxLen] + "..."
+		}
+		result.WriteString(line + "\n")
+		count++
+	}
+
+	return result.String()
 }
 
 func compactGrepOutput(output string, maxLen, maxResults int) string {

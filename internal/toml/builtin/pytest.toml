@@ -1,0 +1,45 @@
+# Pytest CLI filter
+schema_version = 1
+
+[pytest]
+match_command = "^pytest(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^=+ test session starts =+",
+    "^=+",
+    "^\\s*$",
+    "^collecting \\d+ items",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "PASSED.*",
+    "FAILED.*",
+    "ERROR.*",
+    "test_.*",
+    "passed",
+    "failed",
+    "error",
+    "xfailed",
+    "skipped",
+    "warnings",
+    "=== .*failed",
+    "--- FAILURES",
+]
+head = 30
+tail = 50
+max_lines = 100
+
+[pytest_v]
+match_command = "^pytest\\s+(-v|--verbose)(\\s+.*)?$"
+strip_ansi = true
+keep_lines_matching = [
+    "PASSED.*",
+    "FAILED.*",
+    "ERROR.*",
+    "test_.*::",
+    "passed",
+    "failed",
+    "error",
+]
+tail = 100
+max_lines = 200

@@ -1,0 +1,62 @@
+# Docker CLI filter
+schema_version = 1
+
+[docker_ps]
+match_command = "^docker(\\s+ps)?(\\s+.*)?$"
+strip_ansi = true
+truncate_lines_at = 200
+max_lines = 100
+
+[docker_images]
+match_command = "^docker(\\s+images)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^REPOSITORY\\s+TAG",
+    "^<none>",
+]
+truncate_lines_at = 150
+max_lines = 50
+
+[docker_build]
+match_command = "^docker(\\s+build)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Sending build context",
+    "^Step \\d+\\/\\d+ :",
+    "^ ---> ",
+    "^Removing intermediate container",
+    "^Successfully built",
+    "^Successfully tagged",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "WARNING:.*",
+    "COPY failed.*",
+    "RUN.*failed.*",
+]
+on_empty = "Build completed"
+
+[docker_compose_up]
+match_command = "^docker-compose(\\s+up)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Creating network",
+    "^Creating volume",
+    "^Pulling",
+    "^digest:",
+    "^status:",
+    "^done\\.",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "WARNING:.*",
+    "Starting.*",
+    "Attaching to.*",
+]
+max_lines = 50
+
+[docker_compose_ps]
+match_command = "^docker-compose(\\s+ps)?(\\s+.*)?$"
+strip_ansi = true
+truncate_lines_at = 200
+max_lines = 50

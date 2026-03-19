@@ -1,0 +1,49 @@
+# GitHub CLI (gh) filter
+schema_version = 1
+
+[gh_pr_list]
+match_command = "^gh(\\s+pr)?\\s+list(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 50
+
+[gh_pr_view]
+match_command = "^gh(\\s+pr)?\\s+view(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+head = 30
+max_lines = 50
+
+[gh_issue_list]
+match_command = "^gh(\\s+issue)?\\s+list(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 50
+
+[gh_repo_view]
+match_command = "^gh(\\s+repo)?\\s+view(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+head = 20
+max_lines = 30
+
+[gh_run_list]
+match_command = "^gh(\\s+run)?\\s+list(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 30
+
+[gh_workflow]
+match_command = "^gh(\\s+workflow)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+max_lines = 50

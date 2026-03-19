@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,6 +21,7 @@ var (
 	skipEnv      bool
 	queryIntent  string // Query intent for query-aware compression
 	llmEnabled   bool   // Enable LLM-based compression
+	fallbackArgs []string // Args for fallback handler
 )
 
 // Version is set via ldflags during build
@@ -47,14 +49,65 @@ output, applies intelligent filtering, and tracks token savings.`,
 		}
 		return nil
 	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Fallback: handle unknown commands via TOML filter system
+		if len(args) == 0 {
+			return cmd.Help()
+		}
+
+		fallback := GetFallback()
+		output, handled, err := fallback.Handle(args)
+		
+		if !handled {
+			return fmt.Errorf("unknown command: %s", args[0])
+		}
+
+		// Print filtered output
+		fmt.Print(output)
+		
+		return err
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
+// Unknown commands are handled by the TOML filter fallback system.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	// Enable unknown command handling
+	rootCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
+	rootCmd.TraverseChildren = true
+	
+	_, err := rootCmd.ExecuteC()
+	if err != nil {
+		// Check if this is an unknown command error
+		if isUnknownCommandError(err) {
+			// Extract the unknown command from args
+			args := extractUnknownCommandArgs()
+			if len(args) > 0 {
+				fallback := GetFallback()
+				output, handled, ferr := fallback.Handle(args)
+				if handled {
+					fmt.Print(output)
+					if ferr != nil {
+						os.Exit(1)
+					}
+					return
+				}
+			}
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// isUnknownCommandError checks if the error is an unknown command error
+func isUnknownCommandError(err error) bool {
+	return strings.Contains(err.Error(), "unknown command") ||
+	       strings.Contains(err.Error(), "unknown shorthand flag")
+}
+
+// extractUnknownCommandArgs extracts args for the fallback handler
+func extractUnknownCommandArgs() []string {
+	return fallbackArgs
 }
 
 func init() {
@@ -69,8 +122,8 @@ func init() {
 		"verbosity level (-v, -vv, -vvv)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false,
 		"show what would be filtered without executing")
-	rootCmd.PersistentFlags().BoolVarP(&ultraCompact, "ultra-compact", "u", false,
-		"ultra-compact mode: ASCII icons, inline format")
+	rootCmd.PersistentFlags().BoolVarP(&ultraCompact, "ultra-compact", "u", true,
+		"ultra-compact mode: ASCII icons, inline format (default: true)")
 	rootCmd.PersistentFlags().BoolVar(&skipEnv, "skip-env", false,
 		"set SKIP_ENV_VALIDATION=1 for child processes")
 	rootCmd.PersistentFlags().StringVar(&queryIntent, "query", "",

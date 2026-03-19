@@ -1,0 +1,69 @@
+# Cargo (Rust) CLI filter
+schema_version = 1
+
+[cargo_build]
+match_command = "^cargo(\\s+build)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Compiling .*",
+    "^    Checking .*",
+    "^    Finished .*",
+    "^    Running .*",
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "error\\[.*",
+    "warning\\[.*",
+    "Error:.*",
+    "cannot find",
+    "unresolved",
+]
+on_empty = "Build completed"
+
+[cargo_test]
+match_command = "^cargo(\\s+test)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^running \\d+ tests?",
+    "^test .* ok$",
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "FAILED",
+    "error",
+    "panicked",
+    "assertion failed",
+    "test result:",
+]
+head = 20
+tail = 50
+max_lines = 100
+
+[cargo_check]
+match_command = "^cargo(\\s+check)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Compiling .*",
+    "^Checking .*",
+    "^Finished .*",
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "error\\[.*",
+    "warning\\[.*",
+]
+on_empty = "No errors"
+
+[cargo_run]
+match_command = "^cargo(\\s+run)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Compiling .*",
+    "^Finished .*",
+    "^Running .*",
+    "^\\x1b\\[",
+]
+tail = 100
+max_lines = 150

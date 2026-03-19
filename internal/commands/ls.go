@@ -32,12 +32,13 @@ var defaultNoiseDirs = []string{
 }
 
 var lsCmd = &cobra.Command{
-	Use:   "ls [path]",
+	Use:   "ls [path] [args...]",
 	Short: "List directory contents (filtered)",
 	Long: `List directory with noise filtering:
 - Hides .git, node_modules, target, etc.
 - Groups directories and files
 - Shows human-readable sizes`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
 		startTime := time.Now()
 		output, err := runLS(args)
@@ -64,19 +65,118 @@ func init() {
 // runLS executes ls with noise filtering
 func runLS(args []string) (string, error) {
 	path := "."
-	if len(args) > 0 {
-		path = args[0]
+	lsArgs := []string{}
+	
+	// Parse args: separate flags from path
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			lsArgs = append(lsArgs, arg)
+		} else {
+			path = arg
+		}
 	}
+	
+	// Default to -la if no flags provided
+	if len(lsArgs) == 0 {
+		lsArgs = []string{"-la"}
+	}
+	
+	lsArgs = append(lsArgs, path)
 
-	// Get ls -la output
-	cmd := exec.Command("ls", "-la", path)
+	cmd := exec.Command("ls", lsArgs...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ls failed: %w", err)
 	}
 
+	// Use ultra-compact format by default
+	if ultraCompact {
+		return filterLSOutputUltraCompact(out.String()), nil
+	}
 	return filterLSOutput(out.String()), nil
+}
+
+// filterLSOutputUltraCompact returns compact output
+func filterLSOutputUltraCompact(output string) string {
+	lines := strings.Split(output, "\n")
+	if len(lines) == 0 {
+		return output
+	}
+
+	// Load noise dirs from config
+	cfg, err := config.Load(cfgFile)
+	noiseDirs := make(map[string]bool)
+	if err == nil && len(cfg.Filter.NoiseDirs) > 0 {
+		for _, dir := range cfg.Filter.NoiseDirs {
+			noiseDirs[dir] = true
+		}
+	} else {
+		// Use defaults
+		for _, dir := range defaultNoiseDirs {
+			noiseDirs[dir] = true
+		}
+	}
+
+	var dirs []string
+	var files []string
+
+	// Skip the "total X" line at the start
+	startIdx := 0
+	if len(lines) > 0 && strings.HasPrefix(lines[0], "total ") {
+		startIdx = 1
+	}
+
+	for i := startIdx; i < len(lines); i++ {
+		line := lines[i]
+		if len(line) == 0 {
+			continue
+		}
+
+		// Parse ls -la output
+		fields := strings.Fields(line)
+		if len(fields) < 9 {
+			continue
+		}
+
+		perms := fields[0]
+		sizeStr := fields[4]
+		name := strings.Join(fields[8:], " ")
+
+		// Skip . and ..
+		if name == "." || name == ".." {
+			continue
+		}
+
+		// Check if noise directory
+		if noiseDirs[name] {
+			continue
+		}
+
+		// Parse size
+		size := parseSize(sizeStr)
+		sizeFormatted := humanSize(size)
+
+		// Check if directory
+		isDir := strings.HasPrefix(perms, "d")
+
+		if isDir {
+			dirs = append(dirs, fmt.Sprintf("%s/", name))
+		} else {
+			files = append(files, fmt.Sprintf("%s  %s", name, sizeFormatted))
+		}
+	}
+
+	// Sort alphabetically
+	sort.Strings(dirs)
+	sort.Strings(files)
+
+	// Build output: dirs first, then files with sizes
+	var result []string
+	result = append(result, dirs...)
+	result = append(result, files...)
+
+	return strings.Join(result, "\n")
 }
 
 // filterLSOutput filters and formats ls output

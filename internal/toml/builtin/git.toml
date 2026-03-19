@@ -1,0 +1,74 @@
+# Git CLI filter
+schema_version = 1
+
+[git_status]
+match_command = "^git(\\s+status)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^On branch .*",
+    "^Changes to be committed:",
+    "^Changes not staged for commit:",
+    "^Untracked files:",
+    "^\\s+use \".*",
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "new file:.*",
+    "modified:.*",
+    "deleted:.*",
+    "renamed:.*",
+    "copied:.*",
+    "unmerged:.*",
+    "both modified:.*",
+]
+head = 50
+max_lines = 100
+
+[git_log]
+match_command = "^git(\\s+log)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^commit [a-f0-9]+",
+    "^Author: .*",
+    "^Date: .*",
+    "^    $",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "^    [^\\s]",
+]
+head = 30
+max_lines = 50
+
+[git_diff]
+match_command = "^git(\\s+diff)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^diff --git",
+    "^index [a-f0-9]+\\.{2}[a-f0-9]+",
+    "^--- a/.*",
+    "^\\+\\+\\+ b/.*",
+    "^@@ .* @@",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "^[+-]",
+]
+head = 100
+max_lines = 200
+
+[git_branch]
+match_command = "^git(\\s+branch)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\x1b\\[",
+    "^\\s*$",
+]
+max_lines = 50
+
+[git_remote]
+match_command = "^git(\\s+remote)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+max_lines = 20

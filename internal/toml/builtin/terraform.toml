@@ -1,0 +1,51 @@
+# Terraform CLI filter
+schema_version = 1
+
+[terraform_init]
+match_command = "^terraform(\\s+init)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Initializing the backend\\.\\.\\.",
+    "^Initializing provider plugins\\.\\.\\.",
+    "^- Finding .*",
+    "^- Installing .*",
+    "^Terraform has been successfully initialized",
+    "^\\x1b\\[32m",
+    "^\\x1b\\[0m",
+    "^$",
+]
+on_empty = "Terraform initialized"
+
+[terraform_plan]
+match_command = "^terraform(\\s+plan)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Refreshing Terraform state",
+    "^- .*",
+    "^\\x1b\\[32m",
+    "^\\x1b\\[0m",
+]
+keep_lines_matching = [
+    "Plan:.*",
+    "No changes\\..*",
+    "Error:.*",
+    "Warning:.*",
+]
+max_lines = 50
+on_empty = "No changes"
+
+[terraform_apply]
+match_command = "^terraform(\\s+apply)?(\\s+.*)?$"
+strip_ansi = true
+keep_lines_matching = [
+    "Apply complete\\!.*",
+    "Resources:.*",
+    "Error:.*",
+    "Warning:.*",
+]
+max_lines = 30
+
+[terraform_output]
+match_command = "^terraform(\\s+output)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^$"]

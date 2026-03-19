@@ -24,6 +24,7 @@ Filters and formats output for minimal token usage.
 Examples:
   tokman find . -name "*.go"
   tokman find . -type f -mtime -1`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	RunE: runFind,
 }
 
@@ -73,12 +74,71 @@ func runFind(cmd *cobra.Command, args []string) error {
 
 func compactFindOutput(output string) string {
 	lines := strings.Split(output, "\n")
-	// Just strip empty lines and return
-	var result []string
+	var files []string
+	var dirs []string
+	
 	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			result = append(result, line)
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		// Skip current directory entry
+		if line == "." {
+			continue
+		}
+		// Check if directory (ends with / or is a dir path)
+		if strings.HasSuffix(line, "/") || !strings.Contains(line, ".") {
+			dirs = append(dirs, line)
+		} else {
+			files = append(files, line)
 		}
 	}
-	return strings.Join(result, "\n") + "\n"
+	
+	// Ultra-compact: show counts first, then inline list with truncation
+	var result strings.Builder
+	
+	maxShow := 30 // Show first 30 items inline
+	
+	if len(dirs) > 0 {
+		result.WriteString(fmt.Sprintf("%dD:", len(dirs)))
+		shown := 0
+		for i, d := range dirs {
+			if shown >= maxShow {
+				result.WriteString(fmt.Sprintf("\n+%d more", len(dirs)-maxShow))
+				break
+			}
+			if i > 0 && i < maxShow {
+				result.WriteString(" ")
+			}
+			if i < maxShow {
+				// Strip leading ./
+				d = strings.TrimPrefix(d, "./")
+				result.WriteString(d)
+				shown++
+			}
+		}
+		result.WriteString("\n")
+	}
+	
+	if len(files) > 0 {
+		result.WriteString(fmt.Sprintf("%dF:", len(files)))
+		shown := 0
+		for i, f := range files {
+			if shown >= maxShow {
+				result.WriteString(fmt.Sprintf("\n+%d more", len(files)-maxShow))
+				break
+			}
+			if i > 0 && i < maxShow {
+				result.WriteString(" ")
+			}
+			if i < maxShow {
+				// Strip leading ./
+				f = strings.TrimPrefix(f, "./")
+				result.WriteString(f)
+				shown++
+			}
+		}
+		result.WriteString("\n")
+	}
+	
+	return result.String()
 }

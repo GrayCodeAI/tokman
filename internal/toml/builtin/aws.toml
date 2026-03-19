@@ -1,0 +1,59 @@
+# AWS CLI filter
+schema_version = 1
+
+[aws_ec2_describe]
+match_command = "^aws\\s+ec2\\s+describe(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+head = 100
+max_lines = 200
+
+[aws_s3_ls]
+match_command = "^aws\\s+s3(\\s+ls)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^PRE",
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+max_lines = 100
+
+[aws_lambda_list]
+match_command = "^aws\\s+lambda\\s+list(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+head = 50
+max_lines = 100
+
+[aws_cloudformation]
+match_command = "^aws\\s+cloudformation(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "StackName",
+    "StackStatus",
+    "CREATE_COMPLETE",
+    "CREATE_FAILED",
+    "UPDATE_COMPLETE",
+    "DELETE_COMPLETE",
+    "ROLLBACK",
+]
+max_lines = 100
+
+[aws_eks]
+match_command = "^aws\\s+eks(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+max_lines = 50

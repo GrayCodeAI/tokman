@@ -1,0 +1,48 @@
+# Pip CLI filter
+schema_version = 1
+
+[pip_install]
+match_command = "^pip(\\s+install)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Collecting .*",
+    "^  Using cached",
+    "^  Downloading",
+    "^Building wheel",
+    "^Installing collected",
+    "^Successfully installed",
+    "^Requirement already satisfied",
+    "^\\s*$",
+    "^\\x1b\\[",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "WARNING:.*",
+    "Could not find",
+    "No matching",
+]
+on_empty = "Packages installed"
+
+[pip_list]
+match_command = "^pip(\\s+list)?(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = ["^\\x1b\\["]
+head = 50
+max_lines = 100
+
+[pip_outdated]
+match_command = "^pip(\\s+list)?\\s+--outdated(\\s+.*)?$"
+strip_ansi = true
+strip_lines_matching = [
+    "^Package\\s+Version",
+    "^\\x1b\\[",
+    "^\\s*$",
+]
+max_lines = 50
+on_empty = "All packages up to date"
+
+[pip_freeze]
+match_command = "^pip(\\s+freeze)?(\\s+.*)?$"
+strip_ansi = true
+head = 100
+max_lines = 200
