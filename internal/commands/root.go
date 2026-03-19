@@ -23,6 +23,14 @@ var (
 	llmEnabled   bool   // Enable LLM-based compression
 	tokenBudget  int    // Token budget for compression (0 = unlimited)
 	fallbackArgs []string // Args for fallback handler
+	
+	// Compaction flags (Layer 11)
+	compactionEnabled     bool
+	compactionThreshold  int
+	compactionPreserve   int
+	compactionMaxTokens  int
+	compactionSnapshot   bool
+	compactionAutoDetect bool
 )
 
 // Version is set via ldflags during build
@@ -133,11 +141,31 @@ func init() {
 		"enable LLM-based compression (requires Ollama/LM Studio)")
 	rootCmd.PersistentFlags().IntVar(&tokenBudget, "budget", 0,
 		"token budget for output (0 = unlimited, e.g., --budget 2000)")
+	
+	// Compaction flags (Layer 11 - AdaL-style semantic compression)
+	rootCmd.PersistentFlags().BoolVar(&compactionEnabled, "compaction", false,
+		"enable AdaL-style semantic compaction for chat/conversation content")
+	rootCmd.PersistentFlags().IntVar(&compactionThreshold, "compaction-threshold", 2000,
+		"minimum tokens to trigger compaction")
+	rootCmd.PersistentFlags().IntVar(&compactionPreserve, "compaction-preserve", 5,
+		"recent conversation turns to preserve verbatim")
+	rootCmd.PersistentFlags().IntVar(&compactionMaxTokens, "compaction-max-tokens", 500,
+		"maximum tokens for compaction summary")
+	rootCmd.PersistentFlags().BoolVar(&compactionSnapshot, "compaction-snapshot", true,
+		"use state snapshot format (4-section XML)")
+	rootCmd.PersistentFlags().BoolVar(&compactionAutoDetect, "compaction-auto-detect", true,
+		"auto-detect conversation content for compaction")
 
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("query", rootCmd.PersistentFlags().Lookup("query"))
 	viper.BindPFlag("llm", rootCmd.PersistentFlags().Lookup("llm"))
 	viper.BindPFlag("budget", rootCmd.PersistentFlags().Lookup("budget"))
+	viper.BindPFlag("pipeline.enable_compaction", rootCmd.PersistentFlags().Lookup("compaction"))
+	viper.BindPFlag("pipeline.compaction_threshold", rootCmd.PersistentFlags().Lookup("compaction-threshold"))
+	viper.BindPFlag("pipeline.compaction_preserve_turns", rootCmd.PersistentFlags().Lookup("compaction-preserve"))
+	viper.BindPFlag("pipeline.compaction_max_tokens", rootCmd.PersistentFlags().Lookup("compaction-max-tokens"))
+	viper.BindPFlag("pipeline.compaction_state_snapshot", rootCmd.PersistentFlags().Lookup("compaction-snapshot"))
+	viper.BindPFlag("pipeline.compaction_auto_detect", rootCmd.PersistentFlags().Lookup("compaction-auto-detect"))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -266,5 +294,44 @@ func GetTokenBudget() int {
 		return budget
 	}
 	return 0
+}
+
+// IsCompactionEnabled returns whether compaction is enabled
+func IsCompactionEnabled() bool {
+	return compactionEnabled || os.Getenv("TOKMAN_COMPACTION") == "true"
+}
+
+// GetCompactionThreshold returns the compaction threshold
+func GetCompactionThreshold() int {
+	if compactionThreshold > 0 {
+		return compactionThreshold
+	}
+	return 2000
+}
+
+// GetCompactionPreserveTurns returns the number of turns to preserve
+func GetCompactionPreserveTurns() int {
+	if compactionPreserve > 0 {
+		return compactionPreserve
+	}
+	return 5
+}
+
+// GetCompactionMaxTokens returns the max summary tokens
+func GetCompactionMaxTokens() int {
+	if compactionMaxTokens > 0 {
+		return compactionMaxTokens
+	}
+	return 500
+}
+
+// IsCompactionSnapshotEnabled returns whether state snapshot format is enabled
+func IsCompactionSnapshotEnabled() bool {
+	return compactionSnapshot
+}
+
+// IsCompactionAutoDetect returns whether auto-detect is enabled
+func IsCompactionAutoDetect() bool {
+	return compactionAutoDetect
 }
 
