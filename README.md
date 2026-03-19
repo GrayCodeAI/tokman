@@ -103,6 +103,128 @@ tokman ls
 tokman test ./...
 ```
 
+## Live Demo Examples
+
+### Example 1: Git Status Compression
+
+```bash
+$ tokman git status
+```
+**Before (342 tokens):**
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   internal/filter/pipeline.go
+	modified:   internal/filter/h2o.go
+	modified:   internal/filter/semantic.go
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	internal/filter/stream.go
+	internal/filter/stream_test.go
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+**After (78 tokens, 77% reduction):**
+```
+🌿 main (origin/main)
+📝 M internal/filter/pipeline.go
+📝 M internal/filter/h2o.go
+📝 M internal/filter/semantic.go
+❓ internal/filter/stream.go
+❓ internal/filter/stream_test.go
+```
+
+### Example 2: Docker PS Compression
+
+```bash
+$ tokman docker ps
+```
+**Before (528 tokens):**
+```
+CONTAINER ID   IMAGE          COMMAND                  CREATED        STATUS        PORTS                    NAMES
+abc123def456   nginx:latest   "/docker-entrypoint.…"   2 hours ago    Up 2 hours    0.0.0.0:80->80/tcp       web-server
+def789ghi012   redis:alpine   "docker-entrypoint.s…"   3 hours ago    Up 3 hours    0.0.0.0:6379->6379/tcp   cache-server
+jkl345mno678   postgres:14    "docker-entrypoint.s…"   5 hours ago    Up 5 hours    5432/tcp                 db-server
+mno789pqr012   node:18        "node server.js"         1 hour ago     Up 1 hour     0.0.0.0:3000->3000/tcp   api-server
+...
+```
+
+**After (89 tokens, 83% reduction):**
+```
+🐳 nginx:latest    → web-server   (2h)  0.0.0.0:80
+🐳 redis:alpine    → cache-server (3h)  0.0.0.0:6379
+🐳 postgres:14     → db-server    (5h)  5432/tcp
+🐳 node:18         → api-server   (1h)  0.0.0.0:3000
+```
+
+### Example 3: Test Output Compression
+
+```bash
+$ tokman go test ./...
+```
+**Before (2,847 tokens):**
+```
+=== RUN   TestFilterShort
+--- PASS: TestFilterShort (0.00s)
+=== RUN   TestFilterLong
+--- PASS: TestFilterLong (0.00s)
+=== RUN   TestFilterGitStatus
+--- PASS: TestFilterGitStatus (0.00s)
+... (50 more lines) ...
+PASS
+ok  	github.com/GrayCodeAI/tokman/internal/filter	0.014s
+=== RUN   TestPipelineBasic
+--- PASS: TestPipelineBasic (0.00s)
+... (30 more lines) ...
+PASS
+ok  	github.com/GrayCodeAI/tokman/internal/pipeline	0.023s
+```
+
+**After (124 tokens, 96% reduction):**
+```
+✅ internal/filter    0.014s  12 tests
+✅ internal/pipeline  0.023s  8 tests
+──────────────────────────────────
+✅ All passed (20 tests, 0.037s)
+```
+
+### Example 4: Streaming API (for Chat Agents)
+
+```go
+package main
+
+import (
+    "github.com/GrayCodeAI/tokman/internal/filter"
+)
+
+func main() {
+    config := filter.PipelineConfig{
+        Mode:   filter.ModeAggressive,
+        Budget: 4000, // Target token budget
+    }
+    
+    // Channel-based streaming
+    input, output := filter.StreamChannel(config)
+    
+    // Send chunks as they arrive
+    input <- "Long conversation history..."
+    input <- "More context from agent..."
+    close(input)
+    
+    // Receive compressed chunks
+    for chunk := range output {
+        fmt.Println(chunk.Content)
+        fmt.Printf("Saved: %d tokens\n", chunk.TokensSaved)
+    }
+}
+```
+
 ## Commands
 
 ### Core Commands
