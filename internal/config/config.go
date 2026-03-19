@@ -84,6 +84,12 @@ type PipelineConfig struct {
 	AttributionPositional  bool    `mapstructure:"attribution_positional"`   // Use positional bias
 	AttributionFrequency   bool    `mapstructure:"attribution_frequency"`    // Use frequency bias
 	AttributionSemantic    bool    `mapstructure:"attribution_semantic"`     // Use semantic preservation
+	
+	// H2O Filter (Layer 13) - Heavy-Hitter Oracle
+	EnableH2O          bool `mapstructure:"enable_h2o"`            // Enable H2O compression
+	H2OSinkSize        int  `mapstructure:"h2o_sink_size"`         // Attention sink tokens to preserve
+	H2ORecentSize      int  `mapstructure:"h2o_recent_size"`       // Recent tokens to preserve
+	H2OHeavyHitterSize int  `mapstructure:"h2o_heavy_hitter_size"` // Heavy hitter tokens to preserve
 }
 
 // CommandContext provides metadata about the command being executed.
@@ -238,6 +244,12 @@ func Defaults() *Config {
 			AttributionPositional: true,  // Preserve start/end content
 			AttributionFrequency:  true,  // Reduce repeated content
 			AttributionSemantic:   true,  // Preserve keywords, numbers, code
+			
+			// Layer 13: H2O (Heavy-Hitter Oracle)
+			EnableH2O:          true,
+			H2OSinkSize:        4,   // First 4 tokens are attention sinks
+			H2ORecentSize:      20,  // Keep last 20 tokens
+			H2OHeavyHitterSize: 40,  // Top 40 heavy hitters
 		},
 		Hooks: HooksConfig{
 			ExcludedCommands: []string{},

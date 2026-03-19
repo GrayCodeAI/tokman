@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// PipelineCoordinator orchestrates the 12-layer compression pipeline.
+// PipelineCoordinator orchestrates the 13-layer compression pipeline.
 // Research-based: Combines the best techniques from 50+ research papers worldwide
 // to achieve maximum token reduction for CLI/Agent output.
 //
@@ -23,6 +23,7 @@ import (
 // Layer 10: Budget Enforcement (Industry standard) - Guaranteed
 // Layer 11: Compaction Layer (Semantic compression) - Auto
 // Layer 12: Attribution Filter (ProCut, LinkedIn 2025) - 78%
+// Layer 13: H2O Filter (Heavy-Hitter Oracle, NeurIPS 2023) - 30x+
 type PipelineCoordinator struct {
 	config PipelineConfig
 	
@@ -65,6 +66,9 @@ type PipelineCoordinator struct {
 	
 	// Layer 12: Attribution Filter (ProCut-style pruning)
 	attributionFilter *AttributionFilter
+	
+	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
+	h2oFilter *H2OFilter
 }
 
 // PipelineConfig holds configuration for the compression pipeline
@@ -114,6 +118,12 @@ type PipelineConfig struct {
 	// Layer 12: Attribution Filter (ProCut-style pruning)
 	EnableAttribution       bool
 	AttributionThreshold    float64
+	
+	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
+	EnableH2O          bool
+	H2OSinkSize        int
+	H2ORecentSize      int
+	H2OHeavyHitterSize int
 }
 
 // NewPipelineCoordinator creates a new 10-layer pipeline coordinator.
@@ -230,6 +240,20 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 		}
 	}
 	
+	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
+	if cfg.EnableH2O {
+		p.h2oFilter = NewH2OFilter()
+		if cfg.H2OSinkSize > 0 {
+			p.h2oFilter.config.SinkSize = cfg.H2OSinkSize
+		}
+		if cfg.H2ORecentSize > 0 {
+			p.h2oFilter.config.RecentSize = cfg.H2ORecentSize
+		}
+		if cfg.H2OHeavyHitterSize > 0 {
+			p.h2oFilter.config.HeavyHitterSize = cfg.H2OHeavyHitterSize
+		}
+	}
+	
 	return p
 }
 
@@ -300,6 +324,11 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	// Layer 12: Attribution Filter (ProCut-style pruning)
 	if p.attributionFilter != nil {
 		output = p.processLayer12(output, stats)
+	}
+	
+	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
+	if p.h2oFilter != nil {
+		output = p.processLayer13(output, stats)
 	}
 	
 	// Layer 10: Budget Enforcement (Strict token limits)
@@ -398,6 +427,13 @@ func (p *PipelineCoordinator) processLayer12(input string, stats *PipelineStats)
 	return output
 }
 
+// Layer 13: H2O (Heavy-Hitter Oracle)
+func (p *PipelineCoordinator) processLayer13(input string, stats *PipelineStats) string {
+	output, saved := p.h2oFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["13_h2o"] = LayerStat{TokensSaved: saved}
+	return output
+}
+
 // Layer 10: Budget Enforcement
 func (p *PipelineCoordinator) processLayer10(input string, stats *PipelineStats) string {
 	output := input
@@ -442,7 +478,7 @@ func (s *PipelineStats) String() string {
 	var sb strings.Builder
 	
 	sb.WriteString("╔════════════════════════════════════════════════════╗\n")
-	sb.WriteString("║          Tokman 12-Layer Compression Stats         ║\n")
+	sb.WriteString("║          Tokman 13-Layer Compression Stats         ║\n")
 	sb.WriteString("╠════════════════════════════════════════════════════╣\n")
 	sb.WriteString(fmt.Sprintf("║ Original:  %6d tokens                         ║\n", s.OriginalTokens))
 	sb.WriteString(fmt.Sprintf("║ Final:     %6d tokens                         ║\n", s.FinalTokens))
@@ -454,7 +490,7 @@ func (s *PipelineStats) String() string {
 	layerOrder := []string{
 		"1_entropy", "2_perplexity", "3_goal_driven", "4_ast_preserve",
 		"5_contrastive", "6_ngram", "7_evaluator", "8_gist", "9_hierarchical",
-		"neural", "11_compaction", "12_attribution", "10_session", "10_budget",
+		"neural", "11_compaction", "12_attribution", "13_h2o", "10_session", "10_budget",
 	}
 	
 	for _, layer := range layerOrder {
