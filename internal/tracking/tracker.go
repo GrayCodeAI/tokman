@@ -3,6 +3,7 @@ package tracking
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -333,10 +334,12 @@ func (t *Tracker) cleanupOld() {
 		return
 	}
 	cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
-	_, _ = t.db.Exec(
+	if _, err := t.db.Exec(
 		"DELETE FROM commands WHERE timestamp < ?",
 		cutoff.Format(time.RFC3339),
-	)
+	); err != nil {
+		log.Printf("[tokman] tracking cleanup failed: %v", err)
+	}
 }
 
 // CleanupOld manually triggers cleanup of old records.
@@ -368,10 +371,12 @@ func (t *Tracker) CleanupWithRetention(days int) (int64, error) {
 	defer tx.Rollback()
 
 	// Delete layer stats for old commands
-	_, _ = tx.Exec(
+	if _, err := tx.Exec(
 		"DELETE FROM layer_stats WHERE command_id IN (SELECT id FROM commands WHERE timestamp < ?)",
 		cutoff.Format(time.RFC3339),
-	)
+	); err != nil {
+		log.Printf("[tokman] layer_stats cleanup failed: %v", err)
+	}
 
 	// Delete old commands
 	result, err := tx.Exec(
@@ -383,10 +388,12 @@ func (t *Tracker) CleanupWithRetention(days int) (int64, error) {
 	}
 
 	// Delete old parse failures
-	_, _ = tx.Exec(
+	if _, err := tx.Exec(
 		"DELETE FROM parse_failures WHERE timestamp < ?",
 		cutoff.Format(time.RFC3339),
-	)
+	); err != nil {
+		log.Printf("[tokman] parse_failures cleanup failed: %v", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit cleanup: %w", err)

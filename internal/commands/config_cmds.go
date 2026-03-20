@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -36,7 +37,10 @@ func init() {
 }
 
 func runConfigShow(cmd *cobra.Command, args []string) error {
-	cfg := config.Defaults()
+	cfg, err := GetConfig()
+	if err != nil {
+		cfg = config.Defaults()
+	}
 	fmt.Println("Current Configuration:")
 	fmt.Println("=====================")
 	fmt.Printf("  Pipeline:\n")
@@ -53,9 +57,14 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigInit(cmd *cobra.Command, args []string) error {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
 	configDir := filepath.Join(home, ".config", "tokman")
-	os.MkdirAll(configDir, 0755)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("cannot create config directory: %w", err)
+	}
 
 	configPath := filepath.Join(configDir, "config.toml")
 	if _, err := os.Stat(configPath); err == nil {
@@ -89,10 +98,95 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
 
-	// For now, just print the instruction
-	fmt.Printf("To set %s = %s, edit your config file:\n", key, value)
-	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".config", "tokman", "config.toml")
-	fmt.Printf("  %s\n", configPath)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+
+	configDir := filepath.Join(home, ".config", "tokman")
+	configPath := filepath.Join(configDir, "config.toml")
+
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("cannot create config directory: %w", err)
+	}
+
+	// Read existing config or create new
+	var lines []string
+	if data, err := os.ReadFile(configPath); err == nil {
+		lines = strings.Split(string(data), "\n")
+	}
+
+	// Parse key (supports dotted keys like "filter.mode" -> section "filter", key "mode")
+	parts := strings.SplitN(key, ".", 2)
+	section := ""
+	field := key
+	if len(parts) == 2 {
+		section = parts[0]
+		field = parts[1]
+	}
+
+	// Find and update existing key, or append
+	found := false
+	inSection := section == ""
+	newLines := make([]string, 0, len(lines)+2)
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			secName := strings.TrimPrefix(strings.TrimSuffix(trimmed, "]"), "[")
+			inSection = secName == section
+			newLines = append(newLines, line)
+			continue
+		}
+
+		if inSection && strings.Contains(trimmed, "=") {
+			kv := strings.SplitN(trimmed, "=", 2)
+			existingKey := strings.TrimSpace(kv[0])
+			if existingKey == field {
+				newLines = append(newLines, fmt.Sprintf("%s = %s", field, value))
+				found = true
+				continue
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if !found {
+		// Append section and key
+		if section != "" {
+			// Check if section exists
+			sectionExists := false
+			for _, line := range newLines {
+				if strings.TrimSpace(line) == fmt.Sprintf("[%s]", section) {
+					sectionExists = true
+					break
+				}
+			}
+			if !sectionExists {
+				newLines = append(newLines, "", fmt.Sprintf("[%s]", section))
+			}
+			// Add blank line before new key if needed
+			if len(newLines) > 0 && strings.TrimSpace(newLines[len(newLines)-1]) != "" {
+				newLines = append(newLines, "")
+			}
+			newLines = append(newLines, fmt.Sprintf("%s = %s", field, value))
+		} else {
+			// Top-level key
+			if len(newLines) > 0 && strings.TrimSpace(newLines[len(newLines)-1]) != "" {
+				newLines = append(newLines, "")
+			}
+			newLines = append(newLines, fmt.Sprintf("%s = %s", field, value))
+		}
+	}
+
+	// Write config
+	content := strings.Join(newLines, "\n")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("cannot write config: %w", err)
+	}
+
+	fmt.Printf("Set %s = %s\n", key, value)
+	fmt.Printf("Config: %s\n", configPath)
 	return nil
 }

@@ -68,6 +68,19 @@ func getTokmanSourceDir() string {
 	if err != nil {
 		return "."
 	}
-	// Try to find source from executable path
-	return filepath.Dir(filepath.Dir(exe))
+	// For installed binaries (go install), embedded filters are in the binary itself.
+	// Try to find source from executable path (development layout: ./bin/tokman)
+	dir := filepath.Dir(filepath.Dir(exe))
+	builtinDir := filepath.Join(dir, "internal", "toml", "builtin")
+	if _, err := os.Stat(builtinDir); err == nil {
+		return dir
+	}
+	// Try same directory as binary (e.g., /usr/local/bin/)
+	dir = filepath.Dir(exe)
+	builtinDir = filepath.Join(dir, "internal", "toml", "builtin")
+	if _, err := os.Stat(builtinDir); err == nil {
+		return dir
+	}
+	// Fallback: check GOPATH/src layout
+	return dir
 }

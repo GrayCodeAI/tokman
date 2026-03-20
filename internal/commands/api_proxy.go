@@ -68,7 +68,11 @@ func runAPIProxy(cmd *cobra.Command, args []string) error {
 			var data interface{}
 			if json.Unmarshal(body, &data) == nil {
 				data = compressAPIData(data)
-				newBody, _ := json.Marshal(data)
+				newBody, err := json.Marshal(data)
+				if err != nil {
+					resp.Body = io.NopCloser(strings.NewReader(string(body)))
+					return nil
+				}
 				resp.Body = io.NopCloser(strings.NewReader(string(newBody)))
 				resp.ContentLength = int64(len(newBody))
 				resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(newBody)))

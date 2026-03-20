@@ -24,11 +24,10 @@ var (
 
 var learnCmd = &cobra.Command{
 	Use:   "learn",
-	Short: "Learn CLI corrections from Claude Code error history",
-	Long: `Analyze Claude Code session history to learn from errors and corrections.
-
-Identifies patterns of commands that failed and were subsequently corrected,
-generating rules that can help prevent similar errors in the future.
+	Short: "Show known dangerous CLI correction patterns",
+	Long: `Display a curated list of common dangerous commands and their
+safer alternatives, along with tracking-based corrections from
+your command history.
 
 Examples:
   tokman learn

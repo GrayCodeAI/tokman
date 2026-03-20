@@ -162,13 +162,6 @@ func outputTable(daily []struct {
 	fmt.Println()
 }
 
-func truncateReport(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
 func init() {
 	rootCmd.AddCommand(reportCmd)
 

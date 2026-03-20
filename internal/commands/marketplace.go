@@ -46,22 +46,21 @@ func init() {
 
 // CommunityFilters is a registry of known community filters.
 var CommunityFilters = map[string]string{
-	"rtk":        "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/rtk.toml",
-	"jest":       "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/jest.toml",
-	"vitest":     "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/vitest.toml",
-	"playwright": "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/playwright.toml",
-	"cypress":    "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/cypress.toml",
-	"mocha":      "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/mocha.toml",
-	"eslint":     "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/eslint.toml",
-	"biome":      "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/biome.toml",
-	"swc":        "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/swc.toml",
-	"webpack":    "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/webpack.toml",
-	"vite":       "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/vite.toml",
-	"rollup":     "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/rollup.toml",
-	"trivy":      "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/trivy.toml",
-	"snyk":       "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/snyk.toml",
-	"opentofu":   "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/opentofu.toml",
-	"pulumi":     "https://raw.githubusercontent.com/open-compress/claw-compactor/main/filters/pulumi.toml",
+	"jest":       "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/jest.toml",
+	"vitest":     "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/vitest.toml",
+	"playwright": "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/playwright.toml",
+	"cypress":    "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/cypress.toml",
+	"mocha":      "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/mocha.toml",
+	"eslint":     "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/eslint.toml",
+	"biome":      "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/biome.toml",
+	"swc":        "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/swc.toml",
+	"webpack":    "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/webpack.toml",
+	"vite":       "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/vite.toml",
+	"rollup":     "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/rollup.toml",
+	"trivy":      "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/trivy.toml",
+	"snyk":       "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/snyk.toml",
+	"opentofu":   "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/opentofu.toml",
+	"pulumi":     "https://raw.githubusercontent.com/GrayCodeAI/tokman/main/filters/pulumi.toml",
 }
 
 func runMarketplaceSearch(cmd *cobra.Command, args []string) error {

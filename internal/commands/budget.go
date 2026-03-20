@@ -41,7 +41,10 @@ func runBudget(cmd *cobra.Command, args []string) error {
 
 	execCmd := exec.Command(exePath, args[1:]...)
 	execCmd.Env = os.Environ()
-	output, _ := execCmd.CombinedOutput()
+	output, err := execCmd.CombinedOutput()
+	if err != nil && len(output) == 0 {
+		return fmt.Errorf("command failed: %s (%w)", args[0], err)
+	}
 	rawOutput := string(output)
 
 	originalTokens := core.EstimateTokens(rawOutput)

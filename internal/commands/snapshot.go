@@ -58,7 +58,7 @@ func sanitizeSnapshotName(name string) string {
 func getSnapshotDir() string {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, ".local", "share", "tokman", "snapshots")
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
 	return dir
 }
 
@@ -94,7 +94,11 @@ func runSnapshotList(cmd *cobra.Command, args []string) error {
 	fmt.Println("Saved Snapshots:")
 	for _, e := range entries {
 		if !e.IsDir() {
-			info, _ := e.Info()
+			info, err := e.Info()
+			if err != nil {
+				fmt.Printf("  %s (unable to read info)\n", e.Name())
+				continue
+			}
 			fmt.Printf("  %s (%s, %d bytes)\n", e.Name(), info.ModTime().Format("01-02 15:04"), info.Size())
 		}
 	}

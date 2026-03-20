@@ -74,8 +74,6 @@ type DiscoverResult struct {
 }
 
 func runDiscover() error {
-	verbose := false // discoverCmd is not initialized yet, use default
-
 	green := color.New(color.FgGreen).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
@@ -222,7 +220,7 @@ func runDiscover() error {
 		fmt.Println()
 	}
 
-	if len(result.UnsupportedCmds) > 0 && verbose {
+	if len(result.UnsupportedCmds) > 0 && verbose > 0 {
 		fmt.Printf("  %s\n", cyan("Unsupported Commands (frequent but no TokMan wrapper):"))
 		fmt.Println("  ─────────────────────────────────────────")
 		for _, cmd := range result.UnsupportedCmds {

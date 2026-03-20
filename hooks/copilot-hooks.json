@@ -2,7 +2,7 @@
   "PreToolUse": {
     "Bash": {
       "command": "bash",
-      "args": ["${HOME}/.tokman/hooks/copilot-tokman-rewrite.sh"]
+      "args": ["${HOME}/.claude/hooks/tokman-rewrite.sh"]
     }
   }
 }

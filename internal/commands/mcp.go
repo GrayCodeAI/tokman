@@ -125,9 +125,22 @@ func runMCP(cmd *cobra.Command, args []string) error {
 			return
 		}
 
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "read error", http.StatusBadRequest)
+			return
+		}
+
 		var req MCPRequest
-		json.Unmarshal(body, &req)
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if req.Text == "" {
+			http.Error(w, "text required", http.StatusBadRequest)
+			return
+		}
 
 		pipeline := filter.NewPipelineCoordinator(filter.PipelineConfig{
 			Mode:                filter.ModeMinimal,
