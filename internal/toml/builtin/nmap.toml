@@ -1,0 +1,43 @@
+[filters.nmap]
+description = "Compact nmap output — strip verbose, keep results"
+match_command = "^nmap\\b"
+strip_ansi = true
+
+[filters.nmap.strip_lines_matching]
+patterns = [
+  "^\\s*$",
+  "^Starting Nmap",
+  "^Nmap done:",
+  "^Initiating",
+  "^Completed",
+  "^Host is up",
+  "^Not shown:",
+  "^All \\d+",
+]
+
+[filters.nmap.truncate_lines_at]
+value = 120
+
+[filters.nmap.max_lines]
+value = 50
+
+[[tests.nmap]]
+name = "nmap scan compact"
+input = """
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-03-10 12:00 UTC
+Nmap scan report for example.com (93.184.216.34)
+Host is up (0.050s latency).
+Not shown: 997 filtered tcp ports
+PORT    STATE SERVICE
+80/tcp  open  http
+443/tcp open  https
+22/tcp  open  ssh
+
+Nmap done: 1 IP address (1 host up) scanned in 2.50 seconds
+"""
+expected_contains = "PORT"
+
+[[tests.nmap]]
+name = "empty input"
+input = ""
+expected = ""

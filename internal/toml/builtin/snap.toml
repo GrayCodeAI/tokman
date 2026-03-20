@@ -1,0 +1,44 @@
+[filters.snap]
+description = "Compact snap output — strip verbose messages"
+match_command = "^snap\\b"
+strip_ansi = true
+
+[filters.snap.strip_lines_matching]
+patterns = [
+  "^\\s*$",
+  "^Download snap",
+  "^Fetch and check",
+  "^Mount snap",
+  "^Copy snap",
+  "^Setup snap",
+  "^Connect",
+  "^Run install",
+  "^\\s+\\d+%",
+]
+
+[filters.snap.replace]
+"  installed" = "installed"
+"  refreshed" = "refreshed"
+
+[filters.snap.max_lines]
+value = 20
+
+[[tests.snap]]
+name = "snap install compact"
+input = """
+Download snap "code"
+Fetch and check assertions for snap "code"
+Mount snap "code"
+Copy snap "code" data
+Setup snap "code" aliases
+Connect code:home to home
+Connect code:network to network
+Run install hook of snap "code"
+code 9a8f7e6d from Visual Studio Code (vscode*) installed
+"""
+expected_contains = "code"
+
+[[tests.snap]]
+name = "empty input"
+input = ""
+expected = ""
