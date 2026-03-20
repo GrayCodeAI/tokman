@@ -160,7 +160,7 @@ func countFile(t *tokenizer.Tokenizer, path string, enc tokenizer.Encoding) erro
 	}
 
 	count := t.Count(string(content))
-	lines := strings.Count(string(content), "\n")
+	lines := strings.Count(string(content), "\n") + 1
 
 	stats := &tokenizer.CountStats{
 		TotalTokens: count,

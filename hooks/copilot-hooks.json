@@ -1,0 +1,8 @@
+{
+  "PreToolUse": {
+    "Bash": {
+      "command": "bash",
+      "args": ["${HOME}/.tokman/hooks/copilot-tokman-rewrite.sh"]
+    }
+  }
+}

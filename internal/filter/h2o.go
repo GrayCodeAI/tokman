@@ -25,19 +25,19 @@ type H2OFilter struct {
 type H2OConfig struct {
 	// Enable H2O filtering
 	Enabled bool
-	
+
 	// Number of attention sink tokens to always preserve (first N tokens)
 	SinkSize int
-	
+
 	// Number of recent tokens to always preserve
 	RecentSize int
-	
+
 	// Number of heavy hitter tokens to preserve based on importance
 	HeavyHitterSize int
-	
+
 	// Minimum content length to apply compression
 	MinContentLength int
-	
+
 	// Window size for chunk processing
 	ChunkWindow int
 }
@@ -46,11 +46,11 @@ type H2OConfig struct {
 func DefaultH2OConfig() H2OConfig {
 	return H2OConfig{
 		Enabled:          true,
-		SinkSize:         4,    // First 4 tokens are attention sinks
-		RecentSize:       20,   // Keep last 20 tokens for local context
-		HeavyHitterSize:  40,   // Keep top 40 heavy hitters
+		SinkSize:         4,  // First 4 tokens are attention sinks
+		RecentSize:       20, // Keep last 20 tokens for local context
+		HeavyHitterSize:  40, // Keep top 40 heavy hitters
 		MinContentLength: 100,
-		ChunkWindow:      100,  // Process in 100-token windows
+		ChunkWindow:      100, // Process in 100-token windows
 	}
 }
 
@@ -71,43 +71,43 @@ func (h *H2OFilter) Apply(input string, mode Mode) (string, int) {
 	if !h.config.Enabled {
 		return input, 0
 	}
-	
+
 	// Skip short content
 	if len(input) < h.config.MinContentLength {
 		return input, 0
 	}
-	
+
 	originalTokens := EstimateTokens(input)
-	
+
 	// For large content, use line-based processing (memory efficient)
 	// Line-based approach reduces allocations by 10-20x
 	if originalTokens > 50000 {
 		return h.applyLineBased(input, mode, originalTokens)
 	}
-	
+
 	// Tokenize
 	tokens := h.tokenize(input)
 	if len(tokens) < h.config.SinkSize+h.config.RecentSize+h.config.HeavyHitterSize {
 		return input, 0
 	}
-	
+
 	// Calculate importance scores (simulated attention)
 	scores := h.calculateImportance(tokens, input)
-	
+
 	// Build heavy hitter priority queue
 	heavyHitters := h.identifyHeavyHitters(tokens, scores)
-	
+
 	// Build output: sinks + heavy hitters + recent
 	output := h.buildOutput(tokens, heavyHitters, scores)
-	
+
 	finalTokens := EstimateTokens(output)
 	saved := originalTokens - finalTokens
-	
+
 	// Return original if we didn't save much
 	if saved < 5 {
 		return input, 0
 	}
-	
+
 	return output, saved
 }
 
@@ -121,19 +121,22 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 	for scanner.Scan() {
 		lineCount++
 	}
-	
+	if scanner.Err() != nil {
+		return input, 0
+	}
+
 	n := lineCount
 	if n < h.config.SinkSize+h.config.RecentSize+10 {
 		return input, 0
 	}
-	
+
 	// Second pass: score lines and store minimal data
 	// Only store scores for middle section (not sinks or recent)
 	recentStart := n - h.config.RecentSize
 	if recentStart < h.config.SinkSize {
 		recentStart = h.config.SinkSize
 	}
-	
+
 	// Collect scores for middle section only
 	type lineScore struct {
 		index int
@@ -141,7 +144,7 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		text  string
 	}
 	middleLines := make([]lineScore, 0, recentStart-h.config.SinkSize)
-	
+
 	lineIdx := 0
 	scanner = bufio.NewScanner(strings.NewReader(input))
 	for scanner.Scan() {
@@ -157,18 +160,21 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		}
 		lineIdx++
 	}
-	
+	if scanner.Err() != nil {
+		return input, 0
+	}
+
 	// Build keep set for middle lines using heap
 	hh := &tokenHeap{}
 	heap.Init(hh)
-	
+
 	for _, ls := range middleLines {
 		heap.Push(hh, &scoredToken{
 			index: ls.index,
 			score: ls.score,
 		})
 	}
-	
+
 	// Extract heavy hitter indices
 	keepMiddle := make(map[int]bool)
 	heavyHitterCount := h.config.HeavyHitterSize
@@ -177,18 +183,18 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		keepMiddle[st.index] = true
 		heavyHitterCount--
 	}
-	
+
 	// Third pass: build output (streaming)
 	var result strings.Builder
 	result.Grow(originalTokens * 4 / 10) // Pre-allocate ~40% of original
-	
+
 	lineIdx = 0
 	scanner = bufio.NewScanner(strings.NewReader(input))
 	first := true
 	for scanner.Scan() {
 		line := scanner.Text()
 		keep := false
-		
+
 		if lineIdx < h.config.SinkSize {
 			keep = true // Sink
 		} else if lineIdx >= recentStart {
@@ -196,7 +202,7 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		} else if keepMiddle[lineIdx] {
 			keep = true // Heavy hitter
 		}
-		
+
 		if keep {
 			if !first {
 				result.WriteString("\n")
@@ -206,37 +212,40 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		}
 		lineIdx++
 	}
-	
+	if scanner.Err() != nil {
+		return input, 0
+	}
+
 	output := result.String()
 	finalTokens := EstimateTokens(output)
 	saved := originalTokens - finalTokens
-	
+
 	if saved < 5 {
 		return input, 0
 	}
-	
+
 	return output, saved
 }
 
 // scoreLine calculates importance score for a single line
 func (h *H2OFilter) scoreLine(line string, index, totalLines int) float64 {
 	var score float64
-	
+
 	// Positional weight
 	pos := float64(index) / float64(totalLines)
-	
+
 	// Sinks (already handled, but score anyway)
 	if index < h.config.SinkSize {
 		score += 1.0
 	}
-	
+
 	// Recent lines get boost
 	if pos > 0.8 {
 		score += 0.5 * (pos - 0.8) / 0.2
 	}
-	
+
 	lineLower := strings.ToLower(line)
-	
+
 	// Important keywords
 	keywords := []string{
 		"error", "fail", "warning", "success", "done", "complete",
@@ -250,22 +259,22 @@ func (h *H2OFilter) scoreLine(line string, index, totalLines int) float64 {
 			break
 		}
 	}
-	
+
 	// Structural markers
 	if strings.HasSuffix(line, ":") || strings.HasPrefix(line, "#") {
 		score += 0.3
 	}
-	
+
 	// Non-empty lines score higher
 	if len(strings.TrimSpace(line)) > 0 {
 		score += 0.2
 	}
-	
+
 	// Very long lines might be important (code, paths)
 	if len(line) > 100 {
 		score += 0.2
 	}
-	
+
 	return score
 }
 
@@ -280,7 +289,7 @@ type h2oToken struct {
 // tokenize splits content into tokens
 func (h *H2OFilter) tokenize(content string) []h2oToken {
 	var tokens []h2oToken
-	
+
 	// Split by words and whitespace
 	wordStart := -1
 	for i, c := range content {
@@ -315,7 +324,7 @@ func (h *H2OFilter) tokenize(content string) []h2oToken {
 			index: len(tokens),
 		})
 	}
-	
+
 	return tokens
 }
 
@@ -326,7 +335,7 @@ func (h *H2OFilter) tokenize(content string) []h2oToken {
 func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []float64 {
 	n := len(tokens)
 	scores := make([]float64, n)
-	
+
 	// Track word frequency
 	freq := make(map[string]int)
 	for _, t := range tokens {
@@ -335,7 +344,7 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 			freq[word]++
 		}
 	}
-	
+
 	// Track position weights
 	for i, t := range tokens {
 		// Skip whitespace in scoring
@@ -343,25 +352,25 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 			scores[i] = 0.1 // Low but non-zero for structure
 			continue
 		}
-		
+
 		var score float64
-		
+
 		// 1. Positional importance (sinks and end)
 		pos := float64(i) / float64(n)
-		
+
 		// Sinks: first few tokens get high scores
 		if i < h.config.SinkSize {
 			score += 1.0 - float64(i)/float64(h.config.SinkSize)*0.5
 		}
-		
+
 		// Recent tokens: last portion gets boost
 		if pos > 0.8 {
 			score += 0.5 * (pos - 0.8) / 0.2
 		}
-		
+
 		// 2. Semantic importance
 		word := strings.ToLower(t.text)
-		
+
 		// Important keywords
 		keywords := []string{
 			"error", "fail", "warning", "success", "done", "complete",
@@ -376,12 +385,12 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 				break
 			}
 		}
-		
+
 		// Numbers are important
 		if isNumeric(t.text) {
 			score += 0.5
 		}
-		
+
 		// File paths and URLs (check if looks like part of a path)
 		if isFilePath(t.text) || isURL(t.text) {
 			score += 0.8
@@ -397,12 +406,12 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 				break
 			}
 		}
-		
+
 		// Code symbols
 		if isCodeSymbol(t.text) {
 			score += 0.3
 		}
-		
+
 		// 3. Frequency-based (unique words are often important)
 		if freq[word] == 1 && len(word) > 3 {
 			score += 0.2
@@ -410,24 +419,24 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 			// Very common words get slight penalty
 			score -= 0.1
 		}
-		
+
 		// 4. Structural markers
 		if strings.HasSuffix(t.text, ":") || strings.HasSuffix(t.text, "=") {
 			score += 0.3
 		}
-		
+
 		// 5. Length-based (very short tokens often less important)
 		if len(t.text) <= 2 && !isCodeSymbol(t.text) && !isNumeric(t.text) {
 			score -= 0.15
 		}
-		
+
 		// Ensure non-negative
 		if score < 0 {
 			score = 0
 		}
 		scores[i] = score
 	}
-	
+
 	return scores
 }
 
@@ -435,12 +444,12 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 func (h *H2OFilter) identifyHeavyHitters(tokens []h2oToken, scores []float64) map[int]bool {
 	n := len(tokens)
 	keep := make(map[int]bool)
-	
+
 	// Always keep sinks
 	for i := 0; i < h.config.SinkSize && i < n; i++ {
 		keep[i] = true
 	}
-	
+
 	// Always keep recent
 	recentStart := n - h.config.RecentSize
 	if recentStart < h.config.SinkSize {
@@ -449,11 +458,11 @@ func (h *H2OFilter) identifyHeavyHitters(tokens []h2oToken, scores []float64) ma
 	for i := recentStart; i < n; i++ {
 		keep[i] = true
 	}
-	
+
 	// Use a max-heap to find heavy hitters
 	hh := &tokenHeap{}
 	heap.Init(hh)
-	
+
 	for i := h.config.SinkSize; i < recentStart; i++ {
 		if !isWhitespace(tokens[i].text) {
 			heap.Push(hh, &scoredToken{
@@ -462,13 +471,13 @@ func (h *H2OFilter) identifyHeavyHitters(tokens []h2oToken, scores []float64) ma
 			})
 		}
 	}
-	
+
 	// Extract top heavy hitters
 	for hh.Len() > 0 && len(keep) < h.config.SinkSize+h.config.RecentSize+h.config.HeavyHitterSize {
 		st := heap.Pop(hh).(*scoredToken)
 		keep[st.index] = true
 	}
-	
+
 	return keep
 }
 
@@ -501,7 +510,7 @@ func (h *tokenHeap) Pop() interface{} {
 func (h *H2OFilter) buildOutput(tokens []h2oToken, keep map[int]bool, scores []float64) string {
 	var result strings.Builder
 	lastKept := -1
-	
+
 	for i, t := range tokens {
 		if keep[i] {
 			// Add space if we skipped tokens
@@ -515,7 +524,7 @@ func (h *H2OFilter) buildOutput(tokens []h2oToken, keep map[int]bool, scores []f
 			lastKept = i
 		}
 	}
-	
+
 	return result.String()
 }
 

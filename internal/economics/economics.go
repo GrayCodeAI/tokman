@@ -514,9 +514,9 @@ func mergeWeekly(cc []ccusage.Period, tm []WeekStats) []PeriodEconomics {
 	}
 
 	// Merge tokman data (week_start = legacy Saturday)
-	// TODO: Convert Saturday to Monday for alignment if needed
+	// Convert Saturday to Monday for alignment with ccusage week starts
 	for _, entry := range tm {
-		key := entry.WeekStart
+		key := alignWeekStart(entry.WeekStart)
 		if _, exists := periodMap[key]; !exists {
 			periodMap[key] = &PeriodEconomics{Label: key}
 		}
@@ -910,4 +910,22 @@ func GetDailyStats(tracker *tracking.Tracker) []DayStats {
 // MergeDailyLite merges ccusage and tokman daily data (used by dashboard)
 func MergeDailyLite(cc []ccusage.Period, tm []DayStats) []PeriodEconomics {
 	return mergeDaily(cc, tm)
+}
+
+// alignWeekStart converts Saturday-based week starts to Monday for alignment.
+// Tokman legacy data uses Saturday as week start; ccusage uses Monday.
+func alignWeekStart(dateStr string) string {
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return dateStr
+	}
+	// If Saturday (6), shift to next Monday (+2 days)
+	if t.Weekday() == time.Saturday {
+		return t.AddDate(0, 0, 2).Format("2006-01-02")
+	}
+	// If Sunday (0), shift to next Monday (+1 day)
+	if t.Weekday() == time.Sunday {
+		return t.AddDate(0, 0, 1).Format("2006-01-02")
+	}
+	return dateStr
 }

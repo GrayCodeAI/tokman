@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GrayCodeAI/tokman/internal/filter"
+	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
@@ -61,8 +61,8 @@ func runDiff(cmd *cobra.Command, args []string) error {
 
 	fmt.Print(filtered)
 
-	originalTokens := filter.EstimateTokens(output)
-	filteredTokens := filter.EstimateTokens(filtered)
+	originalTokens := core.EstimateTokens(output)
+	filteredTokens := core.EstimateTokens(filtered)
 	timer.Track(fmt.Sprintf("diff %s", strings.Join(args, " ")), "tokman diff", originalTokens, filteredTokens)
 
 	if verbose > 0 {

@@ -275,7 +275,12 @@ func rewriteCompound(cmd string, excluded []string) (string, bool) {
 				segStart = i
 			} else {
 				// | pipe — rewrite first segment only, pass through rest
+				// Skip rewriting if the command uses piped output format (find, fd, etc.)
 				seg := strings.TrimSpace(cmd[segStart:i])
+				if isInPipe(cmd, segStart, i) {
+					result += seg + " " + strings.TrimSpace(cmd[i:])
+					return result, anyChanged
+				}
 				rewritten, changed := rewriteSegment(seg, excluded)
 				if changed {
 					anyChanged = true
@@ -364,6 +369,110 @@ func rewriteHeadNumeric(envPrefix, cmdClean string) (string, bool) {
 	return "", false
 }
 
+// rewriteTailNumeric handles tail -N file → tokman read file --tail-lines N
+// Returns (rewritten, true) if matched, or ("", false) to fall through to generic logic
+func rewriteTailNumeric(envPrefix, cmdClean string) (string, bool) {
+	// Match: tail -<digits> <file>
+	tailNumeric := regexp.MustCompile(`^tail\s+-(\d+)\s+(.+)$`)
+	// Match: tail -n <digits> <file>
+	tailN := regexp.MustCompile(`^tail\s+-n\s+(\d+)\s+(.+)$`)
+	// Match: tail --lines=<digits> <file>
+	tailLines := regexp.MustCompile(`^tail\s+--lines=(\d+)\s+(.+)$`)
+
+	if matches := tailNumeric.FindStringSubmatch(cmdClean); len(matches) == 3 {
+		n := matches[1]
+		file := matches[2]
+		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true
+	}
+	if matches := tailN.FindStringSubmatch(cmdClean); len(matches) == 3 {
+		n := matches[1]
+		file := matches[2]
+		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true
+	}
+	if matches := tailLines.FindStringSubmatch(cmdClean); len(matches) == 3 {
+		n := matches[1]
+		file := matches[2]
+		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true
+	}
+	// tail with any other flag (e.g. -f, -c, -q): skip rewriting
+	if strings.HasPrefix(cmdClean, "tail -") {
+		return "", false
+	}
+	return "", false
+}
+
+// gitGlobalOpts are git options that apply globally (before the subcommand)
+var gitGlobalOpts = []string{"-C", "-c", "--git-dir", "--work-tree", "--no-pager", "--no-optional-locks", "--bare", "--literal-pathspecs"}
+
+// stripGitGlobalOpts removes git global options from the command.
+// e.g. "git -C /tmp status" → "git status"
+func stripGitGlobalOpts(cmdClean string) string {
+	if !strings.HasPrefix(cmdClean, "git ") {
+		return cmdClean
+	}
+	parts := strings.Fields(cmdClean)
+	if len(parts) <= 2 {
+		return cmdClean
+	}
+	filtered := []string{parts[0]} // keep "git"
+	i := 1
+	for i < len(parts) {
+		part := parts[i]
+		isGlobalOpt := false
+		for _, opt := range gitGlobalOpts {
+			if part == opt {
+				isGlobalOpt = true
+				// -C and -c take a value argument — skip next token too
+				if (opt == "-C" || opt == "-c") && i+1 < len(parts) {
+					i += 2
+				} else {
+					i++
+				}
+				break
+			}
+		}
+		if !isGlobalOpt {
+			filtered = append(filtered, parts[i])
+			i++
+		}
+	}
+	return strings.Join(filtered, " ")
+}
+
+// absolutePathRegex matches absolute paths like /usr/bin/grep, /usr/local/bin/rg
+var absolutePathRegex = regexp.MustCompile(`^(/[a-zA-Z0-9._-]+)+/([a-zA-Z0-9._-]+)(\s|$)`)
+
+// stripAbsolutePath normalizes absolute binary paths to just the command name.
+// e.g. "/usr/bin/grep foo" → "grep foo"
+func stripAbsolutePath(cmdClean string) string {
+	if matches := absolutePathRegex.FindStringSubmatch(cmdClean); len(matches) >= 3 {
+		binary := matches[2]
+		// The absolute path was the first token, replace it with just the binary name
+		firstSpace := strings.IndexByte(cmdClean, ' ')
+		if firstSpace > 0 {
+			return binary + cmdClean[firstSpace:]
+		}
+		return binary
+	}
+	return cmdClean
+}
+
+// pipedCommands are commands whose output format is incompatible with piping (e.g. to xargs, grep).
+// When these appear before a pipe, we skip rewriting to avoid breaking the pipeline.
+var pipedCommands = map[string]bool{
+	"find": true, "fd": true, "locate": true,
+}
+
+// isInPipe checks if the command segment is the first part of a pipe and uses a piped command.
+func isInPipe(fullCmd string, segStart int, pipePos int) bool {
+	seg := strings.TrimSpace(fullCmd[segStart:pipePos])
+	parts := strings.Fields(seg)
+	if len(parts) == 0 {
+		return false
+	}
+	return pipedCommands[parts[0]]
+}
+
 // rewriteSegment rewrites a single command segment
 func rewriteSegment(seg string, excluded []string) (string, bool) {
 	trimmed := strings.TrimSpace(seg)
@@ -386,9 +495,20 @@ func rewriteSegment(seg string, excluded []string) (string, bool) {
 		return seg, false
 	}
 
+	// Strip git global options (e.g. "git -C /tmp status" → "git status")
+	cmdClean = stripGitGlobalOpts(cmdClean)
+
+	// Strip absolute binary paths (e.g. "/usr/bin/grep foo" → "grep foo")
+	cmdClean = stripAbsolutePath(cmdClean)
+
 	// Special case: head -N file → tokman read file --max-lines N
 	// Must intercept before generic prefix replacement (which would produce tokman read -N file)
 	if rewritten, ok := rewriteHeadNumeric(envPrefix, cmdClean); ok {
+		return rewritten, true
+	}
+
+	// Special case: tail -N file → tokman read file --tail-lines N
+	if rewritten, ok := rewriteTailNumeric(envPrefix, cmdClean); ok {
 		return rewritten, true
 	}
 

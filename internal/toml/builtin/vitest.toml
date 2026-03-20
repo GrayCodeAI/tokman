@@ -1,0 +1,24 @@
+[[rules]]
+match = "vitest *"
+description = "vitest - fast Vite-native test runner"
+
+[rules.filter]
+keep_lines_matching = [
+    "FAIL.*",
+    "×.*",
+    "Test Files.*",
+    "Tests.*",
+    "Duration.*",
+]
+
+strip_lines_matching = [
+    "^\\s*✓.*",
+    "^\\s*√.*",
+    "^\\s*PASS.*",
+    "^\\s*stdout.*",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "All tests passed."

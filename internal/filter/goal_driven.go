@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+var codeSymbolRe = regexp.MustCompile(`[{}\[\]();:]`)
+
 // GoalDrivenFilter implements SWE-Pruner style compression (Shanghai Jiao Tong, 2025).
 // Goal-driven line-level pruning using CRF-inspired scoring.
 //
@@ -16,15 +18,15 @@ import (
 //
 // Research Results: Up to 14.8x compression for code contexts.
 type GoalDrivenFilter struct {
-	goal       string
-	goalTerms  map[string]float64
-	mode       GoalMode
-	
+	goal      string
+	goalTerms map[string]float64
+	mode      GoalMode
+
 	// CRF-style transition weights
-	keepKeepWeight    float64
-	keepPruneWeight   float64
-	pruneKeepWeight   float64
-	prunePruneWeight  float64
+	keepKeepWeight   float64
+	keepPruneWeight  float64
+	pruneKeepWeight  float64
+	prunePruneWeight float64
 }
 
 // GoalMode defines the goal-driven filtering mode
@@ -46,12 +48,12 @@ func NewGoalDrivenFilter(goal string) *GoalDrivenFilter {
 		goal:             goal,
 		goalTerms:        make(map[string]float64),
 		mode:             parseGoalMode(goal),
-		keepKeepWeight:   0.8,  // Prefer keeping sequences
+		keepKeepWeight:   0.8, // Prefer keeping sequences
 		keepPruneWeight:  0.3,
 		pruneKeepWeight:  0.5,
 		prunePruneWeight: 0.2,
 	}
-	
+
 	g.extractGoalTerms()
 	return g
 }
@@ -59,7 +61,7 @@ func NewGoalDrivenFilter(goal string) *GoalDrivenFilter {
 // parseGoalMode determines the goal mode from the goal string
 func parseGoalMode(goal string) GoalMode {
 	goalLower := strings.ToLower(goal)
-	
+
 	if strings.Contains(goalLower, "debug") || strings.Contains(goalLower, "error") || strings.Contains(goalLower, "fix") {
 		return GoalModeDebug
 	}
@@ -78,7 +80,7 @@ func parseGoalMode(goal string) GoalMode {
 	if strings.Contains(goalLower, "test") {
 		return GoalModeTest
 	}
-	
+
 	return GoalModeGeneric
 }
 
@@ -86,22 +88,22 @@ func parseGoalMode(goal string) GoalMode {
 func (f *GoalDrivenFilter) extractGoalTerms() {
 	// Tokenize goal
 	words := tokenize(f.goal)
-	
+
 	for i, word := range words {
 		wordLower := strings.ToLower(word)
-		
+
 		// Position weight: earlier words more important
 		posWeight := 1.0 - float64(i)/float64(len(words)+1)
-		
+
 		// Length weight: longer words often more specific
 		lenWeight := float64(len(word)) / 10.0
 		if lenWeight > 1.0 {
 			lenWeight = 1.0
 		}
-		
+
 		f.goalTerms[wordLower] = posWeight * lenWeight
 	}
-	
+
 	// Add mode-specific terms
 	f.addModeSpecificTerms()
 }
@@ -122,7 +124,7 @@ func (f *GoalDrivenFilter) addModeSpecificTerms() {
 		f.goalTerms["undefined"] = 1.8
 		f.goalTerms["null"] = 1.5
 		f.goalTerms["nil"] = 1.5
-		
+
 	case GoalModeReview:
 		f.goalTerms["changed"] = 1.8
 		f.goalTerms["modified"] = 1.8
@@ -133,7 +135,7 @@ func (f *GoalDrivenFilter) addModeSpecificTerms() {
 		f.goalTerms["fix"] = 1.8
 		f.goalTerms["todo"] = 1.5
 		f.goalTerms["fixme"] = 1.5
-		
+
 	case GoalModeDeploy:
 		f.goalTerms["success"] = 1.8
 		f.goalTerms["deployed"] = 2.0
@@ -142,13 +144,13 @@ func (f *GoalDrivenFilter) addModeSpecificTerms() {
 		f.goalTerms["version"] = 1.3
 		f.goalTerms["environment"] = 1.3
 		f.goalTerms["production"] = 1.5
-		
+
 	case GoalModeSearch:
 		f.goalTerms["found"] = 1.8
 		f.goalTerms["match"] = 1.5
 		f.goalTerms["result"] = 1.3
 		f.goalTerms["file"] = 1.2
-		
+
 	case GoalModeBuild:
 		f.goalTerms["building"] = 1.5
 		f.goalTerms["compiling"] = 1.5
@@ -156,7 +158,7 @@ func (f *GoalDrivenFilter) addModeSpecificTerms() {
 		f.goalTerms["error"] = 2.0
 		f.goalTerms["warning"] = 1.5
 		f.goalTerms["complete"] = 1.5
-		
+
 	case GoalModeTest:
 		f.goalTerms["pass"] = 1.8
 		f.goalTerms["passed"] = 1.8
@@ -178,17 +180,17 @@ func (f *GoalDrivenFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
-	
+
 	original := len(input)
-	
+
 	lines := strings.Split(input, "\n")
-	
+
 	// Score each line
 	scores := f.scoreLines(lines)
-	
+
 	// Apply CRF-style sequential decision
 	decisions := f.crfDecode(scores)
-	
+
 	// Build output
 	var result []string
 	for i, line := range lines {
@@ -196,21 +198,21 @@ func (f *GoalDrivenFilter) Apply(input string, mode Mode) (string, int) {
 			result = append(result, line)
 		}
 	}
-	
+
 	output := strings.Join(result, "\n")
 	saved := (original - len(output)) / 4
-	
+
 	return output, saved
 }
 
 // scoreLines scores each line for goal relevance
 func (f *GoalDrivenFilter) scoreLines(lines []string) []float64 {
 	scores := make([]float64, len(lines))
-	
+
 	for i, line := range lines {
 		scores[i] = f.scoreLine(line)
 	}
-	
+
 	return scores
 }
 
@@ -218,7 +220,7 @@ func (f *GoalDrivenFilter) scoreLines(lines []string) []float64 {
 func (f *GoalDrivenFilter) scoreLine(line string) float64 {
 	lineLower := strings.ToLower(line)
 	score := 0.0
-	
+
 	// Check for goal terms
 	words := tokenize(lineLower)
 	for _, word := range words {
@@ -226,7 +228,7 @@ func (f *GoalDrivenFilter) scoreLine(line string) float64 {
 			score += weight
 		}
 	}
-	
+
 	// Structural importance
 	if isErrorLine(line) {
 		score += 3.0
@@ -240,12 +242,12 @@ func (f *GoalDrivenFilter) scoreLine(line string) float64 {
 	if isCodeLine(line) {
 		score += 0.5
 	}
-	
+
 	// Length penalty (prefer shorter lines in debug mode)
 	if f.mode == GoalModeDebug && len(line) > 200 {
 		score *= 0.8
 	}
-	
+
 	return score
 }
 
@@ -254,9 +256,9 @@ func (f *GoalDrivenFilter) crfDecode(scores []float64) []bool {
 	if len(scores) == 0 {
 		return []bool{}
 	}
-	
+
 	decisions := make([]bool, len(scores))
-	
+
 	// Normalize scores
 	maxScore := 0.0
 	for _, s := range scores {
@@ -264,24 +266,24 @@ func (f *GoalDrivenFilter) crfDecode(scores []float64) []bool {
 			maxScore = s
 		}
 	}
-	
+
 	threshold := maxScore * 0.3 // Keep lines with 30%+ of max score
-	
+
 	// Viterbi-style decoding with transition weights
 	for i := range scores {
 		keepScore := scores[i]
-		
+
 		// Transition bonus
 		if i > 0 && decisions[i-1] {
 			keepScore += f.keepKeepWeight
 		}
-		
+
 		decisions[i] = keepScore >= threshold
 	}
-	
+
 	// Post-processing: ensure structural coherence
 	f.ensureCoherence(decisions, scores)
-	
+
 	return decisions
 }
 
@@ -300,7 +302,7 @@ func (f *GoalDrivenFilter) ensureCoherence(decisions []bool, scores []float64) {
 			break
 		}
 	}
-	
+
 	// Don't allow more than 3 consecutive pruned lines
 	prunedCount := 0
 	for i := range decisions {
@@ -338,12 +340,12 @@ func isWarningLine(line string) bool {
 // isHeadingLine checks if a line is a heading/separator
 func isHeadingLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Markdown headings
 	if strings.HasPrefix(trimmed, "#") {
 		return true
 	}
-	
+
 	// ASCII separators
 	if len(trimmed) > 0 {
 		allDashes := true
@@ -360,14 +362,14 @@ func isHeadingLine(line string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // isCodeLine checks if a line appears to be code
 func isCodeLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Common code patterns
 	if strings.HasPrefix(trimmed, "func ") ||
 		strings.HasPrefix(trimmed, "def ") ||
@@ -382,8 +384,7 @@ func isCodeLine(line string) bool {
 		strings.HasPrefix(trimmed, "var ") {
 		return true
 	}
-	
+
 	// Contains typical code symbols
-	codePattern := regexp.MustCompile(`[{}\[\]();:]`)
-	return codePattern.MatchString(trimmed)
+	return codeSymbolRe.MatchString(trimmed)
 }

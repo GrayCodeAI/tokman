@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -450,17 +451,19 @@ func exportCSVHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=tokman-export.csv")
-		fmt.Fprintln(w, "timestamp,command,tokens_saved,original_tokens,filtered_tokens,exec_time_ms,project_path")
+		writer := csv.NewWriter(w)
+		defer writer.Flush()
+		writer.Write([]string{"timestamp", "command", "tokens_saved", "original_tokens", "filtered_tokens", "exec_time_ms", "project_path"})
 		for _, rec := range records {
-			fmt.Fprintf(w, "%s,%s,%d,%d,%d,%d,%s\n",
+			writer.Write([]string{
 				rec.Timestamp.Format("2006-01-02 15:04:05"),
 				rec.Command,
-				rec.SavedTokens,
-				rec.OriginalTokens,
-				rec.FilteredTokens,
-				rec.ExecTimeMs,
+				fmt.Sprintf("%d", rec.SavedTokens),
+				fmt.Sprintf("%d", rec.OriginalTokens),
+				fmt.Sprintf("%d", rec.FilteredTokens),
+				fmt.Sprintf("%d", rec.ExecTimeMs),
 				rec.ProjectPath,
-			)
+			})
 		}
 	}
 }
@@ -1078,13 +1081,6 @@ func cacheMetricsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 		json.NewEncoder(w).Encode(response)
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func dashboardIndexHandler(w http.ResponseWriter, r *http.Request) {

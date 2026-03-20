@@ -1,0 +1,31 @@
+[[rules]]
+match = "jest *"
+description = "jest - JavaScript test runner"
+
+[rules.filter]
+# Keep only failing tests and summary
+keep_lines_matching = [
+    "FAIL.*",
+    "✕.*",
+    "●.*",
+    "Test Suites:.*",
+    "Tests:.*",
+    "Snapshots:.*",
+    "Time:.*",
+    "Ran all test suites.*",
+]
+
+# Strip passing test noise
+strip_lines_matching = [
+    "^\\s*✓.*",
+    "^\\s*√.*",
+    "^\\s*PASS.*",
+    "^\\s*\\[32m",
+    "^\\s*console\\.log",
+    "^\\s*console\\.warn",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "All tests passed."

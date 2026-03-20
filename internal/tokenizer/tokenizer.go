@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	tiktoken "github.com/tiktoken-go/tokenizer"
+
+	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
 // Encoding represents a tokenizer encoding type.
@@ -180,10 +182,9 @@ type Message struct {
 }
 
 // EstimateTokens provides a quick heuristic token count.
-// Uses the formula: ceil(text.length / 4.0)
-// This is a fallback when tiktoken is not needed.
+// Delegates to core.EstimateTokens for single source of truth (T22).
 func EstimateTokens(text string) int {
-	return (len(text) + 3) / 4
+	return core.EstimateTokens(text)
 }
 
 // CompareCounts compares heuristic vs actual token count.

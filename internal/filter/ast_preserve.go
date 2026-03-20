@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+var javaMethodRe = regexp.MustCompile(`^\w+\s+\w+\s*\([^)]*\)\s*\{?$`)
+
 // ASTPreserveFilter implements LongCodeZip-style compression (NUS, 2025).
 // AST-aware compression that preserves syntactic validity of code.
 //
@@ -18,18 +20,18 @@ import (
 type ASTPreserveFilter struct {
 	// Language detection
 	detectedLang string
-	
+
 	// Bracket matching
 	braceDepth   int
 	bracketDepth int
 	parenDepth   int
-	
+
 	// String/comment tracking
 	inString     bool
 	stringChar   byte
 	inComment    bool
 	commentStart int
-	
+
 	// Preserve settings
 	preserveImports bool
 	preserveTypes   bool
@@ -53,15 +55,23 @@ func (f *ASTPreserveFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
-	
+
 	original := len(input)
-	
+
+	// Reset per-call state
+	f.braceDepth = 0
+	f.bracketDepth = 0
+	f.parenDepth = 0
+	f.inString = false
+	f.stringChar = 0
+	f.inComment = false
+
 	// Detect language
 	f.detectedLang = detectLanguage(input)
-	
+
 	// Process while preserving AST structure
 	output := f.processWithAST(input, mode)
-	
+
 	saved := (original - len(output)) / 4
 	return output, saved
 }
@@ -70,19 +80,19 @@ func (f *ASTPreserveFilter) Apply(input string, mode Mode) (string, int) {
 func (f *ASTPreserveFilter) processWithAST(input string, mode Mode) string {
 	lines := strings.Split(input, "\n")
 	var result []string
-	
+
 	// Track structural context
 	f.braceDepth = 0
 	f.bracketDepth = 0
 	f.parenDepth = 0
-	
+
 	// Track what to preserve
 	preserveBlocks := make(map[int]bool) // Line numbers to preserve
-	
+
 	for i, line := range lines {
 		f.analyzeLine(line, i, preserveBlocks)
 	}
-	
+
 	// Build output
 	for i, line := range lines {
 		if preserveBlocks[i] || f.isStructuralLine(line) {
@@ -97,17 +107,17 @@ func (f *ASTPreserveFilter) processWithAST(input string, mode Mode) string {
 			result = append(result, line)
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
 // analyzeLine analyzes a line and marks important structural lines
 func (f *ASTPreserveFilter) analyzeLine(line string, lineNum int, preserve map[int]bool) {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Track depth changes
 	f.trackDepth(line)
-	
+
 	// Always preserve structural elements
 	if f.isFunctionDecl(trimmed) {
 		preserve[lineNum] = true
@@ -116,30 +126,30 @@ func (f *ASTPreserveFilter) analyzeLine(line string, lineNum int, preserve map[i
 			preserve[lineNum+j] = true
 		}
 	}
-	
+
 	if f.isClassDecl(trimmed) {
 		preserve[lineNum] = true
 	}
-	
+
 	if f.isImportDecl(trimmed) && f.preserveImports {
 		preserve[lineNum] = true
 	}
-	
+
 	if f.isTypeDecl(trimmed) && f.preserveTypes {
 		preserve[lineNum] = true
 	}
-	
+
 	// Preserve lines with structural changes
 	if strings.Contains(trimmed, "{") || strings.Contains(trimmed, "}") {
 		preserve[lineNum] = true
 	}
-	
+
 	// Preserve error handling
-	if strings.Contains(trimmed, "if err") || strings.Contains(trimmed, "try") || 
-	   strings.Contains(trimmed, "catch") || strings.Contains(trimmed, "except") {
+	if strings.Contains(trimmed, "if err") || strings.Contains(trimmed, "try") ||
+		strings.Contains(trimmed, "catch") || strings.Contains(trimmed, "except") {
 		preserve[lineNum] = true
 	}
-	
+
 	// Preserve return statements
 	if strings.HasPrefix(trimmed, "return ") || trimmed == "return" {
 		preserve[lineNum] = true
@@ -151,10 +161,10 @@ func (f *ASTPreserveFilter) trackDepth(line string) {
 	inString := false
 	stringChar := byte(0)
 	escaped := false
-	
+
 	for i := 0; i < len(line); i++ {
 		c := line[i]
-		
+
 		// Handle strings
 		if !escaped && (c == '"' || c == '\'' || c == '`') {
 			if !inString {
@@ -165,14 +175,14 @@ func (f *ASTPreserveFilter) trackDepth(line string) {
 			}
 			continue
 		}
-		
+
 		// Handle escape
 		if c == '\\' && inString {
 			escaped = !escaped
 			continue
 		}
 		escaped = false
-		
+
 		// Track depth outside strings
 		if !inString {
 			switch c {
@@ -196,18 +206,18 @@ func (f *ASTPreserveFilter) trackDepth(line string) {
 // isStructuralLine checks if a line is a structural element
 func (f *ASTPreserveFilter) isStructuralLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Empty lines are structural (separators)
 	if trimmed == "" {
 		return true
 	}
-	
+
 	// Comments can be compressed
 	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") ||
-	   strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+		strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 		return false
 	}
-	
+
 	return false
 }
 
@@ -230,10 +240,10 @@ func (f *ASTPreserveFilter) isFunctionDecl(line string) bool {
 		return true
 	}
 	// Java/C++
-	if regexp.MustCompile(`^\w+\s+\w+\s*\([^)]*\)\s*\{?$`).MatchString(line) {
+	if javaMethodRe.MatchString(line) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -265,17 +275,17 @@ func (f *ASTPreserveFilter) isTypeDecl(line string) bool {
 // compressLine compresses a non-structural line
 func (f *ASTPreserveFilter) compressLine(line string) string {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Skip empty lines
 	if trimmed == "" {
 		return ""
 	}
-	
+
 	// Skip comments entirely
 	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 		return ""
 	}
-	
+
 	// Shorten variable declarations
 	if strings.HasPrefix(trimmed, "var ") || strings.HasPrefix(trimmed, "let ") {
 		// Keep only essential parts
@@ -284,7 +294,7 @@ func (f *ASTPreserveFilter) compressLine(line string) string {
 			return strings.TrimSpace(parts[0]) + "=" + strings.TrimSpace(parts[1])
 		}
 	}
-	
+
 	return line
 }
 
@@ -294,12 +304,12 @@ func detectLanguage(content string) string {
 	if strings.Contains(content, "package ") && strings.Contains(content, "func ") {
 		return "go"
 	}
-	
+
 	// Python patterns
 	if strings.Contains(content, "def ") && strings.Contains(content, "import ") {
 		return "python"
 	}
-	
+
 	// JavaScript/TypeScript patterns
 	if strings.Contains(content, "function ") || strings.Contains(content, "const ") {
 		if strings.Contains(content, ": ") && strings.Contains(content, "interface ") {
@@ -307,16 +317,16 @@ func detectLanguage(content string) string {
 		}
 		return "javascript"
 	}
-	
+
 	// Rust patterns
 	if strings.Contains(content, "fn ") && strings.Contains(content, "let ") {
 		return "rust"
 	}
-	
+
 	// Java patterns
 	if strings.Contains(content, "public class ") || strings.Contains(content, "private void") {
 		return "java"
 	}
-	
+
 	return "unknown"
 }

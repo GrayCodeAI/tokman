@@ -1,0 +1,74 @@
+name: Token Optimization
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'Command to run through tokman'
+        required: true
+        type: string
+      budget:
+        description: 'Token budget (0 = unlimited)'
+        required: false
+        default: '0'
+        type: string
+      preset:
+        description: 'Pipeline preset (fast/balanced/full)'
+        required: false
+        default: 'balanced'
+        type: string
+    outputs:
+      original_tokens:
+        description: 'Original token count'
+        value: ${{ jobs.compress.outputs.original_tokens }}
+      compressed_tokens:
+        description: 'Compressed token count'
+        value: ${{ jobs.compress.outputs.compressed_tokens }}
+      saved_tokens:
+        description: 'Tokens saved'
+        value: ${{ jobs.compress.outputs.saved_tokens }}
+      reduction_percent:
+        description: 'Reduction percentage'
+        value: ${{ jobs.compress.outputs.reduction_percent }}
+
+jobs:
+  compress:
+    runs-on: ubuntu-latest
+    outputs:
+      original_tokens: ${{ steps.compress.outputs.original_tokens }}
+      compressed_tokens: ${{ steps.compress.outputs.compressed_tokens }}
+      saved_tokens: ${{ steps.compress.outputs.saved_tokens }}
+      reduction_percent: ${{ steps.compress.outputs.reduction_percent }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install tokman
+        run: |
+          go install github.com/GrayCodeAI/tokman/cmd/tokman@latest
+      
+      - name: Run compression
+        id: compress
+        run: |
+          OUTPUT=$(tokman --preset ${{ inputs.preset }} --budget ${{ inputs.budget }} ${{ inputs.command }} 2>/dev/null || true)
+          echo "output<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Get stats from tokman stats command
+          STATS=$(tokman stats --json 2>/dev/null || echo '{"original_tokens":0,"compressed_tokens":0}')
+          echo "original_tokens=$(echo $STATS | jq -r '.original_tokens // 0')" >> $GITHUB_OUTPUT
+          echo "compressed_tokens=$(echo $STATS | jq -r '.compressed_tokens // 0')" >> $GITHUB_OUTPUT
+          echo "saved_tokens=$(echo $STATS | jq -r '.saved_tokens // 0')" >> $GITHUB_OUTPUT
+          echo "reduction_percent=$(echo $STATS | jq -r '.reduction_percent // 0')" >> $GITHUB_OUTPUT
+      
+      - name: Post summary
+        run: |
+          echo "## Token Compression Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Command | \`${{ inputs.command }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Original Tokens | ${{ steps.compress.outputs.original_tokens }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compressed Tokens | ${{ steps.compress.outputs.compressed_tokens }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Saved Tokens | ${{ steps.compress.outputs.saved_tokens }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Reduction | ${{ steps.compress.outputs.reduction_percent }}% |" >> $GITHUB_STEP_SUMMARY

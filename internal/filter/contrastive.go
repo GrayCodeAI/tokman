@@ -17,7 +17,7 @@ import (
 //
 // Research Results: 4-10x compression with improved RAG accuracy.
 type ContrastiveFilter struct {
-	question    string
+	question       string
 	questionNgrams map[string]float64
 	contextNgrams  map[string]float64
 	ngramSize      int
@@ -31,7 +31,7 @@ func NewContrastiveFilter(question string) *ContrastiveFilter {
 		contextNgrams:  make(map[string]float64),
 		ngramSize:      2, // Bigrams
 	}
-	
+
 	c.extractQuestionNgrams()
 	return c
 }
@@ -39,12 +39,12 @@ func NewContrastiveFilter(question string) *ContrastiveFilter {
 // extractQuestionNgrams extracts n-grams from the question
 func (f *ContrastiveFilter) extractQuestionNgrams() {
 	words := tokenize(strings.ToLower(f.question))
-	
+
 	for i := 0; i < len(words)-f.ngramSize+1; i++ {
 		ngram := strings.Join(words[i:i+f.ngramSize], " ")
 		f.questionNgrams[ngram]++
 	}
-	
+
 	// Normalize
 	total := float64(len(words) - f.ngramSize + 1)
 	for ngram := range f.questionNgrams {
@@ -62,15 +62,18 @@ func (f *ContrastiveFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone || f.question == "" {
 		return input, 0
 	}
-	
+
 	original := len(input)
-	
+
+	// Reset context n-grams for fresh extraction each call
+	f.contextNgrams = make(map[string]float64)
+
 	// Extract context n-grams
 	f.extractContextNgrams(input)
-	
+
 	// Score and reorder content
 	output := f.processWithContrastive(input, mode)
-	
+
 	saved := (original - len(output)) / 4
 	return output, saved
 }
@@ -78,12 +81,12 @@ func (f *ContrastiveFilter) Apply(input string, mode Mode) (string, int) {
 // extractContextNgrams extracts n-grams from context
 func (f *ContrastiveFilter) extractContextNgrams(input string) {
 	words := tokenize(strings.ToLower(input))
-	
+
 	for i := 0; i < len(words)-f.ngramSize+1; i++ {
 		ngram := strings.Join(words[i:i+f.ngramSize], " ")
 		f.contextNgrams[ngram]++
 	}
-	
+
 	// Normalize
 	total := float64(len(words) - f.ngramSize + 1)
 	for ngram := range f.contextNgrams {
@@ -94,14 +97,14 @@ func (f *ContrastiveFilter) extractContextNgrams(input string) {
 // processWithContrastive processes using contrastive scoring
 func (f *ContrastiveFilter) processWithContrastive(input string, mode Mode) string {
 	lines := strings.Split(input, "\n")
-	
+
 	// Score each line
 	type scoredLine struct {
 		line  string
 		score float64
 		index int
 	}
-	
+
 	scored := make([]scoredLine, len(lines))
 	for i, line := range lines {
 		scored[i] = scoredLine{
@@ -110,35 +113,35 @@ func (f *ContrastiveFilter) processWithContrastive(input string, mode Mode) stri
 			index: i,
 		}
 	}
-	
+
 	// Sort by score (descending)
 	sort.Slice(scored, func(i, j int) bool {
 		return scored[i].score > scored[j].score
 	})
-	
+
 	// Determine how many lines to keep
 	keepRatio := 0.5
 	if mode == ModeAggressive {
 		keepRatio = 0.3
 	}
-	
+
 	keepCount := int(float64(len(lines)) * keepRatio)
 	if keepCount < 5 {
 		keepCount = 5
 	}
-	
+
 	// Build keep set
 	keepSet := make(map[int]bool)
 	for i := 0; i < keepCount && i < len(scored); i++ {
 		keepSet[scored[i].index] = true
 	}
-	
+
 	// Always keep first and last lines for context
 	keepSet[0] = true
 	if len(lines) > 1 {
 		keepSet[len(lines)-1] = true
 	}
-	
+
 	// Build output preserving order
 	var result []string
 	for i, line := range lines {
@@ -146,7 +149,7 @@ func (f *ContrastiveFilter) processWithContrastive(input string, mode Mode) stri
 			result = append(result, line)
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -156,15 +159,15 @@ func (f *ContrastiveFilter) scoreLine(line string) float64 {
 	if len(words) < 2 {
 		return 0.0
 	}
-	
+
 	score := 0.0
-	
+
 	for i := 0; i < len(words)-f.ngramSize+1; i++ {
 		ngram := strings.Join(words[i:i+f.ngramSize], " ")
-		
+
 		questionProb := f.questionNgrams[ngram]
 		contextProb := f.contextNgrams[ngram]
-		
+
 		// Contrastive score: higher when ngram is in question but rare in context
 		if contextProb > 0 {
 			contrastive := questionProb / contextProb
@@ -174,7 +177,7 @@ func (f *ContrastiveFilter) scoreLine(line string) float64 {
 			score += questionProb * 2.0
 		}
 	}
-	
+
 	// Normalize by line length
 	return score / math.Log(float64(len(words))+1)
 }

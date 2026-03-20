@@ -74,16 +74,15 @@ func runErr(args []string, verbose bool) int {
 		return 1
 	}
 
-	// Collect all output
-	var rawOutput strings.Builder
+	// Collect all output into separate buffers to avoid concurrent writes
+	var stdoutBuf, stderrBuf strings.Builder
 	doneOut := make(chan struct{})
 	doneErr := make(chan struct{})
 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			line := scanner.Text()
-			rawOutput.WriteString(line + "\n")
+			stdoutBuf.WriteString(scanner.Text() + "\n")
 		}
 		close(doneOut)
 	}()
@@ -91,8 +90,7 @@ func runErr(args []string, verbose bool) int {
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			line := scanner.Text()
-			rawOutput.WriteString(line + "\n")
+			stderrBuf.WriteString(scanner.Text() + "\n")
 		}
 		close(doneErr)
 	}()
@@ -108,7 +106,7 @@ func runErr(args []string, verbose bool) int {
 		exitCode = execCmd.ProcessState.ExitCode()
 	}
 
-	raw := rawOutput.String()
+	raw := stdoutBuf.String() + stderrBuf.String()
 	filtered := filterErrorsAdvanced(raw, verbose)
 
 	var result strings.Builder

@@ -1,0 +1,22 @@
+[[rules]]
+match = "fd"
+description = "fd - fast file finder"
+
+[rules.filter]
+# Strip common noise directories from output
+strip_lines_matching = [
+    "node_modules/",
+    ".git/",
+    "target/",
+    "__pycache__/",
+    ".venv/",
+    "vendor/",
+    "dist/",
+    "build/",
+]
+
+# Max lines for large directory listings
+max_lines = 200
+
+[rules.filter.on_empty]
+return = "No files found"

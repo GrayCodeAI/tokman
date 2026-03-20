@@ -1,0 +1,27 @@
+[[rules]]
+match = "trivy *"
+description = "trivy - security vulnerability scanner"
+
+[rules.filter]
+keep_lines_matching = [
+    "HIGH.*",
+    "CRITICAL.*",
+    "MEDIUM.*",
+    "LOW.*",
+    "Total:.*",
+    "Summary:.*",
+    "\\d+ \\(HIGH\\).*",
+    "\\d+ \\(CRITICAL\\).*",
+]
+
+# Strip scan progress
+strip_lines_matching = [
+    "^\\s*\\d{4}.*Scanning.*",
+    "^\\s*Detecting.*",
+    "^\\s*Analyzing.*",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "trivy: no vulnerabilities found"

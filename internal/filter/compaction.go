@@ -34,6 +34,7 @@ type CompactionLayer struct {
 	summarizer     *llm.Summarizer
 	sessionTracker *ConversationTracker
 	cache          map[string]*CompactionResult
+	cacheMu        sync.RWMutex
 	fallback       Filter
 }
 
@@ -41,37 +42,37 @@ type CompactionLayer struct {
 type CompactionConfig struct {
 	// Enable LLM-based compaction
 	Enabled bool
-	
+
 	// Minimum content size to trigger compaction (in lines)
 	ThresholdLines int
-	
+
 	// Minimum content size to trigger compaction (in tokens)
 	ThresholdTokens int
-	
+
 	// Number of recent turns to preserve verbatim
 	PreserveRecentTurns int
-	
+
 	// Maximum summary length in tokens
 	MaxSummaryTokens int
-	
+
 	// Content types to compact (chat, conversation, session)
 	ContentTypes []string
-	
+
 	// Enable caching of compaction results
 	CacheEnabled bool
-	
+
 	// Custom prompt template for compaction
 	PromptTemplate string
-	
+
 	// Detect content type automatically
 	AutoDetect bool
-	
+
 	// Create state snapshot format (4-section XML)
 	StateSnapshotFormat bool
-	
+
 	// Extract key-value pairs from content
 	ExtractKeyValuePairs bool
-	
+
 	// Maximum context entries to preserve
 	MaxContextEntries int
 }
@@ -79,47 +80,47 @@ type CompactionConfig struct {
 // DefaultCompactionConfig returns default configuration
 func DefaultCompactionConfig() CompactionConfig {
 	return CompactionConfig{
-		Enabled:             false, // Opt-in via flag
-		ThresholdLines:      100,
-		ThresholdTokens:     2000,
-		PreserveRecentTurns: 5,
-		MaxSummaryTokens:    500,
-		ContentTypes:        []string{"chat", "conversation", "session", "transcript"},
-		CacheEnabled:        true,
-		AutoDetect:          true,
-		StateSnapshotFormat: true,
+		Enabled:              false, // Opt-in via flag
+		ThresholdLines:       100,
+		ThresholdTokens:      2000,
+		PreserveRecentTurns:  5,
+		MaxSummaryTokens:     500,
+		ContentTypes:         []string{"chat", "conversation", "session", "transcript"},
+		CacheEnabled:         true,
+		AutoDetect:           true,
+		StateSnapshotFormat:  true,
 		ExtractKeyValuePairs: true,
-		MaxContextEntries:   20,
+		MaxContextEntries:    20,
 	}
 }
 
 // CompactionResult represents a compaction result
 type CompactionResult struct {
-	Snapshot       *StateSnapshot
-	OriginalTokens int
-	FinalTokens    int
-	SavedTokens    int
+	Snapshot         *StateSnapshot
+	OriginalTokens   int
+	FinalTokens      int
+	SavedTokens      int
 	CompressionRatio float64
-	Cached         bool
-	Timestamp      time.Time
+	Cached           bool
+	Timestamp        time.Time
 }
 
 // StateSnapshot represents semantic compaction output
 type StateSnapshot struct {
-	SessionHistory SessionHistory `json:"session_history"`
-	CurrentState   CurrentState   `json:"current_state"`
+	SessionHistory SessionHistory  `json:"session_history"`
+	CurrentState   CurrentState    `json:"current_state"`
 	Context        SnapshotContext `json:"context"`
-	PendingPlan    []Milestone    `json:"pending_plan"`
+	PendingPlan    []Milestone     `json:"pending_plan"`
 }
 
 // SessionHistory tracks what happened in the session
 type SessionHistory struct {
-	UserQueries  []string     `json:"user_queries"`
-	ActivityLog  []string     `json:"activity_log"`
-	FilesRead    []string     `json:"files_read,omitempty"`
-	FilesEdited  []string     `json:"files_edited,omitempty"`
-	CommandsRun  []string     `json:"commands_run,omitempty"`
-	Decisions    []string     `json:"decisions,omitempty"`
+	UserQueries []string `json:"user_queries"`
+	ActivityLog []string `json:"activity_log"`
+	FilesRead   []string `json:"files_read,omitempty"`
+	FilesEdited []string `json:"files_edited,omitempty"`
+	CommandsRun []string `json:"commands_run,omitempty"`
+	Decisions   []string `json:"decisions,omitempty"`
 }
 
 // CurrentState tracks what's currently active
@@ -132,9 +133,9 @@ type CurrentState struct {
 
 // SnapshotContext preserves important knowledge
 type SnapshotContext struct {
-	Critical    []string          `json:"critical"`    // Must preserve (can't rediscover)
-	Working     []string          `json:"working"`     // Summarized knowledge
-	KeyValue    map[string]string `json:"key_value"`   // Extracted facts
+	Critical    []string          `json:"critical"`  // Must preserve (can't rediscover)
+	Working     []string          `json:"working"`   // Summarized knowledge
+	KeyValue    map[string]string `json:"key_value"` // Extracted facts
 	CodeContext []CodeContext     `json:"code_context,omitempty"`
 }
 
@@ -154,14 +155,14 @@ type Milestone struct {
 
 // ConversationTracker tracks conversation turns
 type ConversationTracker struct {
-	turns     []Turn
-	maxTurns  int
-	mu        sync.RWMutex
+	turns    []Turn
+	maxTurns int
+	mu       sync.RWMutex
 }
 
 // Turn represents a single conversation turn
 type Turn struct {
-	Role      string    // "user" or "assistant"
+	Role      string // "user" or "assistant"
 	Content   string
 	Timestamp time.Time
 	Hash      string
@@ -177,7 +178,7 @@ func NewCompactionLayer(cfg CompactionConfig) *CompactionLayer {
 		cache:          make(map[string]*CompactionResult),
 		fallback:       NewSemanticFilter(),
 	}
-	
+
 	// Set defaults
 	if c.config.ThresholdLines == 0 {
 		c.config.ThresholdLines = 100
@@ -191,7 +192,7 @@ func NewCompactionLayer(cfg CompactionConfig) *CompactionLayer {
 	if c.config.MaxSummaryTokens == 0 {
 		c.config.MaxSummaryTokens = 500
 	}
-	
+
 	return c
 }
 
@@ -206,77 +207,82 @@ func (c *CompactionLayer) Apply(input string, mode Mode) (string, int) {
 	if !c.config.Enabled {
 		return input, 0
 	}
-	
+
 	// Check cache
 	if c.config.CacheEnabled {
 		cacheKey := c.hashContent(input)
-		if cached, ok := c.cache[cacheKey]; ok {
+		c.cacheMu.RLock()
+		cached, ok := c.cache[cacheKey]
+		c.cacheMu.RUnlock()
+		if ok {
 			return c.snapshotToString(cached.Snapshot), cached.SavedTokens
 		}
 	}
-	
+
 	// Detect content type
 	if c.config.AutoDetect && !c.isCompactable(input) {
 		return input, 0
 	}
-	
+
 	// Check threshold
 	originalTokens := EstimateTokens(input)
 	if originalTokens < c.config.ThresholdTokens {
 		return input, 0
 	}
-	
+
 	// Parse turns from input
 	turns := c.parseTurns(input)
-	
+
 	// If no turns detected, this isn't conversation content - return unchanged
 	if len(turns) == 0 {
 		return input, 0
 	}
-	
+
 	// Create state snapshot
 	snapshot := c.createSnapshot(turns, input)
-	
+
 	// Use LLM for semantic compression
 	if c.summarizer.IsAvailable() {
 		c.enrichWithLLM(snapshot, turns, input)
 	}
-	
+
 	// Calculate savings
 	output := c.snapshotToString(snapshot)
 	finalTokens := EstimateTokens(output)
 	savedTokens := originalTokens - finalTokens
-	
+
 	// Return original if compaction produced empty or invalid output
 	if len(output) == 0 || finalTokens == 0 {
 		return input, 0
 	}
-	
+
 	// Return original if compaction didn't save tokens
 	if savedTokens <= 0 {
 		return input, 0
 	}
-	
+
 	// Cache result
 	if c.config.CacheEnabled && savedTokens > 0 {
 		cacheKey := c.hashContent(input)
+		c.cacheMu.Lock()
 		c.cache[cacheKey] = &CompactionResult{
-			Snapshot:       snapshot,
-			OriginalTokens: originalTokens,
-			FinalTokens:    finalTokens,
-			SavedTokens:    savedTokens,
+			Snapshot:         snapshot,
+			OriginalTokens:   originalTokens,
+			FinalTokens:      finalTokens,
+			SavedTokens:      savedTokens,
 			CompressionRatio: float64(originalTokens) / float64(finalTokens),
-			Timestamp:      time.Now(),
+			Timestamp:        time.Now(),
 		}
+		c.cacheMu.Unlock()
 	}
-	
+
 	return output, savedTokens
 }
 
 // isCompactable checks if content is suitable for compaction
 func (c *CompactionLayer) isCompactable(content string) bool {
 	lower := strings.ToLower(content)
-	
+
 	// Detect chat/conversation patterns
 	chatPatterns := []string{
 		"turn ", "turn:", "user:", "assistant:", "query:",
@@ -284,70 +290,69 @@ func (c *CompactionLayer) isCompactable(content string) bool {
 		"q:", "a:", "question:", "answer:",
 		">>>", "<<<", "```", // Code blocks often in conversations
 	}
-	
+
 	matches := 0
 	for _, pattern := range chatPatterns {
 		if strings.Contains(lower, pattern) {
 			matches++
 		}
 	}
-	
+
 	// If multiple chat patterns found, likely compactable
 	return matches >= 2
 }
 
 // parseTurns parses conversation turns from content
+// Pre-compiled regexes for parseTurns to avoid per-call compilation
+var parseTurnPatterns = []struct {
+	regex   *regexp.Regexp
+	roleMap map[string]string
+}{
+	{
+		regex: regexp.MustCompile(`(?i)^(user|assistant|system):\s*(.*)$`),
+		roleMap: map[string]string{
+			"user":      "user",
+			"assistant": "assistant",
+			"system":    "system",
+		},
+	},
+	{
+		regex: regexp.MustCompile(`(?i)^(turn\s*\d+):\s*(.*)$`),
+		roleMap: map[string]string{
+			"turn": "user",
+		},
+	},
+	{
+		regex: regexp.MustCompile(`(?i)^(q|question):\s*(.*)$`),
+		roleMap: map[string]string{
+			"q":        "user",
+			"question": "user",
+		},
+	},
+}
+
 func (c *CompactionLayer) parseTurns(content string) []Turn {
 	var turns []Turn
-	
-	// Common turn delimiters
-	patterns := []struct {
-		regex   string
-		roleMap map[string]string
-	}{
-		{
-			regex: `(?i)^(user|assistant|system):\s*(.*)$`,
-			roleMap: map[string]string{
-				"user":      "user",
-				"assistant": "assistant",
-				"system":    "system",
-			},
-		},
-		{
-			regex: `(?i)^(turn\s*\d+):\s*(.*)$`,
-			roleMap: map[string]string{
-				"turn": "user",
-			},
-		},
-		{
-			regex: `(?i)^(q|question):\s*(.*)$`,
-			roleMap: map[string]string{
-				"q":        "user",
-				"question": "user",
-			},
-		},
-	}
-	
+
 	lines := strings.Split(content, "\n")
 	var currentTurn *Turn
-	
+
 	for _, line := range lines {
 		matched := false
-		
-		for _, p := range patterns {
-			re := regexp.MustCompile(p.regex)
-			if matches := re.FindStringSubmatch(line); matches != nil {
+
+		for _, p := range parseTurnPatterns {
+			if matches := p.regex.FindStringSubmatch(line); matches != nil {
 				// Save previous turn
 				if currentTurn != nil {
 					turns = append(turns, *currentTurn)
 				}
-				
+
 				// Start new turn
 				role := matches[1]
 				if mapped, ok := p.roleMap[strings.ToLower(role)]; ok {
 					role = mapped
 				}
-				
+
 				currentTurn = &Turn{
 					Role:      role,
 					Content:   matches[2],
@@ -359,19 +364,19 @@ func (c *CompactionLayer) parseTurns(content string) []Turn {
 				break
 			}
 		}
-		
+
 		// Append to current turn if not a new turn marker
 		if !matched && currentTurn != nil {
 			currentTurn.Content += "\n" + line
 			currentTurn.Tokens = EstimateTokens(currentTurn.Content)
 		}
 	}
-	
+
 	// Save last turn
 	if currentTurn != nil {
 		turns = append(turns, *currentTurn)
 	}
-	
+
 	// If no turns detected, treat entire content as one user turn
 	if len(turns) == 0 {
 		turns = []Turn{{
@@ -382,7 +387,7 @@ func (c *CompactionLayer) parseTurns(content string) []Turn {
 			Tokens:    EstimateTokens(content),
 		}}
 	}
-	
+
 	return turns
 }
 
@@ -404,13 +409,13 @@ func (c *CompactionLayer) createSnapshot(turns []Turn, originalContent string) *
 		},
 		PendingPlan: []Milestone{},
 	}
-	
+
 	// Preserve recent turns verbatim
 	recentStart := 0
 	if len(turns) > c.config.PreserveRecentTurns {
 		recentStart = len(turns) - c.config.PreserveRecentTurns
 	}
-	
+
 	// Extract user queries and activity from older turns
 	for i, turn := range turns {
 		if i < recentStart {
@@ -424,32 +429,32 @@ func (c *CompactionLayer) createSnapshot(turns []Turn, originalContent string) *
 			}
 		}
 	}
-	
+
 	// Extract critical context from recent turns
 	for i := recentStart; i < len(turns); i++ {
 		turn := turns[i]
 		critical := c.extractCritical(turn.Content)
 		snapshot.Context.Critical = append(snapshot.Context.Critical, critical...)
-		
+
 		// Extract key-value pairs
 		kv := c.extractKeyValuePairs(turn.Content)
 		for k, v := range kv {
 			snapshot.Context.KeyValue[k] = v
 		}
 	}
-	
+
 	// Limit context entries
 	if len(snapshot.Context.Critical) > c.config.MaxContextEntries {
 		snapshot.Context.Critical = snapshot.Context.Critical[:c.config.MaxContextEntries]
 	}
-	
+
 	// Set current state from last turn
 	if len(turns) > 0 {
 		lastTurn := turns[len(turns)-1]
 		snapshot.CurrentState.Focus = c.extractFocus(lastTurn.Content)
 		snapshot.CurrentState.NextAction = c.inferNextAction(lastTurn.Content)
 	}
-	
+
 	return snapshot
 }
 
@@ -457,18 +462,18 @@ func (c *CompactionLayer) createSnapshot(turns []Turn, originalContent string) *
 func (c *CompactionLayer) enrichWithLLM(snapshot *StateSnapshot, turns []Turn, originalContent string) {
 	// Build prompt for LLM
 	prompt := c.buildCompactionPrompt(snapshot, turns)
-	
+
 	req := llm.SummaryRequest{
 		Content:   prompt,
 		MaxTokens: c.config.MaxSummaryTokens,
 		Intent:    "general",
 	}
-	
+
 	resp, err := c.summarizer.Summarize(req)
 	if err != nil {
 		return
 	}
-	
+
 	// Parse LLM response to enrich snapshot
 	c.parseLLMResponse(resp.Summary, snapshot)
 }
@@ -476,28 +481,28 @@ func (c *CompactionLayer) enrichWithLLM(snapshot *StateSnapshot, turns []Turn, o
 // buildCompactionPrompt creates a prompt for LLM compaction
 func (c *CompactionLayer) buildCompactionPrompt(snapshot *StateSnapshot, turns []Turn) string {
 	var sb strings.Builder
-	
+
 	sb.WriteString("You are a context compactor. Create a concise state snapshot from this conversation.\n\n")
 	sb.WriteString("Extract:\n")
 	sb.WriteString("1. User queries (what the user asked)\n")
 	sb.WriteString("2. Key activities (what was done)\n")
 	sb.WriteString("3. Critical facts (must preserve)\n")
 	sb.WriteString("4. Next action (what to do next)\n\n")
-	
+
 	sb.WriteString("Format as JSON:\n")
 	sb.WriteString("{\n")
 	sb.WriteString("  \"session_history\": {\"user_queries\": [...], \"activity_log\": [...]},\n")
 	sb.WriteString("  \"current_state\": {\"focus\": \"...\", \"next_action\": \"...\"},\n")
 	sb.WriteString("  \"context\": {\"critical\": [...], \"working\": [...]}\n")
 	sb.WriteString("}\n\n")
-	
+
 	// Add turn summaries (limit context)
 	maxTurns := 20
 	start := 0
 	if len(turns) > maxTurns {
 		start = len(turns) - maxTurns
 	}
-	
+
 	sb.WriteString("Conversation turns:\n")
 	for i := start; i < len(turns); i++ {
 		turn := turns[i]
@@ -507,7 +512,7 @@ func (c *CompactionLayer) buildCompactionPrompt(snapshot *StateSnapshot, turns [
 		}
 		sb.WriteString(fmt.Sprintf("[%s]: %s\n", turn.Role, content))
 	}
-	
+
 	return sb.String()
 }
 
@@ -516,15 +521,15 @@ func (c *CompactionLayer) parseLLMResponse(response string, snapshot *StateSnaps
 	// Try to extract JSON from response
 	jsonStart := strings.Index(response, "{")
 	jsonEnd := strings.LastIndex(response, "}")
-	
+
 	if jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart {
 		// No valid JSON, use response as working context
 		snapshot.Context.Working = append(snapshot.Context.Working, response)
 		return
 	}
-	
+
 	jsonStr := response[jsonStart : jsonEnd+1]
-	
+
 	var llmSnapshot struct {
 		SessionHistory struct {
 			UserQueries []string `json:"user_queries"`
@@ -539,13 +544,13 @@ func (c *CompactionLayer) parseLLMResponse(response string, snapshot *StateSnaps
 			Working  []string `json:"working"`
 		} `json:"context"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(jsonStr), &llmSnapshot); err != nil {
 		// Fallback: use as working context
 		snapshot.Context.Working = append(snapshot.Context.Working, response)
 		return
 	}
-	
+
 	// Merge LLM results into snapshot
 	if len(llmSnapshot.SessionHistory.UserQueries) > 0 {
 		snapshot.SessionHistory.UserQueries = append(snapshot.SessionHistory.UserQueries, llmSnapshot.SessionHistory.UserQueries...)
@@ -578,12 +583,12 @@ func (c *CompactionLayer) snapshotToString(snapshot *StateSnapshot) string {
 		parts = append(parts, snapshot.Context.Working...)
 		return strings.Join(parts, "\n")
 	}
-	
+
 	var sb strings.Builder
-	
+
 	sb.WriteString("[Conversation Summary]\n")
 	sb.WriteString("<state_snapshot>\n")
-	
+
 	// Session History
 	sb.WriteString("    <session_history>\n")
 	sb.WriteString("        <user_queries>\n")
@@ -601,13 +606,13 @@ func (c *CompactionLayer) snapshotToString(snapshot *StateSnapshot) string {
 	}
 	sb.WriteString("        </activity_log>\n")
 	sb.WriteString("    </session_history>\n")
-	
+
 	// Current State
 	sb.WriteString("    <current_state>\n")
 	sb.WriteString(fmt.Sprintf("        <focus>%s</focus>\n", snapshot.CurrentState.Focus))
 	sb.WriteString(fmt.Sprintf("        <next_action>%s</next_action>\n", snapshot.CurrentState.NextAction))
 	sb.WriteString("    </current_state>\n")
-	
+
 	// Context
 	sb.WriteString("    <context>\n")
 	sb.WriteString("        <critical>\n")
@@ -634,7 +639,7 @@ func (c *CompactionLayer) snapshotToString(snapshot *StateSnapshot) string {
 		sb.WriteString("        </key_value>\n")
 	}
 	sb.WriteString("    </context>\n")
-	
+
 	// Pending Plan
 	if len(snapshot.PendingPlan) > 0 {
 		sb.WriteString("    <pending_plan>\n")
@@ -643,9 +648,9 @@ func (c *CompactionLayer) snapshotToString(snapshot *StateSnapshot) string {
 		}
 		sb.WriteString("    </pending_plan>\n")
 	}
-	
+
 	sb.WriteString("</state_snapshot>\n")
-	
+
 	return sb.String()
 }
 
@@ -661,14 +666,14 @@ func (c *CompactionLayer) summarizeTurn(content string) string {
 			strings.Index(content, "? "),
 			strings.Index(content, "! "),
 		}
-		
+
 		bestBreak := maxLen
 		for _, bp := range breakPoints {
 			if bp > 0 && bp < bestBreak && bp > 20 {
 				bestBreak = bp
 			}
 		}
-		
+
 		if bestBreak < maxLen {
 			return content[:bestBreak+1]
 		}
@@ -680,47 +685,47 @@ func (c *CompactionLayer) summarizeTurn(content string) string {
 // extractCritical extracts critical information from content
 func (c *CompactionLayer) extractCritical(content string) []string {
 	var critical []string
-	
+
 	// Patterns for critical information
 	patterns := []struct {
 		regex   string
 		extract func(matches []string) string
 	}{
 		{
-			regex: `(?i)(error|failed|exception)[:：]\s*(.+)`,
+			regex:   `(?i)(error|failed|exception)[:：]\s*(.+)`,
 			extract: func(m []string) string { return m[1] + ": " + m[2] },
 		},
 		{
-			regex: `(?i)(file|path)[:：]\s*(.+)`,
+			regex:   `(?i)(file|path)[:：]\s*(.+)`,
 			extract: func(m []string) string { return "file: " + m[2] },
 		},
 		{
-			regex: `(?i)(todo|fixme|important|note)[:：]\s*(.+)`,
+			regex:   `(?i)(todo|fixme|important|note)[:：]\s*(.+)`,
 			extract: func(m []string) string { return m[1] + ": " + m[2] },
 		},
 	}
-	
+
 	for _, p := range patterns {
 		re := regexp.MustCompile(p.regex)
 		if matches := re.FindStringSubmatch(content); matches != nil {
 			critical = append(critical, p.extract(matches))
 		}
 	}
-	
+
 	return critical
 }
 
 // extractKeyValuePairs extracts key-value pairs from content
 func (c *CompactionLayer) extractKeyValuePairs(content string) map[string]string {
 	kv := make(map[string]string)
-	
+
 	// Common key-value patterns
 	patterns := []string{
 		`(?i)(\w+)\s*[:：=]\s*([^\n]+)`,
 		`(?i)"(\w+)":\s*"([^"]+)"`,
 		`(?i)'(\w+)':\s*'([^']+)'`,
 	}
-	
+
 	for _, pattern := range patterns {
 		re := regexp.MustCompile(pattern)
 		matches := re.FindAllStringSubmatch(content, -1)
@@ -735,7 +740,7 @@ func (c *CompactionLayer) extractKeyValuePairs(content string) map[string]string
 			}
 		}
 	}
-	
+
 	// Limit entries
 	if len(kv) > c.config.MaxContextEntries {
 		newKv := make(map[string]string)
@@ -749,7 +754,7 @@ func (c *CompactionLayer) extractKeyValuePairs(content string) map[string]string
 		}
 		kv = newKv
 	}
-	
+
 	return kv
 }
 
@@ -758,7 +763,7 @@ func (c *CompactionLayer) extractFocus(content string) string {
 	// Look for action verbs
 	verbs := []string{"implement", "fix", "add", "remove", "update", "create", "delete", "modify", "refactor"}
 	lower := strings.ToLower(content)
-	
+
 	for _, verb := range verbs {
 		if strings.Contains(lower, verb) {
 			// Find context around verb
@@ -781,7 +786,7 @@ func (c *CompactionLayer) extractFocus(content string) string {
 			return focus
 		}
 	}
-	
+
 	// Default: first 100 chars
 	if len(content) > 100 {
 		return content[:100] + "..."
@@ -792,7 +797,7 @@ func (c *CompactionLayer) extractFocus(content string) string {
 // inferNextAction infers the next action from content
 func (c *CompactionLayer) inferNextAction(content string) string {
 	lower := strings.ToLower(content)
-	
+
 	// Pattern-based inference
 	if strings.Contains(lower, "next") || strings.Contains(lower, "then") {
 		// Extract what follows
@@ -808,17 +813,17 @@ func (c *CompactionLayer) inferNextAction(content string) string {
 			}
 		}
 	}
-	
+
 	// Question-based inference
 	if strings.Contains(lower, "?") {
 		return "Awaiting user's next query"
 	}
-	
+
 	// Task completion inference
 	if strings.Contains(lower, "done") || strings.Contains(lower, "complete") || strings.Contains(lower, "finished") {
 		return "Task completed, awaiting next query"
 	}
-	
+
 	return "Continue processing"
 }
 
@@ -841,13 +846,13 @@ func (c *CompactionLayer) IsAvailable() bool {
 // GetStats returns compaction statistics
 func (c *CompactionLayer) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"enabled":            c.config.Enabled,
-		"threshold_lines":    c.config.ThresholdLines,
-		"threshold_tokens":   c.config.ThresholdTokens,
-		"preserve_recent":    c.config.PreserveRecentTurns,
-		"llm_available":      c.summarizer.IsAvailable(),
-		"cache_size":         len(c.cache),
-		"state_snapshot":     c.config.StateSnapshotFormat,
+		"enabled":          c.config.Enabled,
+		"threshold_lines":  c.config.ThresholdLines,
+		"threshold_tokens": c.config.ThresholdTokens,
+		"preserve_recent":  c.config.PreserveRecentTurns,
+		"llm_available":    c.summarizer.IsAvailable(),
+		"cache_size":       len(c.cache),
+		"state_snapshot":   c.config.StateSnapshotFormat,
 	}
 }
 
@@ -855,14 +860,14 @@ func (c *CompactionLayer) GetStats() map[string]interface{} {
 func Compact(input string, cfg CompactionConfig) (string, *CompactionResult) {
 	layer := NewCompactionLayer(cfg)
 	output, saved := layer.Apply(input, ModeMinimal)
-	
+
 	result := &CompactionResult{
 		OriginalTokens: EstimateTokens(input),
 		FinalTokens:    EstimateTokens(output),
 		SavedTokens:    saved,
 		Timestamp:      time.Now(),
 	}
-	
+
 	return output, result
 }
 
@@ -881,7 +886,7 @@ func NewConversationTracker(maxTurns int) *ConversationTracker {
 func (t *ConversationTracker) AddTurn(role, content string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	
+
 	turn := Turn{
 		Role:      role,
 		Content:   content,
@@ -889,9 +894,9 @@ func (t *ConversationTracker) AddTurn(role, content string) {
 		Hash:      sha256Hash(content),
 		Tokens:    EstimateTokens(content),
 	}
-	
+
 	t.turns = append(t.turns, turn)
-	
+
 	// Evict oldest if over limit
 	if len(t.turns) > t.maxTurns {
 		t.turns = t.turns[1:]
@@ -909,11 +914,11 @@ func (t *ConversationTracker) GetTurns() []Turn {
 func (t *ConversationTracker) GetRecentTurns(n int) []Turn {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	
+
 	if n >= len(t.turns) {
 		return append([]Turn(nil), t.turns...)
 	}
-	
+
 	start := len(t.turns) - n
 	return append([]Turn(nil), t.turns[start:]...)
 }

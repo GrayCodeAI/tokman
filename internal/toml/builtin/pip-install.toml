@@ -1,0 +1,25 @@
+[[rules]]
+match = "pip install *"
+description = "pip - Python package manager"
+
+[rules.filter]
+keep_lines_matching = [
+    "ERROR.*",
+    "WARNING.*",
+    "Successfully installed.*",
+    "Requirement already satisfied.*",
+]
+
+strip_lines_matching = [
+    "^\\s*Downloading.*",
+    "^\\s*Installing.*",
+    "^\\s*Collecting.*",
+    "^\\s*Using cached.*",
+    "^\\s*\\[.*\\].*",
+    "^\\s*━.*",
+]
+
+max_lines = 30
+
+[rules.filter.on_empty]
+return = "pip: installation completed"

@@ -1,0 +1,16 @@
+[[rules]]
+match = "terraform init *"
+description = "terraform init - initialize working directory"
+
+[rules.filter]
+strip_lines_matching = [
+    "Terraform has been successfully initialized!",
+    "You may now begin working with Terraform",
+    "Terraform created state file",
+    "If you ever set or change modules",
+]
+
+[rules.filter.replace]
+from = ".*"
+to = "$0"
+max_lines = 50

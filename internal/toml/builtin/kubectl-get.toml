@@ -1,0 +1,19 @@
+[[rules]]
+match = "kubectl get *"
+description = "kubectl get - list Kubernetes resources"
+
+[rules.filter]
+# Keep header and data, strip noise
+strip_lines_matching = [
+    "^\\s*$",
+]
+
+# Keep header row
+replace = [
+    { from = "^NAME\\s+", to = "NAME " },
+]
+
+max_lines = 200
+
+[rules.filter.on_empty]
+return = "No resources found"

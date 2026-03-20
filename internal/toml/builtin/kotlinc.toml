@@ -1,0 +1,20 @@
+[[rules]]
+match = "kotlinc *"
+description = "kotlinc - Kotlin compiler"
+
+[rules.filter]
+keep_lines_matching = [
+    "error:.*",
+    "warning:.*",
+    "e:.*",
+    "w:.*",
+]
+
+strip_lines_matching = [
+    "^\\s*$",
+]
+
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "kotlinc: compilation successful"

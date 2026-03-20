@@ -1,6 +1,10 @@
 package filter
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/core"
+)
 
 // Mode represents the filtering mode.
 type Mode string
@@ -49,11 +53,11 @@ type Engine struct {
 
 // EngineConfig holds configuration for the filter engine
 type EngineConfig struct {
-	Mode              Mode
-	QueryIntent       string
-	LLMEnabled        bool
-	MultiFileEnabled  bool
-	PromptTemplate    string // Template name for LLM summarization
+	Mode             Mode
+	QueryIntent      string
+	LLMEnabled       bool
+	MultiFileEnabled bool
+	PromptTemplate   string // Template name for LLM summarization
 }
 
 // NewEngine creates a new filter engine with all registered filters.
@@ -77,26 +81,26 @@ func NewEngineWithConfig(cfg EngineConfig) *Engine {
 		NewImportFilter(),
 		NewLogAggregator(),
 	}
-	
+
 	// Add multi-file filter early if enabled (for cross-file optimization)
 	if cfg.MultiFileEnabled {
 		filters = append(filters, NewMultiFileFilter(MultiFileConfig{
 			PreserveBoundaries: true,
 		}))
 	}
-	
+
 	// Add research-based semantic filters
-	filters = append(filters, 
-		NewSemanticFilter(),     // Semantic pruning - research-based
+	filters = append(filters,
+		NewSemanticFilter(),      // Semantic pruning - research-based
 		NewPositionAwareFilter(), // Position-bias optimization - reorders for LLM recall
 		NewHierarchicalFilter(),  // Multi-level summarization for large outputs
 	)
-	
+
 	// Add query-aware filter if intent is provided
 	if cfg.QueryIntent != "" {
 		filters = append(filters, NewQueryAwareFilter(cfg.QueryIntent))
 	}
-	
+
 	if cfg.Mode == ModeAggressive {
 		filters = append(filters, NewBodyFilter())
 	}
@@ -122,7 +126,7 @@ func NewEngineWithLLM(mode Mode, queryIntent string, llmEnabled bool) *Engine {
 // NewEngineWithLLMAndConfig creates a fully configured engine with LLM support.
 func NewEngineWithLLMAndConfig(cfg EngineConfig) *Engine {
 	engine := NewEngineWithConfig(cfg)
-	
+
 	if cfg.LLMEnabled {
 		// Insert LLM-aware filter after semantic filter
 		llmFilter := NewLLMAwareFilter(LLMAwareConfig{
@@ -131,7 +135,7 @@ func NewEngineWithLLMAndConfig(cfg EngineConfig) *Engine {
 			CacheEnabled:   true,
 			PromptTemplate: cfg.PromptTemplate,
 		})
-		
+
 		// Find position after semantic filter
 		filters := make([]Filter, 0, len(engine.filters)+1)
 		for _, f := range engine.filters {
@@ -142,7 +146,7 @@ func NewEngineWithLLMAndConfig(cfg EngineConfig) *Engine {
 		}
 		engine.filters = filters
 	}
-	
+
 	return engine
 }
 
@@ -205,19 +209,14 @@ func (e *Engine) SetMode(mode Mode) {
 }
 
 // EstimateTokens provides a heuristic token count.
-// Uses the formula: ceil(text.length / 4.0)
+// Delegates to core.EstimateTokens for single source of truth (T22).
 func EstimateTokens(text string) int {
-	return (len(text) + 3) / 4
+	return core.EstimateTokens(text)
 }
 
 // CalculateTokensSaved computes token savings between original and filtered.
 func CalculateTokensSaved(original, filtered string) int {
-	originalTokens := EstimateTokens(original)
-	filteredTokens := EstimateTokens(filtered)
-	if originalTokens > filteredTokens {
-		return originalTokens - filteredTokens
-	}
-	return 0
+	return core.CalculateTokensSaved(original, filtered)
 }
 
 // IsCode checks if the output looks like source code.

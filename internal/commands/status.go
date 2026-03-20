@@ -46,7 +46,15 @@ var statusCmd = &cobra.Command{
 
 		fmt.Printf("\n%s\n", green("📊 TokMan Status"))
 		fmt.Println(strings.Repeat("─", 50))
-		fmt.Printf("Project: %s\n", cyan(projectPath))
+
+		// Show enabled/disabled state
+		if isEnabled() {
+			fmt.Printf("  Status:  %s\n", green("● enabled"))
+		} else {
+			fmt.Printf("  Status:  %s\n", yellow("○ disabled (run 'tokman enable')"))
+		}
+
+		fmt.Printf("  Project: %s\n", cyan(projectPath))
 		fmt.Println(strings.Repeat("─", 50))
 
 		if summary.TotalCommands == 0 {

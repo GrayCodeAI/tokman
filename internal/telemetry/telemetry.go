@@ -3,6 +3,7 @@ package telemetry
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -106,9 +107,35 @@ func (c *Client) sendPing() {
 		tokensSavedTotal, _ = c.stats.TokensSavedTotal()
 	}
 
-	// Build payload (JSON-like structure)
-	payload := fmt.Sprintf(`{"device_hash":"%s","version":"%s","os":"%s","arch":"%s","install_method":"%s","commands_24h":%d,"top_commands":%s,"savings_pct":%.2f,"tokens_saved_24h":%d,"tokens_saved_total":%d}`,
-		deviceHash, version, osName, arch, installMethod, commands24h, formatStringSlice(topCommands), savingsPct, tokensSaved24h, tokensSavedTotal)
+	// Build payload using proper JSON marshaling to prevent injection
+	telemetryPayload := struct {
+		DeviceHash       string   `json:"device_hash"`
+		Version          string   `json:"version"`
+		OS               string   `json:"os"`
+		Arch             string   `json:"arch"`
+		InstallMethod    string   `json:"install_method"`
+		Commands24h      int64    `json:"commands_24h"`
+		TopCommands      []string `json:"top_commands"`
+		SavingsPct       float64  `json:"savings_pct"`
+		TokensSaved24h   int64    `json:"tokens_saved_24h"`
+		TokensSavedTotal int64    `json:"tokens_saved_total"`
+	}{
+		DeviceHash:       deviceHash,
+		Version:          version,
+		OS:               osName,
+		Arch:             arch,
+		InstallMethod:    installMethod,
+		Commands24h:      commands24h,
+		TopCommands:      topCommands,
+		SavingsPct:       savingsPct,
+		TokensSaved24h:   tokensSaved24h,
+		TokensSavedTotal: tokensSavedTotal,
+	}
+	payloadBytes, err := json.Marshal(telemetryPayload)
+	if err != nil {
+		return
+	}
+	payload := string(payloadBytes)
 
 	// Send HTTP POST (with 2-second timeout)
 	// Using curl for simplicity (no external HTTP dependencies)

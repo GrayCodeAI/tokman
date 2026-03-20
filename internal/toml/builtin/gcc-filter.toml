@@ -1,0 +1,17 @@
+[[rules]]
+match = "gcc *"
+description = "gcc - GNU C compiler"
+
+[rules.filter]
+# Keep only error and warning lines
+keep_lines_matching = [
+    ".*error:.*",
+    ".*warning:.*",
+    ".*note:.*",
+]
+
+# Max lines
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "gcc: compilation successful (no errors or warnings)"

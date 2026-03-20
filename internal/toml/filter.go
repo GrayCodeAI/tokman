@@ -3,6 +3,7 @@ package toml
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -47,7 +48,8 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 	for _, rule := range e.config.Replace {
 		re, err := regexp.Compile(rule.Pattern)
 		if err != nil {
-			continue // Skip invalid patterns
+			fmt.Fprintf(os.Stderr, "warning: invalid regex pattern %q: %v\n", rule.Pattern, err)
+			continue
 		}
 		output = re.ReplaceAllString(output, rule.Replacement)
 	}
@@ -58,6 +60,7 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 	for _, rule := range e.config.MatchOutput {
 		re, err := regexp.Compile(rule.Pattern)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: invalid regex pattern %q: %v\n", rule.Pattern, err)
 			continue
 		}
 		if re.MatchString(output) {

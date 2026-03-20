@@ -5,12 +5,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 )
+
+// sanitizePluginName prevents path traversal by cleaning the plugin name
+func sanitizePluginName(name string) string {
+	name = filepath.Base(name)
+	name = strings.ReplaceAll(name, "..", "")
+	name = strings.TrimSuffix(name, ".json")
+	return name
+}
 
 var pluginCmd = &cobra.Command{
 	Use:   "plugin",
@@ -94,10 +103,9 @@ func runPluginList(cmd *cobra.Command, args []string) error {
 	fmt.Println("Loaded Plugins:")
 	fmt.Println()
 	for _, f := range filters {
-		status := "disabled"
-		if f.Name() != "" {
-			// Check if enabled by trying to cast
-			status = "enabled"
+		status := "enabled"
+		if !f.Enabled() {
+			status = "disabled"
 		}
 		fmt.Printf("  • %s (%s)\n", f.Name(), status)
 		if f.Description() != "" {
@@ -109,7 +117,7 @@ func runPluginList(cmd *cobra.Command, args []string) error {
 }
 
 func runPluginCreate(cmd *cobra.Command, args []string) error {
-	name := args[0]
+	name := sanitizePluginName(args[0])
 	pluginsDir := getPluginsDir()
 
 	if err := os.MkdirAll(pluginsDir, 0755); err != nil {
@@ -169,6 +177,7 @@ func runPluginDisable(cmd *cobra.Command, args []string) error {
 }
 
 func togglePlugin(name string, enabled bool) error {
+	name = sanitizePluginName(name)
 	pluginsDir := getPluginsDir()
 	pluginPath := filepath.Join(pluginsDir, name+".json")
 

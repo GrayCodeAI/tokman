@@ -90,9 +90,6 @@ func runLearn() error {
 	}
 
 	// Scan Claude Code history for error patterns
-	home, _ := os.UserHomeDir()
-	_ = filepath.Join(home, ".claude") // claudeDir for future use
-
 	// Look for conversation history
 	corrections := make(map[string]*Correction)
 

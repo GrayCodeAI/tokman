@@ -14,22 +14,22 @@ type Metrics struct {
 	mu sync.RWMutex
 
 	// Counters
-	TotalRequests      int64
-	TotalCompressions  int64
-	TotalTokensIn      int64
-	TotalTokensOut     int64
-	TotalTokensSaved   int64
-	TotalErrors        int64
+	TotalRequests     int64
+	TotalCompressions int64
+	TotalTokensIn     int64
+	TotalTokensOut    int64
+	TotalTokensSaved  int64
+	TotalErrors       int64
 
 	// Histograms (simplified as maps)
-	ProcessingTimes    []time.Duration
-	ReductionPercents  []float64
+	ProcessingTimes   []time.Duration
+	ReductionPercents []float64
 
 	// Gauges
-	ActiveConnections  int64
+	ActiveConnections int64
 
 	// Content type distribution
-	ContentTypeCounts  map[string]int64
+	ContentTypeCounts map[string]int64
 
 	// Start time for uptime
 	StartTime time.Time
@@ -72,8 +72,10 @@ func (m *Metrics) RecordCompression(original, final int, duration time.Duration,
 		m.ReductionPercents = m.ReductionPercents[1:]
 	}
 
-	// Track content types
-	m.ContentTypeCounts[contentType]++
+	// Track content types (capped at 1000 entries)
+	if len(m.ContentTypeCounts) < 1000 {
+		m.ContentTypeCounts[contentType]++
+	}
 }
 
 // RecordError tracks an error
@@ -130,15 +132,15 @@ func (m *Metrics) Snapshot() MetricsSnapshot {
 
 // MetricsSnapshot is a point-in-time view of metrics
 type MetricsSnapshot struct {
-	Uptime            time.Duration   `json:"uptime"`
-	TotalRequests     int64           `json:"total_requests"`
-	TotalCompressions int64           `json:"total_compressions"`
-	TotalTokensIn     int64           `json:"total_tokens_in"`
-	TotalTokensOut    int64           `json:"total_tokens_out"`
-	TotalTokensSaved  int64           `json:"total_tokens_saved"`
-	TotalErrors       int64           `json:"total_errors"`
-	AvgProcessingMs   int64           `json:"avg_processing_ms"`
-	AvgReductionPct   float64         `json:"avg_reduction_pct"`
+	Uptime            time.Duration    `json:"uptime"`
+	TotalRequests     int64            `json:"total_requests"`
+	TotalCompressions int64            `json:"total_compressions"`
+	TotalTokensIn     int64            `json:"total_tokens_in"`
+	TotalTokensOut    int64            `json:"total_tokens_out"`
+	TotalTokensSaved  int64            `json:"total_tokens_saved"`
+	TotalErrors       int64            `json:"total_errors"`
+	AvgProcessingMs   int64            `json:"avg_processing_ms"`
+	AvgReductionPct   float64          `json:"avg_reduction_pct"`
 	ContentTypeCounts map[string]int64 `json:"content_type_counts"`
 }
 
@@ -184,10 +186,12 @@ func (m *Metrics) PrometheusFormat() string {
 	output += fmt.Sprintf("tokman_uptime_seconds %.0f\n", snap.Uptime.Seconds())
 
 	// Content type metrics
-	for ct, count := range snap.ContentTypeCounts {
+	if len(snap.ContentTypeCounts) > 0 {
 		output += fmt.Sprintf("\n# HELP tokman_content_type_total Requests by content type\n")
 		output += fmt.Sprintf("# TYPE tokman_content_type_total counter\n")
-		output += fmt.Sprintf("tokman_content_type_total{type=\"%s\"} %d\n", ct, count)
+		for ct, count := range snap.ContentTypeCounts {
+			output += fmt.Sprintf("tokman_content_type_total{type=\"%s\"} %d\n", ct, count)
+		}
 	}
 
 	return output

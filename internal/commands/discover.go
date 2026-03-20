@@ -55,11 +55,13 @@ func init() {
 
 // DiscoveredCommand represents a discovered command pattern
 type DiscoveredCommand struct {
-	Command   string `json:"command"`
-	Count     int    `json:"count"`
-	Category  string `json:"category"`
-	CouldSave bool   `json:"could_save"`
-	Example   string `json:"example,omitempty"`
+	Command     string  `json:"command"`
+	Count       int     `json:"count"`
+	Category    string  `json:"category"`
+	CouldSave   bool    `json:"could_save"`
+	SavingsPct  float64 `json:"savings_percent,omitempty"`
+	TokensSaved int     `json:"tokens_saved,omitempty"`
+	Example     string  `json:"example,omitempty"`
 }
 
 // DiscoverResult represents the discovery results
@@ -150,10 +152,12 @@ func runDiscover() error {
 		// Check if it's a known wrapper opportunity
 		if category, ok := tokmanWrappers[baseCmd]; ok {
 			result.Opportunities = append(result.Opportunities, DiscoveredCommand{
-				Command:   stat.Command,
-				Count:     stat.ExecutionCount,
-				Category:  category,
-				CouldSave: true,
+				Command:     stat.Command,
+				Count:       stat.ExecutionCount,
+				Category:    category,
+				CouldSave:   true,
+				SavingsPct:  stat.ReductionPct,
+				TokensSaved: stat.TotalSaved,
 			})
 		} else if stat.TotalSaved == 0 && stat.ExecutionCount >= 3 {
 			// Unsupported command that's frequently used
@@ -209,7 +213,11 @@ func runDiscover() error {
 		fmt.Printf("  %s\n", yellow("Missed Opportunities (could use TokMan):"))
 		fmt.Println("  ─────────────────────────────────────────")
 		for _, opp := range result.Opportunities {
-			fmt.Printf("    %-12s  %3dx  [%s]\n", truncate(opp.Command, 30), opp.Count, opp.Category)
+			pct := ""
+			if opp.SavingsPct > 0 {
+				pct = fmt.Sprintf("  %4.1f%% saved", opp.SavingsPct)
+			}
+			fmt.Printf("    %-30s  %3dx  [%s]%s\n", truncate(opp.Command, 30), opp.Count, opp.Category, pct)
 		}
 		fmt.Println()
 	}

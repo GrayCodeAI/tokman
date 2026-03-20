@@ -132,7 +132,7 @@ func runDockerPs(args []string) error {
 		originalTokens := filter.EstimateTokens(output)
 		filteredTokens := filter.EstimateTokens(filtered)
 		timer.Track("docker ps", "tokman docker ps", originalTokens, filteredTokens)
-		return err
+		return nil
 	}
 
 	var result strings.Builder

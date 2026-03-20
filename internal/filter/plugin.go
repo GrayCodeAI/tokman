@@ -53,6 +53,10 @@ func (f *PluginFilter) Name() string {
 	return f.name
 }
 
+func (f *PluginFilter) Enabled() bool {
+	return f.enabled
+}
+
 func (f *PluginFilter) Description() string {
 	return f.description
 }

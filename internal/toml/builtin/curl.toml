@@ -1,0 +1,27 @@
+[[rules]]
+match = "curl *"
+description = "curl - HTTP client"
+
+[rules.filter]
+# Strip progress bars and transfer stats
+strip_lines_matching = [
+    "^\\s*%\\s+Total",
+    "^\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+",
+    "^\\s*\\d+:\\d+:\\d+",
+    "^\\s*100\\s+\\d+",
+    "^\\s*\\*\\s+",
+    "^>\\s+",
+    "^<\\s+",
+]
+
+# Truncate verbose headers
+replace = [
+    { from = "^HTTP/[0-9.]+ .{200,}", to = "HTTP response (truncated)" },
+    { from = "^[{\\[].{1000,}", to = "(large response body, truncated)" },
+]
+
+# Max output size
+max_lines = 300
+
+[rules.filter.on_empty]
+return = "curl: no output"

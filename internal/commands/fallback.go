@@ -1,13 +1,14 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/toml"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
@@ -18,6 +19,7 @@ type FallbackHandler struct {
 	registry   *toml.FilterRegistry
 	loader     *toml.Loader
 	tracker    *tracking.Tracker
+	runner     core.CommandRunner // T1: Injected command runner
 	teeEnabled bool
 	teeDir     string
 }
@@ -25,10 +27,10 @@ type FallbackHandler struct {
 // NewFallbackHandler creates a new fallback handler
 func NewFallbackHandler() *FallbackHandler {
 	loader := toml.GetLoader()
-	
+
 	// Get current working directory as project dir
 	projectDir, _ := os.Getwd()
-	
+
 	registry, err := loader.LoadAll(projectDir)
 	if err != nil {
 		// Log warning but continue with empty registry
@@ -40,6 +42,7 @@ func NewFallbackHandler() *FallbackHandler {
 		registry:   registry,
 		loader:     loader,
 		tracker:    getGlobalTracker(),
+		runner:     core.NewOSCommandRunner(), // T1: Use CommandRunner interface
 		teeEnabled: true,
 		teeDir:     getTeeDir(),
 	}
@@ -58,7 +61,7 @@ func (h *FallbackHandler) Handle(args []string) (string, bool, error) {
 	}
 
 	command := strings.Join(args, " ")
-	
+
 	// Find matching TOML filter
 	filename, filterName, config := h.registry.FindMatchingFilter(command)
 	if config == nil {
@@ -74,7 +77,7 @@ func (h *FallbackHandler) Handle(args []string) (string, bool, error) {
 	start := time.Now()
 	output, exitCode, err := h.executeCommand(args)
 	execTime := time.Since(start)
-	
+
 	if err != nil {
 		// Save tee on failure
 		if h.teeEnabled && len(output) > 500 {
@@ -89,13 +92,13 @@ func (h *FallbackHandler) Handle(args []string) (string, bool, error) {
 
 	// Record tracking
 	if h.tracker != nil {
-		originalTokens := filter.EstimateTokens(output)
-		filteredTokens := filter.EstimateTokens(filtered)
+		originalTokens := core.EstimateTokens(output) // T22: Unified estimator
+		filteredTokens := core.EstimateTokens(filtered)
 		saved := originalTokens - filteredTokens
 		if saved < 0 {
 			saved = 0
 		}
-		
+
 		record := &tracking.CommandRecord{
 			Command:        command,
 			OriginalTokens: originalTokens,
@@ -121,7 +124,7 @@ func (h *FallbackHandler) Handle(args []string) (string, bool, error) {
 // rawPassthrough executes command without filtering
 func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
 	output, exitCode, err := h.executeCommand(args)
-	
+
 	// Record parse failure for future improvement
 	if h.tracker != nil && len(args) > 0 {
 		h.tracker.RecordParseFailure(strings.Join(args, " "), getProjectPath(), false)
@@ -136,33 +139,17 @@ func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
 	return output, true, err
 }
 
-// executeCommand runs the command and captures output
+// executeCommand runs the command and captures output via CommandRunner (T1)
 func (h *FallbackHandler) executeCommand(args []string) (string, int, error) {
 	if len(args) == 0 {
 		return "", 0, nil
 	}
 
-	// Resolve the command path
-	cmdPath, err := exec.LookPath(args[0])
-	if err != nil {
-		return fmt.Sprintf("command not found: %s", args[0]), 127, err
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
-	// Execute the command
-	cmd := exec.Command(cmdPath, args[1:]...)
-	cmd.Env = os.Environ()
-	
-	output, err := cmd.CombinedOutput()
-	exitCode := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 1
-		}
-	}
-
-	return string(output), exitCode, err
+	output, exitCode, err := h.runner.Run(ctx, args)
+	return output, exitCode, err
 }
 
 // saveTee saves raw output to a file for recovery
@@ -231,40 +218,59 @@ func getProjectPath() string {
 	return path
 }
 
-// applyPipeline applies the multi-layer compression pipeline
+// applyPipeline applies the multi-layer compression pipeline with preset support.
+// T81/T90: Supports fast/balanced/full presets and early-exit.
 func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.FilterConfig) string {
 	// Build pipeline configuration from CLI flags
 	mode := filter.ModeMinimal
 	if IsUltraCompact() {
 		mode = filter.ModeAggressive
 	}
-	
-	cfg := filter.PipelineConfig{
-		Mode:            mode,
-		QueryIntent:     GetQueryIntent(),
-		Budget:          GetTokenBudget(),
-		LLMEnabled:      IsLLMEnabled(),
-		SessionTracking: true,
-		NgramEnabled:    true,
-		MultiFileEnabled: true,
+
+	preset := GetLayerPreset()
+	var cfg filter.PipelineConfig
+
+	if preset != "" {
+		// Use preset configuration (T90)
+		cfg = filter.PresetConfig(filter.PipelinePreset(preset), mode)
+		cfg.QueryIntent = GetQueryIntent()
+		cfg.Budget = GetTokenBudget()
+		cfg.LLMEnabled = IsLLMEnabled()
+	} else {
+		// Use full pipeline (default)
+		cfg = filter.PipelineConfig{
+			Mode:                mode,
+			QueryIntent:         GetQueryIntent(),
+			Budget:              GetTokenBudget(),
+			LLMEnabled:          IsLLMEnabled(),
+			SessionTracking:     true,
+			NgramEnabled:        true,
+			MultiFileEnabled:    true,
+			EnableCompaction:    true,
+			EnableAttribution:   true,
+			EnableH2O:           true,
+			EnableAttentionSink: true,
+		}
 	}
-	
+
 	// Create and run the pipeline
 	pipeline := filter.NewPipelineCoordinator(cfg)
 	filtered, stats := pipeline.Process(output)
-	
+
 	// Log compression stats in verbose mode
 	if IsVerbose() && stats.TotalSaved > 0 {
 		fmt.Fprintf(os.Stderr, "[pipeline: %d -> %d tokens, %.1f%% saved]\n",
 			stats.OriginalTokens, stats.FinalTokens, stats.ReductionPercent)
 	}
-	
+
 	// If TOML has specific rules, apply them as a final pass
 	if tomlConfig != nil && (len(tomlConfig.Replace) > 0 || len(tomlConfig.MatchOutput) > 0 || len(tomlConfig.StripLinesMatching) > 0) {
 		engine := toml.NewTOMLFilterEngine(tomlConfig)
-		filtered, _ = engine.Apply(filtered, mode)
+		if result, _ := engine.Apply(filtered, mode); result != "" {
+			filtered = result
+		}
 	}
-	
+
 	return filtered
 }
 

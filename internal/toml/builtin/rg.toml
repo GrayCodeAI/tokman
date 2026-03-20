@@ -1,0 +1,23 @@
+[[rules]]
+match = "rg"
+description = "ripgrep - fast regex search"
+
+[rules.filter]
+# Strip ANSI codes
+strip_ansi = true
+
+# Keep matching lines, remove noise
+strip_lines_matching = [
+    "^Binary file .* matches$",
+]
+
+# Truncate long paths
+replace = [
+    { from = "^([^:]+:[0-9]+:).{500,}", to = "$1... (truncated)" },
+]
+
+# Max lines for large searches
+max_lines = 500
+
+[rules.filter.on_empty]
+return = "No matches found"

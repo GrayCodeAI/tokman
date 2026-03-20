@@ -1,0 +1,26 @@
+[[rules]]
+match = "eslint *"
+description = "eslint - JavaScript linter"
+
+[rules.filter]
+# Keep error/warning lines
+keep_lines_matching = [
+    ".*error.*",
+    ".*warning.*",
+    ".*problem.*",
+    "✖.*",
+    "\\d+ error.*",
+    "\\d+ warning.*",
+]
+
+# Strip success messages
+strip_lines_matching = [
+    "^\\s*✓.*",
+    "^\\s*✔.*",
+    "no problems found",
+]
+
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "ESLint: no problems found"

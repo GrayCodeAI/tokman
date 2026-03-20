@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/GrayCodeAI/tokman/internal/config"
+	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
 // HistoryRetentionDays is the number of days to retain tracking data.
@@ -17,7 +20,8 @@ const HistoryRetentionDays = 90
 
 // Tracker manages token tracking persistence.
 type Tracker struct {
-	db *sql.DB
+	db            *sql.DB
+	lastCleanupMs int64 // atomic: unix timestamp of last cleanup
 }
 
 // TimedExecution tracks execution time and token savings.
@@ -80,7 +84,12 @@ func (t *TimedExecution) TrackPassthrough(command, tokmanCmd string) {
 		}
 
 		cwd, _ := os.Getwd()
-		tracker.RecordFallback(command, cwd, "", execTime.Milliseconds())
+		tracker.Record(&CommandRecord{
+			Command:      command,
+			ProjectPath:  cwd,
+			ExecTimeMs:   execTime.Milliseconds(),
+			ParseSuccess: false,
+		})
 	})
 }
 
@@ -114,12 +123,9 @@ func GetGlobalTracker() *Tracker {
 }
 
 // DatabasePath returns the default database path.
+// Delegates to config.DatabasePath for consistent XDG compliance.
 func DatabasePath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".config", "tokman", "tracking.db")
+	return config.DatabasePath()
 }
 
 // NewTracker creates a new Tracker with the given database path.
@@ -132,6 +138,16 @@ func NewTracker(dbPath string) (*Tracker, error) {
 	// Enable WAL mode for better performance
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+
+	// Set busy timeout to retry on locked database
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
+	// Enable foreign key constraints
+	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
 	// Run migrations
@@ -156,9 +172,9 @@ func (t *Tracker) Query(query string, args ...interface{}) (*sql.Rows, error) {
 }
 
 // EstimateTokens provides a heuristic token count.
-// Uses the formula: ceil(text.length / 4.0)
+// Delegates to core.EstimateTokens for single source of truth (T22).
 func EstimateTokens(text string) int {
-	return (len(text) + 3) / 4
+	return core.EstimateTokens(text)
 }
 
 // Record saves a command execution to the database.
@@ -192,15 +208,130 @@ func (t *Tracker) Record(record *CommandRecord) error {
 		record.ID = id
 	}
 
-	// Run cleanup after recording (fire-and-forget, don't block)
+	// Run cleanup after recording (throttled - at most once per minute)
 	go t.cleanupOld()
 
 	return nil
 }
 
+// LayerStatRecord holds per-layer statistics for database recording.
+type LayerStatRecord struct {
+	LayerName   string
+	TokensSaved int
+	DurationUs  int64
+}
+
+// RecordLayerStats saves per-layer statistics for a command.
+// T184: Per-layer savings tracking.
+func (t *Tracker) RecordLayerStats(commandID int64, stats []LayerStatRecord) error {
+	if len(stats) == 0 {
+		return nil
+	}
+
+	tx, err := t.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(
+		"INSERT INTO layer_stats (command_id, layer_name, tokens_saved, duration_us) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, s := range stats {
+		if _, err := stmt.Exec(commandID, s.LayerName, s.TokensSaved, s.DurationUs); err != nil {
+			return fmt.Errorf("failed to insert layer stat: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetLayerStats returns per-layer statistics for a command.
+func (t *Tracker) GetLayerStats(commandID int64) ([]LayerStatRecord, error) {
+	rows, err := t.db.Query(
+		"SELECT layer_name, tokens_saved, duration_us FROM layer_stats WHERE command_id = ? ORDER BY id",
+		commandID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query layer stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []LayerStatRecord
+	for rows.Next() {
+		var s LayerStatRecord
+		if err := rows.Scan(&s.LayerName, &s.TokensSaved, &s.DurationUs); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+// GetTopLayers returns the most effective compression layers.
+func (t *Tracker) GetTopLayers(limit int) ([]struct {
+	LayerName  string
+	TotalSaved int64
+	AvgSaved   float64
+	CallCount  int64
+}, error) {
+	query := `
+		SELECT layer_name, SUM(tokens_saved) as total_saved,
+		       AVG(tokens_saved) as avg_saved, COUNT(*) as call_count
+		FROM layer_stats
+		GROUP BY layer_name
+		ORDER BY total_saved DESC
+		LIMIT ?
+	`
+	rows, err := t.db.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []struct {
+		LayerName  string
+		TotalSaved int64
+		AvgSaved   float64
+		CallCount  int64
+	}
+	for rows.Next() {
+		var r struct {
+			LayerName  string
+			TotalSaved int64
+			AvgSaved   float64
+			CallCount  int64
+		}
+		if err := rows.Scan(&r.LayerName, &r.TotalSaved, &r.AvgSaved, &r.CallCount); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // cleanupOld removes records older than HistoryRetentionDays.
 // This is called automatically after each Record operation.
 func (t *Tracker) cleanupOld() {
+	// Throttle: at most one cleanup per 60 seconds
+	now := time.Now().UnixMilli()
+	last := atomic.LoadInt64(&t.lastCleanupMs)
+	if now-last < 60000 {
+		return
+	}
+	if !atomic.CompareAndSwapInt64(&t.lastCleanupMs, last, now) {
+		return
+	}
 	cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
 	_, _ = t.db.Exec(
 		"DELETE FROM commands WHERE timestamp < ?",
@@ -222,8 +353,70 @@ func (t *Tracker) CleanupOld() (int64, error) {
 	return result.RowsAffected()
 }
 
+// CleanupWithRetention removes records older than specified days.
+// T183: Configurable data retention policy.
+func (t *Tracker) CleanupWithRetention(days int) (int64, error) {
+	if days <= 0 {
+		days = HistoryRetentionDays
+	}
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	tx, err := t.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete layer stats for old commands
+	_, _ = tx.Exec(
+		"DELETE FROM layer_stats WHERE command_id IN (SELECT id FROM commands WHERE timestamp < ?)",
+		cutoff.Format(time.RFC3339),
+	)
+
+	// Delete old commands
+	result, err := tx.Exec(
+		"DELETE FROM commands WHERE timestamp < ?",
+		cutoff.Format(time.RFC3339),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to cleanup: %w", err)
+	}
+
+	// Delete old parse failures
+	_, _ = tx.Exec(
+		"DELETE FROM parse_failures WHERE timestamp < ?",
+		cutoff.Format(time.RFC3339),
+	)
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit cleanup: %w", err)
+	}
+
+	return result.RowsAffected()
+}
+
+// DatabaseSize returns the size of the tracking database in bytes.
+func (t *Tracker) DatabaseSize() (int64, error) {
+	var pageCount, pageSize int64
+	err := t.db.QueryRow("PRAGMA page_count").Scan(&pageCount)
+	if err != nil {
+		return 0, err
+	}
+	err = t.db.QueryRow("PRAGMA page_size").Scan(&pageSize)
+	if err != nil {
+		return 0, err
+	}
+	return pageCount * pageSize, nil
+}
+
+// Vacuum reclaims unused space in the database.
+func (t *Tracker) Vacuum() error {
+	_, err := t.db.Exec("VACUUM")
+	return err
+}
+
 // GetSavings returns the total token savings for a project path.
-// Uses GLOB matching to include child directories.
+// Uses GLOB matching for case-sensitive path comparison.
 func (t *Tracker) GetSavings(projectPath string) (*SavingsSummary, error) {
 	query := `
 		SELECT 
@@ -235,7 +428,7 @@ func (t *Tracker) GetSavings(projectPath string) (*SavingsSummary, error) {
 		WHERE project_path GLOB ? OR project_path = ?
 	`
 
-	pattern := projectPath + "/*"
+	pattern := projectPath + "/%"
 	summary := &SavingsSummary{}
 
 	err := t.db.QueryRow(query, pattern, projectPath).Scan(
@@ -265,6 +458,29 @@ func (t *Tracker) CountCommandsSince(since time.Time) (int64, error) {
 	return count, err
 }
 
+// ParseFailureRecord represents a single parse failure event.
+type ParseFailureRecord struct {
+	ID                int64     `json:"id"`
+	Timestamp         time.Time `json:"timestamp"`
+	RawCommand        string    `json:"raw_command"`
+	ErrorMessage      string    `json:"error_message"`
+	FallbackSucceeded bool      `json:"fallback_succeeded"`
+}
+
+// ParseFailureSummary represents aggregated parse failure analytics.
+type ParseFailureSummary struct {
+	Total          int64                 `json:"total"`
+	RecoveryRate   float64               `json:"recovery_rate"`
+	TopCommands    []CommandFailureCount `json:"top_commands"`
+	RecentFailures []ParseFailureRecord  `json:"recent_failures"`
+}
+
+// CommandFailureCount represents a command and its failure count.
+type CommandFailureCount struct {
+	Command string `json:"command"`
+	Count   int    `json:"count"`
+}
+
 // TopCommands returns the top N commands by execution count.
 func (t *Tracker) TopCommands(limit int) ([]string, error) {
 	rows, err := t.db.Query(
@@ -286,6 +502,9 @@ func (t *Tracker) TopCommands(limit int) ([]string, error) {
 			continue
 		}
 		commands = append(commands, cmd)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return commands, nil
 }
@@ -338,7 +557,7 @@ func (t *Tracker) GetCommandStats(projectPath string) ([]CommandStats, error) {
 		ORDER BY total_saved DESC
 	`
 
-	pattern := projectPath + "/*"
+	pattern := projectPath + "/%"
 	rows, err := t.db.Query(query, pattern, projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get command stats: %w", err)
@@ -356,6 +575,9 @@ func (t *Tracker) GetCommandStats(projectPath string) ([]CommandStats, error) {
 		}
 		stats = append(stats, s)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return stats, nil
 }
@@ -371,7 +593,7 @@ func (t *Tracker) GetRecentCommands(projectPath string, limit int) ([]CommandRec
 		LIMIT ?
 	`
 
-	pattern := projectPath + "/*"
+	pattern := projectPath + "/%"
 	rows, err := t.db.Query(query, pattern, projectPath, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent commands: %w", err)
@@ -391,6 +613,9 @@ func (t *Tracker) GetRecentCommands(projectPath string, limit int) ([]CommandRec
 		r.ParseSuccess = parseSuccess == 1
 		records = append(records, r)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return records, nil
 }
@@ -409,13 +634,13 @@ func (t *Tracker) GetDailySavings(projectPath string, days int) ([]struct {
 			COALESCE(SUM(original_tokens), 0) as original,
 			COUNT(*) as commands
 		FROM commands
-		WHERE (project_path GLOB ? OR project_path = ?)
+		WHERE (project_path LIKE ? OR project_path = ?)
 		  AND timestamp >= DATE('now', ?)
 		GROUP BY DATE(timestamp)
 		ORDER BY date DESC
 	`
 
-	pattern := projectPath + "/*"
+	pattern := projectPath + "/%"
 	daysStr := fmt.Sprintf("-%d days", days)
 	rows, err := t.db.Query(query, pattern, projectPath, daysStr)
 	if err != nil {
@@ -441,48 +666,11 @@ func (t *Tracker) GetDailySavings(projectPath string, days int) ([]struct {
 		}
 		results = append(results, r)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return results, nil
-}
-
-// RecordFallback records a command that wasn't recognized (parse failure).
-func (t *Tracker) RecordFallback(command string, projectPath string, output string, execTimeMs int64) error {
-	originalTokens := EstimateTokens(output)
-	return t.Record(&CommandRecord{
-		Command:        command,
-		OriginalOutput: output,
-		FilteredOutput: output,
-		OriginalTokens: originalTokens,
-		FilteredTokens: originalTokens,
-		SavedTokens:    0,
-		ProjectPath:    projectPath,
-		ExecTimeMs:     execTimeMs,
-		Timestamp:      time.Now(),
-		ParseSuccess:   false,
-	})
-}
-
-// ParseFailureRecord represents a single parse failure event.
-type ParseFailureRecord struct {
-	ID                int64     `json:"id"`
-	Timestamp         time.Time `json:"timestamp"`
-	RawCommand        string    `json:"raw_command"`
-	ErrorMessage      string    `json:"error_message"`
-	FallbackSucceeded bool      `json:"fallback_succeeded"`
-}
-
-// ParseFailureSummary represents aggregated parse failure analytics.
-type ParseFailureSummary struct {
-	Total          int64                 `json:"total"`
-	RecoveryRate   float64               `json:"recovery_rate"`
-	TopCommands    []CommandFailureCount `json:"top_commands"`
-	RecentFailures []ParseFailureRecord  `json:"recent_failures"`
-}
-
-// CommandFailureCount represents a command and its failure count.
-type CommandFailureCount struct {
-	Command string `json:"command"`
-	Count   int    `json:"count"`
 }
 
 // RecordParseFailure records a parse failure event.
@@ -499,11 +687,8 @@ func (t *Tracker) RecordParseFailure(rawCommand string, errorMessage string, fal
 		return fmt.Errorf("failed to record parse failure: %w", err)
 	}
 
-	// Cleanup old records
-	go func() {
-		cutoff := time.Now().AddDate(0, 0, -HistoryRetentionDays)
-		t.db.Exec("DELETE FROM parse_failures WHERE timestamp < ?", cutoff.Format(time.RFC3339))
-	}()
+	// Cleanup old records (throttled)
+	go t.cleanupOld()
 
 	return nil
 }

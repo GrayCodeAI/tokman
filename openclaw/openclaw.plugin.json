@@ -1,0 +1,28 @@
+{
+  "id": "tokman-rewrite",
+  "name": "TokMan Token Optimizer",
+  "version": "1.0.0",
+  "description": "Transparently rewrites shell commands to their TokMan equivalents for 60-90% LLM token savings",
+  "homepage": "https://github.com/GrayCodeAI/tokman",
+  "license": "MIT",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable automatic command rewriting to TokMan equivalents"
+      },
+      "verbose": {
+        "type": "boolean",
+        "default": false,
+        "description": "Log rewrite decisions to console for debugging"
+      }
+    }
+  },
+  "uiHints": {
+    "enabled": { "label": "Enable TokMan rewriting" },
+    "verbose": { "label": "Verbose logging" }
+  }
+}

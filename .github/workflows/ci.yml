@@ -8,15 +8,19 @@ on:
 
 jobs:
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.24']
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: ${{ matrix.go-version }}
       
       - name: Download dependencies
         run: go mod download
@@ -25,26 +29,53 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out ./...
       
       - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.out
 
   build:
-    name: Build
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
-      
-      - name: Build
-        run: go build -v ./...
+          go-version: '1.24'
       
       - name: Build binary
-        run: go build -o tokman ./cmd/tokman
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          go build -ldflags="-s -w" -trimpath -o tokman${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/tokman
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tokman-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: tokman*
 
   lint:
     name: Lint
@@ -55,7 +86,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
       
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -72,7 +103,54 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
       
       - name: Run benchmarks
-        run: go test -bench=. -benchmem ./internal/filter/ -run=^$
+        run: go test -bench=. -benchmem ./internal/filter/ -run=^$ | tee bench-current.txt
+      
+      - name: Download previous benchmark results
+        uses: actions/cache@v4
+        with:
+          path: bench-baseline.txt
+          key: benchmark-baseline
+      
+      - name: Compare benchmarks
+        run: |
+          if [ -f bench-baseline.txt ]; then
+            echo "=== Benchmark Comparison ==="
+            go install golang.org/x/perf/cmd/benchstat@latest
+            benchstat bench-baseline.txt bench-current.txt || echo "Benchmark comparison complete"
+          fi
+          cp bench-current.txt bench-baseline.txt
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: bench-current.txt
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Build binary
+        run: go build -o tokman ./cmd/tokman
+      
+      - name: Test doctor command
+        run: ./tokman doctor
+      
+      - name: Test benchmark command
+        run: ./tokman benchmark echo "hello world test data for compression"
+      
+      - name: Test explain command
+        run: ./tokman explain echo "hello world test data"
+      
+      - name: Test config validate
+        run: ./tokman config validate || true

@@ -1,0 +1,23 @@
+[[rules]]
+match = "rustc *"
+description = "rustc - Rust compiler"
+
+[rules.filter]
+# Keep only error and warning lines
+keep_lines_matching = [
+    ".*error\\[E[0-9]+\\].*",
+    ".*warning.*",
+    ".*-->.*",
+    "^\\s*\\|.*",
+]
+
+# Strip verbose diagnostics
+strip_lines_matching = [
+    "^\\s*= help:.*",
+    "^\\s*= note:.*",
+]
+
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "rustc: compilation successful"

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/viper"
@@ -24,19 +25,19 @@ type PipelineConfig struct {
 	// Context limits
 	MaxContextTokens int `mapstructure:"max_context_tokens"` // Max input context (default: 2M)
 	ChunkSize        int `mapstructure:"chunk_size"`         // Processing chunk size for large inputs
-	
+
 	// Layer enable/disable
-	EnableEntropy     bool `mapstructure:"enable_entropy"`
-	EnablePerplexity  bool `mapstructure:"enable_perplexity"`
-	EnableGoalDriven  bool `mapstructure:"enable_goal_driven"`
-	EnableAST         bool `mapstructure:"enable_ast"`
-	EnableContrastive bool `mapstructure:"enable_contrastive"`
-	EnableNgram       bool `mapstructure:"enable_ngram"`
-	EnableEvaluator   bool `mapstructure:"enable_evaluator"`
-	EnableGist        bool `mapstructure:"enable_gist"`
+	EnableEntropy      bool `mapstructure:"enable_entropy"`
+	EnablePerplexity   bool `mapstructure:"enable_perplexity"`
+	EnableGoalDriven   bool `mapstructure:"enable_goal_driven"`
+	EnableAST          bool `mapstructure:"enable_ast"`
+	EnableContrastive  bool `mapstructure:"enable_contrastive"`
+	EnableNgram        bool `mapstructure:"enable_ngram"`
+	EnableEvaluator    bool `mapstructure:"enable_evaluator"`
+	EnableGist         bool `mapstructure:"enable_gist"`
 	EnableHierarchical bool `mapstructure:"enable_hierarchical"`
-	EnableBudget      bool `mapstructure:"enable_budget"`
-	
+	EnableBudget       bool `mapstructure:"enable_budget"`
+
 	// Layer thresholds (tunable)
 	EntropyThreshold      float64 `mapstructure:"entropy_threshold"`       // Layer 1: 0.0-1.0 (default: 0.3)
 	PerplexityThreshold   float64 `mapstructure:"perplexity_threshold"`    // Layer 2: 0.0-1.0 (default: 0.5)
@@ -48,65 +49,65 @@ type PipelineConfig struct {
 	GistMinChunkSize      int     `mapstructure:"gist_min_chunk_size"`     // Layer 8: chars (default: 100)
 	HierarchicalMaxLevels int     `mapstructure:"hierarchical_max_levels"` // Layer 9: depth (default: 3)
 	HierarchicalRatio     float64 `mapstructure:"hierarchical_ratio"`      // Layer 9: 0.0-1.0 (default: 0.3)
-	
+
 	// Budget enforcement
-	DefaultBudget    int  `mapstructure:"default_budget"`     // Default token budget (0 = unlimited)
-	HardBudgetLimit  bool `mapstructure:"hard_budget_limit"`  // Strict enforcement
+	DefaultBudget      int    `mapstructure:"default_budget"`       // Default token budget (0 = unlimited)
+	HardBudgetLimit    bool   `mapstructure:"hard_budget_limit"`    // Strict enforcement
 	BudgetOverflowFile string `mapstructure:"budget_overflow_file"` // File to save overflow content
-	
+
 	// Resilience
-	TeeOnFailure    bool   `mapstructure:"tee_on_failure"`    // Save raw output on failure
-	TeeDir          string `mapstructure:"tee_dir"`           // Directory for tee files
-	FailSafeMode    bool   `mapstructure:"failsafe_mode"`     // Return original on corruption
-	ValidateOutput  bool   `mapstructure:"validate_output"`   // Check output validity
-	ShortCircuitBudget bool `mapstructure:"short_circuit_budget"` // Skip layers if budget met
-	
+	TeeOnFailure       bool   `mapstructure:"tee_on_failure"`       // Save raw output on failure
+	TeeDir             string `mapstructure:"tee_dir"`              // Directory for tee files
+	FailSafeMode       bool   `mapstructure:"failsafe_mode"`        // Return original on corruption
+	ValidateOutput     bool   `mapstructure:"validate_output"`      // Check output validity
+	ShortCircuitBudget bool   `mapstructure:"short_circuit_budget"` // Skip layers if budget met
+
 	// Performance
-	ParallelLayers  bool `mapstructure:"parallel_layers"`   // Run independent layers in parallel
-	CacheEnabled    bool `mapstructure:"cache_enabled"`     // Cache compression results
-	CacheMaxSize    int  `mapstructure:"cache_max_size"`    // Max cache entries
-	StreamThreshold int  `mapstructure:"stream_threshold"`  // Stream if input > N tokens
-	
+	ParallelLayers  bool `mapstructure:"parallel_layers"`  // Run independent layers in parallel
+	CacheEnabled    bool `mapstructure:"cache_enabled"`    // Cache compression results
+	CacheMaxSize    int  `mapstructure:"cache_max_size"`   // Max cache entries
+	StreamThreshold int  `mapstructure:"stream_threshold"` // Stream if input > N tokens
+
 	// LLM Compaction (Layer 11) - Semantic compression
-	EnableCompaction       bool   `mapstructure:"enable_compaction"`        // Enable LLM-based compaction
-	CompactionThreshold    int    `mapstructure:"compaction_threshold"`     // Minimum tokens to trigger
-	CompactionPreserveTurns int   `mapstructure:"compaction_preserve_turns"` // Recent turns to keep verbatim
-	CompactionMaxTokens    int    `mapstructure:"compaction_max_tokens"`    // Max summary tokens
+	EnableCompaction        bool   `mapstructure:"enable_compaction"`         // Enable LLM-based compaction
+	CompactionThreshold     int    `mapstructure:"compaction_threshold"`      // Minimum tokens to trigger
+	CompactionPreserveTurns int    `mapstructure:"compaction_preserve_turns"` // Recent turns to keep verbatim
+	CompactionMaxTokens     int    `mapstructure:"compaction_max_tokens"`     // Max summary tokens
 	CompactionStateSnapshot bool   `mapstructure:"compaction_state_snapshot"` // Use state snapshot format
-	CompactionAutoDetect   bool   `mapstructure:"compaction_auto_detect"`   // Auto-detect conversation content
-	LLMProvider            string `mapstructure:"llm_provider"`             // ollama, lmstudio, openai
-	LLMModel               string `mapstructure:"llm_model"`                // Model name
-	LLMBaseURL             string `mapstructure:"llm_base_url"`             // API endpoint
-	
+	CompactionAutoDetect    bool   `mapstructure:"compaction_auto_detect"`    // Auto-detect conversation content
+	LLMProvider             string `mapstructure:"llm_provider"`              // ollama, lmstudio, openai
+	LLMModel                string `mapstructure:"llm_model"`                 // Model name
+	LLMBaseURL              string `mapstructure:"llm_base_url"`              // API endpoint
+
 	// Attribution Filter (Layer 12) - ProCut-style pruning
-	EnableAttribution      bool    `mapstructure:"enable_attribution"`       // Enable attribution filtering
-	AttributionThreshold   float64 `mapstructure:"attribution_threshold"`    // Importance threshold (0.0-1.0)
-	AttributionPositional  bool    `mapstructure:"attribution_positional"`   // Use positional bias
-	AttributionFrequency   bool    `mapstructure:"attribution_frequency"`    // Use frequency bias
-	AttributionSemantic    bool    `mapstructure:"attribution_semantic"`     // Use semantic preservation
-	
+	EnableAttribution     bool    `mapstructure:"enable_attribution"`     // Enable attribution filtering
+	AttributionThreshold  float64 `mapstructure:"attribution_threshold"`  // Importance threshold (0.0-1.0)
+	AttributionPositional bool    `mapstructure:"attribution_positional"` // Use positional bias
+	AttributionFrequency  bool    `mapstructure:"attribution_frequency"`  // Use frequency bias
+	AttributionSemantic   bool    `mapstructure:"attribution_semantic"`   // Use semantic preservation
+
 	// H2O Filter (Layer 13) - Heavy-Hitter Oracle
 	EnableH2O          bool `mapstructure:"enable_h2o"`            // Enable H2O compression
 	H2OSinkSize        int  `mapstructure:"h2o_sink_size"`         // Attention sink tokens to preserve
 	H2ORecentSize      int  `mapstructure:"h2o_recent_size"`       // Recent tokens to preserve
 	H2OHeavyHitterSize int  `mapstructure:"h2o_heavy_hitter_size"` // Heavy hitter tokens to preserve
-	
+
 	// Attention Sink Filter (Layer 14) - StreamingLLM-style
-	EnableAttentionSink  bool `mapstructure:"enable_attention_sink"`   // Enable attention sink filtering
-	AttentionSinkCount   int  `mapstructure:"attention_sink_count"`    // Initial tokens to preserve as sinks
-	AttentionRecentCount int  `mapstructure:"attention_recent_count"`  // Recent lines to preserve
+	EnableAttentionSink  bool `mapstructure:"enable_attention_sink"`  // Enable attention sink filtering
+	AttentionSinkCount   int  `mapstructure:"attention_sink_count"`   // Initial tokens to preserve as sinks
+	AttentionRecentCount int  `mapstructure:"attention_recent_count"` // Recent lines to preserve
 }
 
 // CommandContext provides metadata about the command being executed.
 // Used for intelligent filtering decisions.
 type CommandContext struct {
-	Command    string `mapstructure:"command"`     // "git", "npm", "cargo", etc.
-	Subcommand string `mapstructure:"subcommand"`  // "status", "test", "build"
-	ExitCode   int    `mapstructure:"exit_code"`   // Non-zero = likely has errors
-	Intent     string `mapstructure:"intent"`      // "debug", "review", "deploy", "search"
-	IsTest     bool   `mapstructure:"is_test"`     // Test output detection
-	IsBuild    bool   `mapstructure:"is_build"`    // Build output detection
-	IsError    bool   `mapstructure:"is_error"`    // Error output detection
+	Command    string `mapstructure:"command"`    // "git", "npm", "cargo", etc.
+	Subcommand string `mapstructure:"subcommand"` // "status", "test", "build"
+	ExitCode   int    `mapstructure:"exit_code"`  // Non-zero = likely has errors
+	Intent     string `mapstructure:"intent"`     // "debug", "review", "deploy", "search"
+	IsTest     bool   `mapstructure:"is_test"`    // Test output detection
+	IsBuild    bool   `mapstructure:"is_build"`   // Build output detection
+	IsError    bool   `mapstructure:"is_error"`   // Error output detection
 }
 
 // TrackingConfig controls token tracking behavior.
@@ -194,7 +195,7 @@ func Defaults() *Config {
 			// Context limits - supports up to 2M tokens
 			MaxContextTokens: 2000000, // 2M tokens max
 			ChunkSize:        100000,  // 100K tokens per chunk
-			
+
 			// All layers enabled by default
 			EnableEntropy:      true,
 			EnablePerplexity:   true,
@@ -206,7 +207,7 @@ func Defaults() *Config {
 			EnableGist:         true,
 			EnableHierarchical: true,
 			EnableBudget:       true,
-			
+
 			// Layer thresholds (research-backed defaults)
 			EntropyThreshold:      0.3,
 			PerplexityThreshold:   0.5,
@@ -218,48 +219,48 @@ func Defaults() *Config {
 			GistMinChunkSize:      100,
 			HierarchicalMaxLevels: 3,
 			HierarchicalRatio:     0.3,
-			
+
 			// Budget
 			DefaultBudget:   0,    // Unlimited by default
 			HardBudgetLimit: true, // Strict enforcement when budget set
-			
+
 			// Resilience
-			TeeOnFailure:     true,
-			FailSafeMode:     true,
-			ValidateOutput:   true,
+			TeeOnFailure:       true,
+			FailSafeMode:       true,
+			ValidateOutput:     true,
 			ShortCircuitBudget: true,
-			
+
 			// Performance
 			ParallelLayers:  false, // Sequential for deterministic output
 			CacheEnabled:    true,
 			CacheMaxSize:    1000,
 			StreamThreshold: 500000, // Stream if > 500K tokens
-			
+
 			// Layer 11: Compaction (enabled by default for automatic chat compression)
 			EnableCompaction:        true,
-			CompactionThreshold:     500,   // Trigger early for better compression
-			CompactionPreserveTurns: 10,    // Keep more recent turns
-			CompactionMaxTokens:     5000,  // Larger summaries for big contexts
+			CompactionThreshold:     500,  // Trigger early for better compression
+			CompactionPreserveTurns: 10,   // Keep more recent turns
+			CompactionMaxTokens:     5000, // Larger summaries for big contexts
 			CompactionStateSnapshot: true,
 			CompactionAutoDetect:    true,
-			
+
 			// Layer 12: Attribution (ProCut-style pruning)
 			EnableAttribution:     true,
-			AttributionThreshold:  0.25,  // Lower threshold = more pruning
-			AttributionPositional: true,  // Preserve start/end content
-			AttributionFrequency:  true,  // Reduce repeated content
-			AttributionSemantic:   true,  // Preserve keywords, numbers, code
-			
+			AttributionThreshold:  0.25, // Lower threshold = more pruning
+			AttributionPositional: true, // Preserve start/end content
+			AttributionFrequency:  true, // Reduce repeated content
+			AttributionSemantic:   true, // Preserve keywords, numbers, code
+
 			// Layer 13: H2O (Heavy-Hitter Oracle)
 			EnableH2O:          true,
-			H2OSinkSize:        4,   // First 4 tokens are attention sinks
-			H2ORecentSize:      20,  // Keep last 20 tokens
-			H2OHeavyHitterSize: 40,  // Top 40 heavy hitters
-			
+			H2OSinkSize:        4,  // First 4 tokens are attention sinks
+			H2ORecentSize:      20, // Keep last 20 tokens
+			H2OHeavyHitterSize: 40, // Top 40 heavy hitters
+
 			// Layer 14: Attention Sink (StreamingLLM-style)
 			EnableAttentionSink:  true,
-			AttentionSinkCount:   4,   // First 4 lines are attention sinks
-			AttentionRecentCount: 8,   // Keep last 8 lines in rolling cache
+			AttentionSinkCount:   4, // First 4 lines are attention sinks
+			AttentionRecentCount: 8, // Keep last 8 lines in rolling cache
 		},
 		Hooks: HooksConfig{
 			ExcludedCommands: []string{},
@@ -307,22 +308,59 @@ func Load(cfgFile string) (*Config, error) {
 
 	// Environment variable aliases (for compatibility)
 	if val := os.Getenv("TOKMAN_DB_PATH"); val != "" {
-		viper.SetDefault("tracking.database_path", val)
+		viper.Set("tracking.database_path", val)
 	}
 	if val := os.Getenv("TOKMAN_TELEMETRY_DISABLED"); val != "" {
-		viper.SetDefault("tracking.telemetry", val == "false")
+		viper.Set("tracking.telemetry", val == "false")
 	}
 	if val := os.Getenv("TOKMAN_AUDIT_DIR"); val != "" {
-		viper.SetDefault("hooks.audit_dir", val)
+		viper.Set("hooks.audit_dir", val)
 	}
 	if val := os.Getenv("TOKMAN_TEE_DIR"); val != "" {
-		viper.SetDefault("hooks.tee_dir", val)
+		viper.Set("hooks.tee_dir", val)
 	}
 	if val := os.Getenv("TOKMAN_TEE"); val != "" {
-		viper.SetDefault("hooks.tee_enabled", val == "true" || val == "1")
+		viper.Set("hooks.tee_enabled", val == "true" || val == "1")
 	}
 	if val := os.Getenv("TOKMAN_HOOK_AUDIT"); val != "" {
-		viper.SetDefault("hooks.audit_enabled", val == "true" || val == "1")
+		viper.Set("hooks.audit_enabled", val == "true" || val == "1")
+	}
+
+	// T163: Pipeline environment variable overrides
+	if val := os.Getenv("TOKMAN_BUDGET"); val != "" {
+		if n, err := strconv.Atoi(val); err == nil {
+			viper.Set("pipeline.default_budget", n)
+		}
+	}
+	if val := os.Getenv("TOKMAN_MODE"); val != "" {
+		viper.Set("filter.mode", val)
+	}
+	if val := os.Getenv("TOKMAN_PRESET"); val != "" {
+		viper.Set("pipeline.preset", val)
+	}
+	if val := os.Getenv("TOKMAN_MAX_CONTEXT"); val != "" {
+		if n, err := strconv.Atoi(val); err == nil {
+			viper.Set("pipeline.max_context_tokens", n)
+		}
+	}
+	if val := os.Getenv("TOKMAN_CACHE_SIZE"); val != "" {
+		if n, err := strconv.Atoi(val); err == nil {
+			viper.Set("pipeline.cache_max_size", n)
+		}
+	}
+	if val := os.Getenv("TOKMAN_ENTROPY_THRESHOLD"); val != "" {
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			viper.Set("pipeline.entropy_threshold", f)
+		}
+	}
+	if val := os.Getenv("TOKMAN_COMPACTION"); val != "" {
+		viper.Set("pipeline.enable_compaction", val == "true" || val == "1")
+	}
+	if val := os.Getenv("TOKMAN_H2O"); val != "" {
+		viper.Set("pipeline.enable_h2o", val == "true" || val == "1")
+	}
+	if val := os.Getenv("TOKMAN_ATTENTION_SINK"); val != "" {
+		viper.Set("pipeline.enable_attention_sink", val == "true" || val == "1")
 	}
 
 	// Read config file if it exists

@@ -29,6 +29,23 @@ var defaultNoiseDirs = []string{
 	".next",
 	"coverage",
 	".cache",
+	".turbo",
+	".vercel",
+	".pytest_cache",
+	".mypy_cache",
+	".tox",
+	"venv",
+	".nyc_output",
+	".DS_Store",
+	"Thumbs.db",
+	".vs",
+	".eggs",
+	".turbo",
+	".svelte-kit",
+	".angular",
+	".parcel-cache",
+	".output",
+	".data",
 }
 
 var lsCmd = &cobra.Command{
@@ -41,7 +58,7 @@ var lsCmd = &cobra.Command{
 	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
 		startTime := time.Now()
-		output, err := runLS(args)
+		raw, filtered, err := runLS(args)
 		execTime := time.Since(startTime).Milliseconds()
 
 		if err != nil {
@@ -49,10 +66,10 @@ var lsCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Print(output)
+		fmt.Print(filtered)
 
 		// Record to tracker
-		if err := recordCommand("ls", output, output, execTime, true); err != nil && verbose > 0 {
+		if err := recordCommand("ls", raw, filtered, execTime, true); err != nil && verbose > 0 {
 			fmt.Fprintf(cmd.OutOrStderr(), "Warning: failed to record: %v\n", err)
 		}
 	},
@@ -62,11 +79,11 @@ func init() {
 	rootCmd.AddCommand(lsCmd)
 }
 
-// runLS executes ls with noise filtering
-func runLS(args []string) (string, error) {
+// runLS executes ls with noise filtering, returns (raw, filtered, error)
+func runLS(args []string) (string, string, error) {
 	path := "."
 	lsArgs := []string{}
-	
+
 	// Parse args: separate flags from path
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
@@ -75,26 +92,28 @@ func runLS(args []string) (string, error) {
 			path = arg
 		}
 	}
-	
+
 	// Default to -la if no flags provided
 	if len(lsArgs) == 0 {
 		lsArgs = []string{"-la"}
 	}
-	
+
 	lsArgs = append(lsArgs, path)
 
 	cmd := exec.Command("ls", lsArgs...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("ls failed: %w", err)
+		return "", "", fmt.Errorf("ls failed: %w", err)
 	}
+
+	raw := out.String()
 
 	// Use ultra-compact format by default
 	if ultraCompact {
-		return filterLSOutputUltraCompact(out.String()), nil
+		return raw, filterLSOutputUltraCompact(raw), nil
 	}
-	return filterLSOutput(out.String()), nil
+	return raw, filterLSOutput(raw), nil
 }
 
 // filterLSOutputUltraCompact returns compact output
@@ -119,7 +138,8 @@ func filterLSOutputUltraCompact(output string) string {
 	}
 
 	var dirs []string
-	var files []string
+	var files []struct{ name, size string }
+	extCount := make(map[string]int)
 
 	// Skip the "total X" line at the start
 	startIdx := 0
@@ -163,18 +183,58 @@ func filterLSOutputUltraCompact(output string) string {
 		if isDir {
 			dirs = append(dirs, fmt.Sprintf("%s/", name))
 		} else {
-			files = append(files, fmt.Sprintf("%s  %s", name, sizeFormatted))
+			files = append(files, struct{ name, size string }{name, sizeFormatted})
+			// Track extension
+			ext := "no ext"
+			if dotIdx := strings.LastIndex(name, "."); dotIdx >= 0 {
+				ext = name[dotIdx:]
+			}
+			extCount[ext]++
 		}
 	}
 
 	// Sort alphabetically
 	sort.Strings(dirs)
-	sort.Strings(files)
+	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
 
 	// Build output: dirs first, then files with sizes
 	var result []string
 	result = append(result, dirs...)
-	result = append(result, files...)
+	for _, f := range files {
+		result = append(result, fmt.Sprintf("%s  %s", f.name, f.size))
+	}
+
+	// Summary line with extension counts
+	if len(files) > 0 || len(dirs) > 0 {
+		summary := fmt.Sprintf("\n%d files, %d dirs", len(files), len(dirs))
+		if len(extCount) > 0 {
+			// Sort extensions by count
+			type extPair struct {
+				ext   string
+				count int
+			}
+			var extPairs []extPair
+			for e, c := range extCount {
+				extPairs = append(extPairs, extPair{e, c})
+			}
+			sort.Slice(extPairs, func(i, j int) bool { return extPairs[i].count > extPairs[j].count })
+
+			var parts []string
+			limit := 5
+			if len(extPairs) < limit {
+				limit = len(extPairs)
+			}
+			for _, ep := range extPairs[:limit] {
+				parts = append(parts, fmt.Sprintf("%d %s", ep.count, ep.ext))
+			}
+			summary += " (" + strings.Join(parts, ", ")
+			if len(extPairs) > 5 {
+				summary += fmt.Sprintf(", +%d more", len(extPairs)-5)
+			}
+			summary += ")"
+		}
+		result = append(result, summary)
+	}
 
 	return strings.Join(result, "\n")
 }

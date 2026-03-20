@@ -1,0 +1,28 @@
+[[rules]]
+match = "npm test *"
+description = "npm test - run test suite"
+
+[rules.filter]
+keep_lines_matching = [
+    "FAIL.*",
+    "Error.*",
+    "✗.*",
+    "×.*",
+    "Test Suites:.*",
+    "Tests:.*",
+    "Snapshots:.*",
+    "Time:.*",
+]
+
+strip_lines_matching = [
+    "^\\s*✓.*",
+    "^\\s*√.*",
+    "^\\s*PASS.*",
+    "^\\s*>.*",
+    "^\\s*\\[.*\\].*",
+]
+
+max_lines = 80
+
+[rules.filter.on_empty]
+return = "All tests passed."

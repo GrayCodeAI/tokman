@@ -1,0 +1,25 @@
+[[rules]]
+match = "npx playwright test *"
+description = "playwright - end-to-end testing"
+
+[rules.filter]
+keep_lines_matching = [
+    "\\d+ failed.*",
+    "\\d+ passed.*",
+    "Error:.*",
+    "at .*",
+    "Test Files.*",
+    "Tests.*",
+]
+
+strip_lines_matching = [
+    "^\\s*✓.*",
+    "^\\s*Running.*",
+    "^\\s*[0-9]+ \\|.*",
+    "^\\s*Waiting.*",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "All Playwright tests passed."

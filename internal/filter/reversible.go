@@ -1,0 +1,164 @@
+package filter
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+)
+
+// ReversibleStore stores original outputs indexed by content hash.
+// R1: Claw-compactor style reversible compression.
+// Users can restore any compressed output to its original form.
+type ReversibleStore struct {
+	baseDir string
+	mu      sync.RWMutex
+}
+
+// StoredEntry holds a reversible compression entry.
+type StoredEntry struct {
+	Hash         string         `json:"hash"`
+	Command      string         `json:"command"`
+	Original     string         `json:"original"`
+	Compressed   string         `json:"compressed"`
+	OriginalHash string         `json:"original_hash"`
+	Mode         string         `json:"mode"`
+	Budget       int            `json:"budget"`
+	Timestamp    time.Time      `json:"timestamp"`
+	LayerStats   map[string]int `json:"layer_stats,omitempty"`
+}
+
+// NewReversibleStore creates a store in the tokman data directory.
+func NewReversibleStore() *ReversibleStore {
+	home, _ := os.UserHomeDir()
+	baseDir := filepath.Join(home, ".local", "share", "tokman", "reversible")
+	os.MkdirAll(baseDir, 0755)
+	return &ReversibleStore{baseDir: baseDir}
+}
+
+// Store saves an original-compressed pair for later restoration.
+func (s *ReversibleStore) Store(command, original, compressed string, mode string, budget int, layerStats map[string]int) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	hash := s.computeHash(original)
+	entry := StoredEntry{
+		Hash:         hash[:12],
+		Command:      command,
+		Original:     original,
+		Compressed:   compressed,
+		OriginalHash: hash,
+		Mode:         mode,
+		Budget:       budget,
+		Timestamp:    time.Now(),
+		LayerStats:   layerStats,
+	}
+
+	data, _ := json.Marshal(entry)
+	filename := fmt.Sprintf("%s_%s.json", time.Now().Format("20060102_150405"), hash[:8])
+	path := filepath.Join(s.baseDir, filename)
+	os.WriteFile(path, data, 0644)
+
+	return hash[:12]
+}
+
+// Restore retrieves the original output by hash prefix.
+func (s *ReversibleStore) Restore(hashPrefix string) (*StoredEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	entries, err := os.ReadDir(s.baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("no reversible entries found")
+	}
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.baseDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var entry StoredEntry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			continue
+		}
+		if entry.Hash == hashPrefix || entry.OriginalHash[:12] == hashPrefix {
+			return &entry, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no entry found for hash: %s", hashPrefix)
+}
+
+// ListRecent returns the N most recent reversible entries.
+func (s *ReversibleStore) ListRecent(n int) ([]StoredEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	entries, err := os.ReadDir(s.baseDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []StoredEntry
+	for _, e := range entries {
+		if e.IsDir() || len(results) >= n {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.baseDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var entry StoredEntry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			continue
+		}
+		results = append(results, entry)
+	}
+
+	return results, nil
+}
+
+// Cleanup removes entries older than the given duration.
+func (s *ReversibleStore) Cleanup(maxAge time.Duration) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cutoff := time.Now().Add(-maxAge)
+	entries, _ := os.ReadDir(s.baseDir)
+	removed := 0
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			os.Remove(filepath.Join(s.baseDir, e.Name()))
+			removed++
+		}
+	}
+	return removed
+}
+
+// Size returns the number of stored entries.
+func (s *ReversibleStore) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entries, _ := os.ReadDir(s.baseDir)
+	return len(entries)
+}
+
+func (s *ReversibleStore) computeHash(content string) string {
+	h := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(h[:])
+}

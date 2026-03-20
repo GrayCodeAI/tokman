@@ -1,0 +1,28 @@
+[[rules]]
+match = "webpack *"
+description = "webpack - module bundler"
+
+[rules.filter]
+keep_lines_matching = [
+    "ERROR.*",
+    "WARNING.*",
+    "Module not found.*",
+    "Asset.*",
+    "Entrypoint.*",
+    "Time:.*",
+    "Built at:.*",
+    "Hash:.*",
+    "WARNING in.*",
+    "ERROR in.*",
+]
+
+strip_lines_matching = [
+    "^\\s*\\[.*\\].*",
+    "^\\s*chunk.*",
+    "^\\s*\\[\\d+\\].*",
+]
+
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "webpack: build successful"

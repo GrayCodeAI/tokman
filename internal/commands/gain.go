@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -53,7 +54,7 @@ func init() {
 	gainCmd.Flags().BoolVarP(&gainProject, "project", "p", false, "Filter to current project only")
 	gainCmd.Flags().BoolVarP(&gainGraph, "graph", "g", false, "Show ASCII graph of daily savings")
 	gainCmd.Flags().BoolVarP(&gainHistory, "history", "H", false, "Show recent command history")
-	gainCmd.Flags().BoolVarP(&gainQuota, "quota", "q", false, "Show monthly quota savings estimate")
+	gainCmd.Flags().BoolVar(&gainQuota, "quota", false, "Show monthly quota savings estimate")
 	gainCmd.Flags().StringVarP(&gainTier, "tier", "t", "20x", "Subscription tier for quota: pro, 5x, 20x")
 	gainCmd.Flags().BoolVarP(&gainDaily, "daily", "d", false, "Show daily breakdown")
 	gainCmd.Flags().BoolVarP(&gainWeekly, "weekly", "w", false, "Show weekly breakdown")
@@ -102,9 +103,9 @@ func runGain(verbose bool) {
 	}
 	defer tracker.Close()
 
-	// Resolve project scope
+	// Resolve project scope (default to current project)
 	var projectPath string
-	if gainProject {
+	if gainProject || !gainAll {
 		cwd, _ := os.Getwd()
 		projectPath = cwd
 	}
@@ -430,8 +431,14 @@ func printWeekly(tracker *tracking.Tracker, projectPath string) {
 		weekMap[weekKey] = w
 	}
 
-	// Print weeks
-	for weekKey, w := range weekMap {
+	// Print weeks (sorted for deterministic output)
+	weekKeys := make([]string, 0, len(weekMap))
+	for k := range weekMap {
+		weekKeys = append(weekKeys, k)
+	}
+	sort.Strings(weekKeys)
+	for _, weekKey := range weekKeys {
+		w := weekMap[weekKey]
 		fmt.Printf("%-12s  %8d  %12s\n", weekKey, w.commands, formatTokens(w.saved))
 	}
 	fmt.Println()

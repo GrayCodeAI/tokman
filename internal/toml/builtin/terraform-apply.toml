@@ -1,0 +1,28 @@
+[[rules]]
+match = "terraform apply *"
+description = "terraform apply - apply infrastructure changes"
+
+[rules.filter]
+keep_lines_matching = [
+    "Apply complete!.*",
+    "Changes:.*",
+    "Outputs:.*",
+    "Error:.*",
+    "Warning:.*",
+    "Plan:.*",
+    "  \\+.*",
+    "  -.*",
+    "  ~.*",
+    "  #.*",
+]
+
+strip_lines_matching = [
+    "^\\s*\\[.*\\].*",
+    "^\\s*Refreshing state.*",
+    "^\\s*Read.*complete.*",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "terraform apply: completed"

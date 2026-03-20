@@ -19,13 +19,17 @@ var (
 	dryRun       bool
 	ultraCompact bool
 	skipEnv      bool
-	queryIntent  string // Query intent for query-aware compression
-	llmEnabled   bool   // Enable LLM-based compression
-	tokenBudget  int    // Token budget for compression (0 = unlimited)
+	queryIntent  string   // Query intent for query-aware compression
+	llmEnabled   bool     // Enable LLM-based compression
+	tokenBudget  int      // Token budget for compression (0 = unlimited)
 	fallbackArgs []string // Args for fallback handler
-	
+	layerPreset  string   // Pipeline preset: fast/balanced/full (T90)
+	outputFile   string   // R35: Write output to file
+	quietMode    bool     // R36: Suppress all non-essential output
+	jsonOutput   bool     // R37: Machine-readable JSON output
+
 	// Compaction flags (Layer 11)
-	compactionEnabled     bool
+	compactionEnabled    bool
 	compactionThreshold  int
 	compactionPreserve   int
 	compactionMaxTokens  int
@@ -66,14 +70,14 @@ output, applies intelligent filtering, and tracks token savings.`,
 
 		fallback := GetFallback()
 		output, handled, err := fallback.Handle(args)
-		
+
 		if !handled {
 			return fmt.Errorf("unknown command: %s", args[0])
 		}
 
 		// Print filtered output
 		fmt.Print(output)
-		
+
 		return err
 	},
 }
@@ -84,7 +88,7 @@ func Execute() {
 	// Enable unknown command handling
 	rootCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 	rootCmd.TraverseChildren = true
-	
+
 	_, err := rootCmd.ExecuteC()
 	if err != nil {
 		// Check if this is an unknown command error
@@ -111,7 +115,7 @@ func Execute() {
 // isUnknownCommandError checks if the error is an unknown command error
 func isUnknownCommandError(err error) bool {
 	return strings.Contains(err.Error(), "unknown command") ||
-	       strings.Contains(err.Error(), "unknown shorthand flag")
+		strings.Contains(err.Error(), "unknown shorthand flag")
 }
 
 // extractUnknownCommandArgs extracts args for the fallback handler
@@ -141,7 +145,15 @@ func init() {
 		"enable LLM-based compression (requires Ollama/LM Studio)")
 	rootCmd.PersistentFlags().IntVar(&tokenBudget, "budget", 0,
 		"token budget for output (0 = unlimited, e.g., --budget 2000)")
-	
+	rootCmd.PersistentFlags().StringVar(&layerPreset, "preset", "",
+		"pipeline preset: fast, balanced, or full (T90)")
+	rootCmd.PersistentFlags().StringVarP(&outputFile, "output", "o", "",
+		"write output to file instead of stdout")
+	rootCmd.PersistentFlags().BoolVarP(&quietMode, "quiet", "q", false,
+		"suppress all non-essential output")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false,
+		"machine-readable JSON output")
+
 	// Compaction flags (Layer 11 - Semantic compression)
 	rootCmd.PersistentFlags().BoolVar(&compactionEnabled, "compaction", true,
 		"enable semantic compaction for chat/conversation content (default: true)")
@@ -335,3 +347,26 @@ func IsCompactionAutoDetect() bool {
 	return compactionAutoDetect
 }
 
+// GetLayerPreset returns the pipeline preset (fast/balanced/full).
+// T90: Pipeline mode presets.
+func GetLayerPreset() string {
+	if layerPreset != "" {
+		return layerPreset
+	}
+	return os.Getenv("TOKMAN_PRESET")
+}
+
+// GetOutputFile returns the output file path.
+func GetOutputFile() string {
+	return outputFile
+}
+
+// IsQuietMode returns whether quiet mode is enabled.
+func IsQuietMode() bool {
+	return quietMode
+}
+
+// IsJSONOutput returns whether JSON output is enabled.
+func IsJSONOutput() bool {
+	return jsonOutput
+}

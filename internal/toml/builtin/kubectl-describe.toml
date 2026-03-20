@@ -1,0 +1,41 @@
+[[rules]]
+match = "kubectl describe *"
+description = "kubectl describe - describe Kubernetes resources"
+
+[rules.filter]
+# Keep important sections
+keep_lines_matching = [
+    "Name:.*",
+    "Namespace:.*",
+    "Status:.*",
+    "State:.*",
+    "Ready:.*",
+    "Containers:.*",
+    "Events:.*",
+    "Type.*Reason.*",
+    "Normal.*",
+    "Warning.*",
+    "Conditions:.*",
+    "Last State:.*",
+    "Restart Count:.*",
+    "Image:.*",
+    "Node:.*",
+]
+
+# Strip verbose metadata
+strip_lines_matching = [
+    "^\\s*Annotations:.*",
+    "^\\s*Labels:.*",
+    "^\\s*Selector:.*",
+    "^\\s*IP:.*",
+    "^\\s*Controlled By:.*",
+    "^\\s*Port:.*",
+    "^\\s*Host Port:.*",
+    "^\\s*Limits:.*",
+    "^\\s*Requests:.*",
+]
+
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "kubectl describe: no output"

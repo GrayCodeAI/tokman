@@ -1,0 +1,20 @@
+[[rules]]
+match = "kubectl logs *"
+description = "kubectl logs - pod logs"
+
+[rules.filter]
+# Keep errors and warnings
+keep_lines_matching = [
+    "(?i)error.*",
+    "(?i)warn.*",
+    "(?i)fatal.*",
+    "(?i)panic.*",
+    "(?i)exception.*",
+    "(?i)traceback.*",
+]
+
+# Deduplicate repeated lines
+max_lines = 100
+
+[rules.filter.on_empty]
+return = "kubectl logs: no output"

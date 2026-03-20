@@ -1,0 +1,25 @@
+[[rules]]
+match = "yarn *"
+description = "yarn - package manager"
+
+[rules.filter]
+keep_lines_matching = [
+    "error.*",
+    "ERROR.*",
+    "warning.*",
+    "WARNING.*",
+    "success.*",
+    "Done in.*",
+]
+
+strip_lines_matching = [
+    "^\\s*\\[.*\\].*",
+    "^\\s*Resolving.*",
+    "^\\s*Fetching.*",
+    "^\\s*Linking.*",
+]
+
+max_lines = 50
+
+[rules.filter.on_empty]
+return = "yarn: completed"
