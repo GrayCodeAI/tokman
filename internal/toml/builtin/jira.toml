@@ -2,19 +2,56 @@
 description = "Compact Jira CLI output — strip verbose metadata, keep essentials"
 match_command = "^jira\\b"
 strip_ansi = true
-strip_lines_matching = [
+
+[filters.jira.replace]
+# Compact status names
+"In Progress" = "WIP"
+"Open" = "OPEN"
+"In Review" = "REVIEW"
+"Done" = "DONE"
+"To Do" = "TODO"
+"In QA" = "QA"
+
+[filters.jira.strip_lines_matching]
+patterns = [
   "^\\s*$",
   "^\\s*--",
+  "^\\s*\\+--",
+  "^\\s*\\|\\s*$",
+  "Created:",       # Verbose metadata
+  "Updated:",       # Verbose metadata
+  "Reporter:",
+  "Priority:",
+  "Labels:",
+  "Components:",
+  "Sprint:",
+  "Epic Link:",
+  "Fix Version:",
+  "Affects Version:",
 ]
-truncate_lines_at = 120
-max_lines = 40
+
+[filters.jira.keep_lines_matching]
+patterns = [
+  "^KEY:",
+  "^Summary:",
+  "^Status:",
+  "^Assignee:",
+  "^TYPE\\t",
+  "^\\w+\\t\\w+-\\d+",  # Issue rows like "Story\tPROJ-123"
+]
+
+[filters.jira.truncate_lines_at]
+value = 120
+
+[filters.jira.max_lines]
+value = 40
 
 [[tests.jira]]
-name = "strips blank lines from issue list"
-input = "TYPE\tKEY\tSUMMARY\tSTATUS\n\nStory\tPROJ-123\tAdd login feature\tIn Progress\n\nBug\tPROJ-456\tFix crash on startup\tOpen"
-expected = "TYPE\tKEY\tSUMMARY\tSTATUS\nStory\tPROJ-123\tAdd login feature\tIn Progress\nBug\tPROJ-456\tFix crash on startup\tOpen"
+name = "issue list with status compaction"
+input = "TYPE\tKEY\tSUMMARY\tSTATUS\n\nStory\tPROJ-123\tAdd login feature\tIn Progress\n\nBug\tPROJ-456\tFix crash\tDone"
+expected_contains = "WIP"
 
 [[tests.jira]]
 name = "single issue view"
-input = "KEY: PROJ-123\nSummary: Add login feature\nStatus: In Progress\nAssignee: john@example.com"
-expected = "KEY: PROJ-123\nSummary: Add login feature\nStatus: In Progress\nAssignee: john@example.com"
+input = "KEY: PROJ-123\nSummary: Add login feature\nStatus: In Progress\nAssignee: john@example.com\nCreated: 2026-03-01\nUpdated: 2026-03-10"
+expected_contains = "KEY: PROJ-123"

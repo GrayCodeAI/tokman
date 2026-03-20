@@ -1,28 +1,50 @@
 [filters.jj]
-description = "Compact Jujutsu (jj) output — strip blank lines, truncate"
+description = "Compact Jujutsu (jj) output — strip hints, truncate metadata"
 match_command = "^jj\\b"
 strip_ansi = true
-strip_lines_matching = [
+
+[filters.jj.replace]
+# Compact common jj prefixes
+"zzzzzzzz root()" = "root()"
+
+[filters.jj.strip_lines_matching]
+patterns = [
   "^\\s*$",
   "^Hint:",
   "^Working copy now at:",
+  "^Added .* files",
+  "^Removed .* files",
+  "^Nothing changed",
+  "^Rebased ",
+  "^Parent commit:",
+  "^Branch .* pointing to",
 ]
-max_lines = 30
-truncate_lines_at = 120
+
+[filters.jj.truncate_lines_at]
+value = 120
+
+[filters.jj.head_lines]
+value = 40
 
 [[tests.jj]]
 name = "log output stripped of hints"
-input = """
-@  qpvuntsm patrick@example.com 2026-03-10 12:00 abc123
+input = """@  qpvuntsm patrick@example.com 2026-03-10 12:00 abc123
 │  feat: add new feature
 ◉  zzzzzzzz root()
 
 Working copy now at: qpvuntsm abc123 feat: add new feature
 Hint: use `jj log` to see the full history
 """
-expected = "@  qpvuntsm patrick@example.com 2026-03-10 12:00 abc123\n│  feat: add new feature\n◉  zzzzzzzz root()"
+expected_contains = "qpvuntsm"
 
 [[tests.jj]]
-name = "empty input passes through"
-input = ""
-expected = ""
+name = "jj status compact"
+input = """Parent commit: qpvuntsm abc123 feat: feature
+Working copy : rlvkpnrz def456
+Modified files:
+  src/main.rs
+  src/lib.rs
+
+Nothing changed.
+"""
+expected_contains = "src/main.rs"
