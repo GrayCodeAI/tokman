@@ -41,7 +41,7 @@ Example plugin (save as ~/.config/tokman/plugins/hide-npm-warnings.json):
 
 var pluginListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all loaded plugins",
+	Short: "List all loaded plugins and built-in filters",
 	RunE:  runPluginList,
 }
 
@@ -86,32 +86,67 @@ func getPluginsDir() string {
 }
 
 func runPluginList(cmd *cobra.Command, args []string) error {
+	// Show custom plugins
 	pluginsDir := getPluginsDir()
 	pm := filter.NewPluginManager(pluginsDir)
 
-	if err := pm.LoadPlugins(); err != nil {
-		return fmt.Errorf("failed to load plugins: %w", err)
-	}
-
-	filters := pm.GetFilters()
-	if len(filters) == 0 {
-		fmt.Println("No plugins loaded.")
-		fmt.Println("\nRun 'tokman plugin examples' to generate example plugins.")
-		return nil
-	}
-
-	fmt.Println("Loaded Plugins:")
-	fmt.Println()
-	for _, f := range filters {
-		status := "enabled"
-		if !f.Enabled() {
-			status = "disabled"
-		}
-		fmt.Printf("  • %s (%s)\n", f.Name(), status)
-		if f.Description() != "" {
-			fmt.Printf("    %s\n", f.Description())
+	if err := pm.LoadPlugins(); err == nil {
+		filters := pm.GetFilters()
+		if len(filters) > 0 {
+			fmt.Println("Custom Plugins:")
+			for _, f := range filters {
+				status := "enabled"
+				if !f.Enabled() {
+					status = "disabled"
+				}
+				fmt.Printf("  • %s (%s)\n", f.Name(), status)
+				if f.Description() != "" {
+					fmt.Printf("    %s\n", f.Description())
+				}
+			}
+			fmt.Println()
 		}
 	}
+
+	// Show built-in TOML filters
+	builtinDir := filepath.Join(getTokmanSourceDir(), "internal", "toml", "builtin")
+	if entries, err := os.ReadDir(builtinDir); err == nil {
+		count := 0
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".toml") {
+				count++
+			}
+		}
+		if count > 0 {
+			fmt.Printf("Built-in Filters (%d):\n", count)
+			for _, e := range entries {
+				if strings.HasSuffix(e.Name(), ".toml") {
+					name := strings.TrimSuffix(e.Name(), ".toml")
+					fmt.Printf("  ✓ %s\n", name)
+				}
+			}
+			fmt.Println()
+		}
+	}
+
+	// Show user filters
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		userDir := filepath.Join(home, ".config", "tokman", "filters")
+		if entries, err := os.ReadDir(userDir); err == nil && len(entries) > 0 {
+			fmt.Printf("User Filters (%d):\n", len(entries))
+			for _, e := range entries {
+				if strings.HasSuffix(e.Name(), ".toml") {
+					name := strings.TrimSuffix(e.Name(), ".toml")
+					fmt.Printf("  ✓ %s (user)\n", name)
+				}
+			}
+			fmt.Println()
+		}
+	}
+
+	fmt.Println("Tip: Use 'tokman explain <command>' to see which filters apply.")
+	fmt.Println("     Use 'tokman plugin examples' to generate example plugins.")
 
 	return nil
 }
@@ -208,4 +243,25 @@ func togglePlugin(name string, enabled bool) error {
 	}
 	fmt.Printf("Plugin %q %s.\n", name, action)
 	return nil
+}
+
+func getTokmanSourceDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	// For installed binaries (go install), embedded filters are in the binary itself.
+	// Try to find source from executable path (development layout: ./bin/tokman)
+	dir := filepath.Dir(filepath.Dir(exe))
+	builtinDir := filepath.Join(dir, "internal", "toml", "builtin")
+	if _, err := os.Stat(builtinDir); err == nil {
+		return dir
+	}
+	// Try same directory as binary (e.g., /usr/local/bin/)
+	dir = filepath.Dir(exe)
+	builtinDir = filepath.Join(dir, "internal", "toml", "builtin")
+	if _, err := os.Stat(builtinDir); err == nil {
+		return dir
+	}
+	return dir
 }
