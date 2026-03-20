@@ -14,8 +14,9 @@ import (
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show token savings summary",
-	Long:  `Display a summary of token savings for the current project.`,
+	Short: "Quick token savings summary",
+	Long: `Display a quick one-line summary of token savings.
+For a comprehensive report with graphs and history, use 'tokman gain'.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := GetConfig()
 		if err != nil {
@@ -37,6 +38,13 @@ var statusCmd = &cobra.Command{
 		cyan := color.New(color.FgCyan).SprintFunc()
 		yellow := color.New(color.FgYellow).SprintFunc()
 
+		// Show enabled/disabled state
+		if isEnabled() {
+			fmt.Printf("%s\n", green("TokMan: enabled"))
+		} else {
+			fmt.Printf("%s\n", yellow("TokMan: disabled (run 'tokman enable')"))
+		}
+
 		// Get overall summary
 		summary, err := tracker.GetSavings(projectPath)
 		if err != nil {
@@ -44,51 +52,42 @@ var statusCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Printf("\n%s\n", green("📊 TokMan Status"))
-		fmt.Println(strings.Repeat("─", 50))
-
-		// Show enabled/disabled state
-		if isEnabled() {
-			fmt.Printf("  Status:  %s\n", green("● enabled"))
-		} else {
-			fmt.Printf("  Status:  %s\n", yellow("○ disabled (run 'tokman enable')"))
-		}
-
-		fmt.Printf("  Project: %s\n", cyan(projectPath))
-		fmt.Println(strings.Repeat("─", 50))
-
 		if summary.TotalCommands == 0 {
-			fmt.Println(yellow("No commands recorded yet."))
-			fmt.Println("\nRun some commands through TokMan to see savings.")
+			fmt.Println(yellow("No commands recorded yet. Run some commands through TokMan."))
 			return
 		}
 
-		// Display summary
-		fmt.Printf("\n%s\n", green("Overall Summary"))
-		fmt.Printf("  Commands executed:  %s\n", cyan(fmt.Sprintf("%d", summary.TotalCommands)))
-		fmt.Printf("  Original tokens:    %s\n", cyan(fmt.Sprintf("%d", summary.TotalOriginal)))
-		fmt.Printf("  Filtered tokens:    %s\n", cyan(fmt.Sprintf("%d", summary.TotalFiltered)))
-		fmt.Printf("  Tokens saved:       %s\n", green(fmt.Sprintf("%d", summary.TotalSaved)))
-		fmt.Printf("  Reduction:          %s\n", green(fmt.Sprintf("%.1f%%", summary.ReductionPct)))
+		// Quick summary line
+		fmt.Printf("%s\n", strings.Repeat("─", 50))
+		fmt.Printf("  Commands: %s  |  Saved: %s tokens (%s)  |  Project: %s\n",
+			cyan(fmt.Sprintf("%d", summary.TotalCommands)),
+			green(fmt.Sprintf("%d", summary.TotalSaved)),
+			green(fmt.Sprintf("%.1f%%", summary.ReductionPct)),
+			cyan(shortenPath(projectPath)),
+		)
 
-		// Get per-command stats
+		// Top 3 commands
 		stats, err := tracker.GetCommandStats(projectPath)
 		if err == nil && len(stats) > 0 {
-			fmt.Printf("\n%s\n", green("Top Commands by Savings"))
-			fmt.Println(strings.Repeat("─", 50))
+			fmt.Printf("  Top: ")
 			for i, s := range stats {
-				if i >= 5 {
-					break // Show top 5
+				if i >= 3 {
+					break
 				}
-				fmt.Printf("  %-20s %s saved (%.1f%% reduction)\n",
-					s.Command,
-					green(fmt.Sprintf("%d", s.TotalSaved)),
-					s.ReductionPct,
-				)
+				if i > 0 {
+					fmt.Printf(", ")
+				}
+				cmdName := s.Command
+				if len(cmdName) > 15 {
+					cmdName = cmdName[:13] + ".."
+				}
+				fmt.Printf("%s (%d)", cmdName, s.TotalSaved)
 			}
+			fmt.Println()
 		}
 
-		fmt.Println()
+		fmt.Printf("%s\n", strings.Repeat("─", 50))
+		fmt.Printf("Run %s for detailed report.\n", cyan("tokman gain"))
 	},
 }
 
