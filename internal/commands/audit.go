@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(auditCmd)
 	auditCmd.Flags().StringP("mode", "m", "aggressive", "compression mode: minimal, aggressive")
 	auditCmd.Flags().IntP("budget", "b", 0, "token budget (0 = unlimited)")
-	auditCmd.Flags().StringP("query", "q", "", "query intent for query-aware compression")
+	auditCmd.Flags().String("query", "", "query intent for query-aware compression")
 	auditCmd.Flags().Bool("layers", true, "show layer-by-layer breakdown")
 	auditCmd.Flags().Bool("validate", true, "validate output quality")
 	auditCmd.Flags().Bool("json", false, "output in JSON format")
