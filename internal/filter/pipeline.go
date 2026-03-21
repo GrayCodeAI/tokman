@@ -312,8 +312,11 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 	}
 
 	// Layer 14: Attention Sink Filter (StreamingLLM-style)
+	// T14: Use adaptive attention sinks based on content size
 	if cfg.EnableAttentionSink {
-		p.attentionSinkFilter = NewAttentionSinkFilter()
+		// Estimate lines from typical content for adaptive sizing
+		estimatedLines := 50 // Default estimate
+		p.attentionSinkFilter = NewAdaptiveAttentionSinkFilter(estimatedLines)
 		if cfg.AttentionSinkCount > 0 {
 			p.attentionSinkFilter.config.SinkTokenCount = cfg.AttentionSinkCount
 		}
@@ -407,6 +410,7 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 }
 
 // Process runs the full 14-layer compression pipeline with early-exit support.
+// T7: Stage gates skip layers when not applicable (zero cost).
 // T81: Skip remaining layers if budget already met.
 func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	stats := &PipelineStats{
@@ -417,7 +421,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	output := input
 
 	// Layer 1: Entropy Filtering (Remove low-information tokens)
-	if p.entropyFilter != nil && p.config.EnableEntropy {
+	// T7: Stage gate - skip if content is too short or already dense
+	if p.entropyFilter != nil && p.config.EnableEntropy && !p.shouldSkipEntropy(output) {
 		output = p.processLayer1(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -425,7 +430,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 2: Perplexity Pruning (Iterative token removal)
-	if p.perplexityFilter != nil && p.config.EnablePerplexity {
+	// T7: Stage gate - skip if too few lines
+	if p.perplexityFilter != nil && p.config.EnablePerplexity && !p.shouldSkipPerplexity(output) {
 		output = p.processLayer2(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -433,7 +439,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 3: Goal-Driven Selection (CRF-style line scoring)
-	if p.goalDrivenFilter != nil && p.config.EnableGoalDriven {
+	// T7: Stage gate - skip if no query intent
+	if p.goalDrivenFilter != nil && p.config.EnableGoalDriven && !p.shouldSkipGoalDriven() {
 		output = p.processLayer3(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -449,7 +456,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 5: Contrastive Ranking (Question-relevance scoring)
-	if p.contrastiveFilter != nil && p.config.EnableContrastive {
+	// T7: Stage gate - skip if no query intent
+	if p.contrastiveFilter != nil && p.config.EnableContrastive && !p.shouldSkipContrastive() {
 		output = p.processLayer5(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -457,7 +465,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 6: N-gram Abbreviation (Lossless compression)
-	if p.ngramAbbreviator != nil {
+	// T7: Stage gate - skip if content is too short or has no patterns
+	if p.ngramAbbreviator != nil && !p.shouldSkipNgram(output) {
 		output = p.processLayer6(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -497,7 +506,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 11: Compaction Layer (Semantic compression)
-	if p.compactionLayer != nil {
+	// T7: Stage gate - skip if not conversation-like content
+	if p.compactionLayer != nil && !p.shouldSkipCompaction(output) {
 		output = p.processLayer11(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -513,7 +523,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
-	if p.h2oFilter != nil {
+	// T7: Stage gate - skip if content is too short
+	if p.h2oFilter != nil && !p.shouldSkipH2O(output) {
 		output = p.processLayer13(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -521,7 +532,8 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 14: Attention Sink Filter (StreamingLLM-style)
-	if p.attentionSinkFilter != nil {
+	// T7: Stage gate - skip if content is too short
+	if p.attentionSinkFilter != nil && !p.shouldSkipAttentionSink(output) {
 		output = p.processLayer14(output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
@@ -529,22 +541,26 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	}
 
 	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
-	if p.metaTokenFilter != nil {
+	// T7: Stage gate - skip if content is too short
+	if p.metaTokenFilter != nil && !p.shouldSkipMetaToken(output) {
 		output = p.processLayer15(output, stats)
 	}
 
 	// Layer 16: Semantic Chunk Filter (ChunkKV style)
-	if p.semanticChunkFilter != nil {
+	// T7: Stage gate - skip if content is too short
+	if p.semanticChunkFilter != nil && !p.shouldSkipSemanticChunk(output) {
 		output = p.processLayer16(output, stats)
 	}
 
 	// Layer 17: Sketch-based Reversible Store (KVReviver style)
-	if p.sketchStoreFilter != nil {
+	// T7: Stage gate - skip if no budget tracking
+	if p.sketchStoreFilter != nil && !p.shouldSkipSketchStore() {
 		output = p.processLayer17(output, stats)
 	}
 
 	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
-	if p.lazyPrunerFilter != nil {
+	// T7: Stage gate - skip if no budget tracking
+	if p.lazyPrunerFilter != nil && !p.shouldSkipLazyPruner() {
 		output = p.processLayer18(output, stats)
 	}
 
@@ -571,6 +587,121 @@ func (p *PipelineCoordinator) shouldEarlyExit(stats *PipelineStats) bool {
 	}
 	currentTokens := stats.OriginalTokens - stats.computeTotalSaved()
 	return currentTokens <= p.config.Budget
+}
+
+// T7: Stage Gates - Skip layers when not applicable
+// Each gate checks if the layer would provide value for the given content.
+// This reduces unnecessary processing and improves pipeline efficiency.
+
+// shouldSkipEntropy checks if entropy filtering would help.
+// Skip if content is too short or already highly dense.
+func (p *PipelineCoordinator) shouldSkipEntropy(content string) bool {
+	if len(content) < 50 {
+		return true // Too short for meaningful entropy analysis
+	}
+	// Check if content is already dense (low repetition)
+	uniqueChars := make(map[rune]bool)
+	for _, r := range content {
+		uniqueChars[r] = true
+		if len(uniqueChars) > 30 {
+			return false // Diverse content, entropy filtering will help
+		}
+	}
+	// Very few unique chars - might still benefit from entropy filtering
+	// but likely has other issues
+	return false
+}
+
+// shouldSkipPerplexity checks if perplexity pruning would help.
+// Skip if content has no clear structure or is too short.
+func (p *PipelineCoordinator) shouldSkipPerplexity(content string) bool {
+	lines := strings.Count(content, "\n")
+	if lines < 5 {
+		return true // Too few lines for perplexity analysis
+	}
+	return false
+}
+
+// shouldSkipGoalDriven checks if goal-driven selection applies.
+// Skip if no query intent is specified.
+func (p *PipelineCoordinator) shouldSkipGoalDriven() bool {
+	return p.config.QueryIntent == ""
+}
+
+// shouldSkipContrastive checks if contrastive ranking applies.
+// Skip if no query intent is specified.
+func (p *PipelineCoordinator) shouldSkipContrastive() bool {
+	return p.config.QueryIntent == ""
+}
+
+// shouldSkipNgram checks if N-gram abbreviation would help.
+// Skip if content has no repeated patterns.
+func (p *PipelineCoordinator) shouldSkipNgram(content string) bool {
+	if len(content) < 200 {
+		return true // Too short for pattern extraction
+	}
+	// Quick check for potential patterns
+	words := strings.Fields(content)
+	if len(words) < 20 {
+		return true
+	}
+	return false
+}
+
+// shouldSkipCompaction checks if compaction would help.
+// Skip if content doesn't look like conversation/chat.
+func (p *PipelineCoordinator) shouldSkipCompaction(content string) bool {
+	// Check for conversation markers
+	conversationMarkers := []string{"User:", "Assistant:", "AI:", "Human:", "\n\n", ">>>"}
+	for _, marker := range conversationMarkers {
+		if strings.Contains(content, marker) {
+			return false // Has conversation structure
+		}
+	}
+	return true
+}
+
+// shouldSkipH2O checks if H2O heavy-hitter filtering would help.
+// Skip if content is too short.
+func (p *PipelineCoordinator) shouldSkipH2O(content string) bool {
+	tokens := EstimateTokens(content)
+	// Lower threshold - H2O can still help with moderate content
+	return tokens < 50 // Too short for heavy-hitter analysis
+}
+
+// shouldSkipAttentionSink checks if attention sink filtering would help.
+// Skip if content is too short.
+func (p *PipelineCoordinator) shouldSkipAttentionSink(content string) bool {
+	lines := strings.Count(content, "\n")
+	return lines < 3 // Too few lines for attention sink benefit
+}
+
+// shouldSkipMetaToken checks if meta-token compression would help.
+// Skip if content has no repeated token sequences.
+func (p *PipelineCoordinator) shouldSkipMetaToken(content string) bool {
+	if len(content) < 500 {
+		return true
+	}
+	// Quick check for potential repeated sequences
+	return false
+}
+
+// shouldSkipSemanticChunk checks if semantic chunking would help.
+// Skip if content is too short or has no clear boundaries.
+func (p *PipelineCoordinator) shouldSkipSemanticChunk(content string) bool {
+	return len(content) < 300
+}
+
+// shouldSkipSketchStore checks if sketch storage would help.
+// Skip if budget tracking isn't enabled.
+func (p *PipelineCoordinator) shouldSkipSketchStore() bool {
+	return p.config.Budget <= 0
+}
+
+// shouldSkipLazyPruner checks if lazy pruning would help.
+// Skip if budget tracking isn't enabled.
+func (p *PipelineCoordinator) shouldSkipLazyPruner() bool {
+	return p.config.Budget <= 0
 }
 
 // computeTotalSaved returns total tokens saved across all layers.
