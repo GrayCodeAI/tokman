@@ -1,0 +1,43 @@
+# Pulumi IaC filter
+schema_version = 1
+
+[pulumi_preview]
+match_command = "pulumi.*preview|pulumi up.*--skip-preview"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+─.*",
+]
+keep_lines_matching = [
+    "Previewing update.*",
+    "Resources:.*",
+    "\\+.*to create.*",
+    "~.*to update.*",
+    "-.*to delete.*",
+    "Error:.*",
+    "warning:.*",
+]
+max_lines = 50
+
+[pulumi_up]
+match_command = "pulumi.*up|pulumi update"
+strip_ansi = true
+keep_lines_matching = [
+    "Updating.*",
+    "Resources:.*",
+    "Duration:.*",
+    "Permalink:.*",
+    "Error:.*",
+]
+max_lines = 30
+
+[pulumi_destroy]
+match_command = "pulumi.*destroy"
+strip_ansi = true
+keep_lines_matching = [
+    "Destroying.*",
+    "Resources:.*",
+    "Duration:.*",
+    "Error:.*",
+]
+max_lines = 20

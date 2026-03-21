@@ -1,0 +1,31 @@
+# Snyk security scanner filter
+schema_version = 1
+
+[snyk_test]
+match_command = "snyk.*test|snyk test"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "Testing.*",
+    "Organization:.*",
+]
+keep_lines_matching = [
+    "✗.*vulnerability.*",
+    "✓.*fixed.*",
+    "Issue.*",
+    "Severity:.*",
+    "Tested.*dependencies.*",
+    "Issues:.*",
+    "Error:.*",
+]
+max_lines = 80
+
+[snyk_monitor]
+match_command = "snyk.*monitor"
+strip_ansi = true
+keep_lines_matching = [
+    "Monitoring.*",
+    "Project:.*",
+    "Issues:.*",
+]
+max_lines = 20

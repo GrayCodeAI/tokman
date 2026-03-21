@@ -1,0 +1,29 @@
+# Vite dev server/bundler filter
+schema_version = 1
+
+[vite_dev]
+match_command = "vite|npx.*vite"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "watching for file changes.*",
+]
+keep_lines_matching = [
+    "VITE.*ready.*",
+    "Local:.*http://.*",
+    "Network:.*http://.*",
+    "ERROR.*",
+    "error.*",
+]
+max_lines = 15
+
+[vite_build]
+match_command = "vite.*build"
+strip_ansi = true
+keep_lines_matching = [
+    "vite.*built.*",
+    "✓.*built in.*",
+    "dist/.*",
+    "ERROR.*",
+]
+max_lines = 30

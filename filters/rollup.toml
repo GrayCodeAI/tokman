@@ -1,0 +1,29 @@
+# Rollup bundler filter
+schema_version = 1
+
+[rollup_build]
+match_command = "rollup|npx.*rollup"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+created.*",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "(!) .*",
+    "WARN.*",
+    "Build complete.*",
+    "chunks.*",
+    "Output:.*",
+]
+max_lines = 50
+
+[rollup_watch]
+match_command = "rollup.*--watch"
+strip_ansi = true
+keep_lines_matching = [
+    "Error:.*",
+    "Build complete.*",
+    "Watching for changes.*",
+]
+max_lines = 15

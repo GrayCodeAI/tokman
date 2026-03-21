@@ -1,0 +1,32 @@
+# Trivy security scanner filter
+schema_version = 1
+
+[trivy_scan]
+match_command = "trivy|trivy.*image|trivy.*fs"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s*┌.*",
+    "^\\s*│.*",
+    "^\\s*└.*",
+]
+keep_lines_matching = [
+    "CRITICAL.*",
+    "HIGH.*",
+    "MEDIUM.*",
+    "LOW.*",
+    "Total:.*",
+    "CVE-.*",
+    "Error:.*",
+]
+max_lines = 100
+
+[trivy_report]
+match_command = "trivy.*--format.*json"
+strip_ansi = true
+keep_lines_matching = [
+    "Report saved.*",
+    "Results:.*",
+    "Found.*vulnerabilities.*",
+]
+max_lines = 10

@@ -1,0 +1,27 @@
+# SWC compiler filter
+schema_version = 1
+
+[swc_compile]
+match_command = "swc|swcrc|npx.*swc"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "Compiling.*",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "error\\[.*\\]:.*",
+    "Successfully compiled.*",
+    "Output:.*",
+]
+max_lines = 50
+
+[swc_watch]
+match_command = "swc.*--watch"
+strip_ansi = true
+keep_lines_matching = [
+    "Error:.*",
+    "Compiled successfully.*",
+]
+max_lines = 20
+on_empty = "Watching for changes"
