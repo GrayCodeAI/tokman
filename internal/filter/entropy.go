@@ -3,6 +3,13 @@ package filter
 import (
 	"math"
 	"strings"
+	"sync"
+)
+
+// Cached token frequencies (initialized once, shared across all EntropyFilter instances)
+var (
+	cachedTokenFrequencies map[string]float64
+	tokenFrequenciesOnce   sync.Once
 )
 
 // EntropyFilter implements Selective Context compression (Mila/Guerin et al., 2023).
@@ -36,9 +43,17 @@ func NewEntropyFilterWithThreshold(threshold float64) *EntropyFilter {
 	}
 }
 
-// initTokenFrequencies returns common token frequencies
+// initTokenFrequencies returns common token frequencies (cached via sync.Once)
 // T31-T32: Expanded from ~150 to 500+ entries including code-specific tokens.
 func initTokenFrequencies() map[string]float64 {
+	tokenFrequenciesOnce.Do(func() {
+		cachedTokenFrequencies = buildTokenFrequencies()
+	})
+	return cachedTokenFrequencies
+}
+
+// buildTokenFrequencies builds the token frequency map
+func buildTokenFrequencies() map[string]float64 {
 	return map[string]float64{
 		// ============ ENGLISH COMMON WORDS ============
 		// Very common tokens (high frequency = low entropy = candidates for removal)

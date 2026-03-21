@@ -21,13 +21,22 @@ var (
 	initNoPatch   bool
 	initUninstall bool
 	initMode      string
-	initCursor    bool
-	initCopilot   bool
-	initWindsurf  bool
-	initCline     bool
-	initOpencode  bool
-	initGemini    bool
-	initCodex     bool
+	initAll       bool
+	// Existing agent flags
+	initCursor   bool
+	initCopilot  bool
+	initWindsurf bool
+	initCline    bool
+	initOpencode bool
+	initGemini   bool
+	initCodex    bool
+	// New agent flags
+	initAdaL     bool
+	initKiro     bool
+	initKilo     bool
+	initReplit   bool
+	initAider    bool
+	initContinue bool
 )
 
 // Embedded hook script
@@ -269,6 +278,38 @@ Examples:
 		if initCodex {
 			runCodexInit(initGlobal)
 		}
+
+		// New agent hooks
+		mode := PatchModeAsk
+		if initAutoPatch {
+			mode = PatchModeAuto
+		} else if initNoPatch {
+			mode = PatchModeSkip
+		}
+
+		if initAdaL {
+			runAdaLInit(initGlobal, mode)
+		}
+		if initKiro {
+			runKiroInit(initGlobal, mode)
+		}
+		if initKilo {
+			runKiloInit(initGlobal, mode)
+		}
+		if initReplit {
+			runReplitInit(initGlobal)
+		}
+		if initAider {
+			runAiderInit(initGlobal)
+		}
+		if initContinue {
+			runContinueInit(initGlobal)
+		}
+
+		// --all flag: detect and setup all installed agents
+		if initAll {
+			runAllAgentsInit(initGlobal, mode)
+		}
 	},
 }
 
@@ -279,6 +320,8 @@ func init() {
 	initCmd.Flags().BoolVar(&initNoPatch, "no-patch", false, "Skip settings.json patching (show manual instructions)")
 	initCmd.Flags().BoolVar(&initUninstall, "uninstall", false, "Remove TokMan from ~/.claude/")
 	initCmd.Flags().StringVar(&initMode, "mode", "minimal", "Filter mode: none, minimal, aggressive")
+	initCmd.Flags().BoolVar(&initAll, "all", false, "Setup all detected agents")
+	// Existing agent flags
 	initCmd.Flags().BoolVar(&initCursor, "cursor", false, "Install Cursor Agent hook")
 	initCmd.Flags().BoolVar(&initCopilot, "copilot", false, "Install GitHub Copilot hook + instructions")
 	initCmd.Flags().BoolVar(&initWindsurf, "windsurf", false, "Install Windsurf rules file")
@@ -286,6 +329,13 @@ func init() {
 	initCmd.Flags().BoolVar(&initOpencode, "opencode", false, "Install OpenCode plugin")
 	initCmd.Flags().BoolVar(&initGemini, "gemini", false, "Install Gemini CLI hook")
 	initCmd.Flags().BoolVar(&initCodex, "codex", false, "Configure Codex CLI integration")
+	// New agent flags
+	initCmd.Flags().BoolVar(&initAdaL, "adal", false, "Install AdaL (SylphAI) integration")
+	initCmd.Flags().BoolVar(&initKiro, "kiro", false, "Install Kiro integration")
+	initCmd.Flags().BoolVar(&initKilo, "kilo", false, "Install Kilo Code integration")
+	initCmd.Flags().BoolVar(&initReplit, "replit", false, "Install Replit Agent integration")
+	initCmd.Flags().BoolVar(&initAider, "aider", false, "Install Aider native integration")
+	initCmd.Flags().BoolVar(&initContinue, "continue", false, "Install Continue integration")
 }
 
 func runLocalInit() {
@@ -512,6 +562,24 @@ func runUninstall() {
 
 	// 6. Remove Codex artifacts
 	removed = append(removed, uninstallCodex()...)
+
+	// 7. Remove AdaL artifacts
+	removed = append(removed, uninstallAdaL()...)
+
+	// 8. Remove Kiro artifacts
+	removed = append(removed, uninstallKiro()...)
+
+	// 9. Remove Kilo artifacts
+	removed = append(removed, uninstallKilo()...)
+
+	// 10. Remove Replit artifacts
+	removed = append(removed, uninstallReplit()...)
+
+	// 11. Remove Aider artifacts
+	removed = append(removed, uninstallAider()...)
+
+	// 12. Remove Continue artifacts
+	removed = append(removed, uninstallContinue()...)
 
 	// Report results
 	fmt.Println()

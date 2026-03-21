@@ -103,8 +103,88 @@ var (
 		StatusFunc:  statusCodexCLI,
 	}
 
+	// AdaL - SylphAI's AI Agent
+	AdaL = Agent{
+		Name:        "adal",
+		DisplayName: "AdaL (SylphAI)",
+		BinaryName:  "adal",
+		ConfigPath:  "~/.adal/config",
+		DetectFunc:  detectAdaL,
+		SetupFunc:   setupAdaL,
+		StatusFunc:  statusAdaL,
+	}
+
+	// Kiro - AI coding agent
+	Kiro = Agent{
+		Name:        "kiro",
+		DisplayName: "Kiro",
+		BinaryName:  "kiro",
+		ConfigPath:  "~/.kilorc",
+		DetectFunc:  detectKiro,
+		SetupFunc:   setupKiro,
+		StatusFunc:  statusKiro,
+	}
+
+	// Kilo Code - AI coding agent
+	KiloCode = Agent{
+		Name:        "kilo-code",
+		DisplayName: "Kilo Code",
+		BinaryName:  "kilo",
+		ConfigPath:  "~/.kilorc",
+		DetectFunc:  detectKiloCode,
+		SetupFunc:   setupKiloCode,
+		StatusFunc:  statusKiloCode,
+	}
+
+	// Windsurf - Codeium's AI IDE
+	Windsurf = Agent{
+		Name:        "windsurf",
+		DisplayName: "Windsurf",
+		BinaryName:  "windsurf",
+		ConfigPath:  "~/.windsurf/settings.json",
+		DetectFunc:  detectWindsurf,
+		SetupFunc:   setupWindsurf,
+		StatusFunc:  statusWindsurf,
+	}
+
+	// Replit Agent - Cloud-based AI agent
+	ReplitAgent = Agent{
+		Name:        "replit-agent",
+		DisplayName: "Replit Agent",
+		BinaryName:  "replit",
+		ConfigPath:  ".replit",
+		DetectFunc:  detectReplitAgent,
+		SetupFunc:   setupReplitAgent,
+		StatusFunc:  statusReplitAgent,
+	}
+
+	// Gemini CLI - Google's Gemini CLI
+	GeminiCLI = Agent{
+		Name:        "gemini-cli",
+		DisplayName: "Gemini CLI",
+		BinaryName:  "gemini",
+		ConfigPath:  "~/.gemini/settings.json",
+		DetectFunc:  detectGeminiCLI,
+		SetupFunc:   setupGeminiCLI,
+		StatusFunc:  statusGeminiCLI,
+	}
+
+	// OpenCode - Open source AI coding agent
+	OpenCode = Agent{
+		Name:        "opencode",
+		DisplayName: "OpenCode",
+		BinaryName:  "opencode",
+		ConfigPath:  "~/.config/opencode/config.toml",
+		DetectFunc:  detectOpenCode,
+		SetupFunc:   setupOpenCode,
+		StatusFunc:  statusOpenCode,
+	}
+
 	// AllAgents is the list of supported agents
-	AllAgents = []Agent{ClaudeCode, Cursor, Cline, Continue, Aider, CodexCLI}
+	AllAgents = []Agent{
+		ClaudeCode, Cursor, Cline, Continue, Aider, CodexCLI,
+		AdaL, Kiro, KiloCode, Windsurf, ReplitAgent, GeminiCLI, OpenCode,
+	}
 )
 
 // === Detection Functions ===
@@ -180,6 +260,64 @@ func detectCodexCLI() bool {
 		return true
 	}
 	return configExists("~/.codex/config.json")
+}
+
+func detectAdaL() bool {
+	// Check for adal binary
+	if _, err := exec.LookPath("adal"); err == nil {
+		return true
+	}
+	// Check for ADAL_SESSION_ID env var
+	if os.Getenv("ADAL_SESSION_ID") != "" {
+		return true
+	}
+	// Check for config directory
+	return configExists("~/.adal/config")
+}
+
+func detectKiro() bool {
+	if _, err := exec.LookPath("kiro"); err == nil {
+		return true
+	}
+	return configExists("~/.kilorc")
+}
+
+func detectKiloCode() bool {
+	if _, err := exec.LookPath("kilo"); err == nil {
+		return true
+	}
+	return configExists("~/.kilorc")
+}
+
+func detectWindsurf() bool {
+	// Check for windsurf binary
+	if _, err := exec.LookPath("windsurf"); err == nil {
+		return true
+	}
+	// Check for Windsurf config directory
+	if runtime.GOOS == "darwin" {
+		return configExists("~/Library/Application Support/Windsurf/User/settings.json")
+	}
+	return configExists("~/.config/windsurf/User/settings.json")
+}
+
+func detectReplitAgent() bool {
+	// Replit Agent runs in the cloud, check for .replit file
+	return configExists(".replit")
+}
+
+func detectGeminiCLI() bool {
+	if _, err := exec.LookPath("gemini"); err == nil {
+		return true
+	}
+	return configExists("~/.gemini/settings.json")
+}
+
+func detectOpenCode() bool {
+	if _, err := exec.LookPath("opencode"); err == nil {
+		return true
+	}
+	return configExists("~/.config/opencode/config.toml")
 }
 
 // === Setup Functions ===
@@ -264,6 +402,144 @@ func setupCodexCLI() error {
 		},
 	}
 	return writeJSONConfig(filepath.Join(configDir, "config.json"), config)
+}
+
+func setupAdaL() error {
+	configDir := expandPath("~/.adal")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+
+	// AdaL uses YAML config with MCP tool support
+	config := `# AdaL Configuration with TokMan Integration
+# Token optimization enabled via tokman
+
+mcp:
+  servers:
+    tokman:
+      command: tokman
+      args: ["mcp", "serve"]
+      tools:
+        - compress
+        - status
+        - suggest
+
+optimization:
+  token_reduction: true
+  cache_enabled: true
+`
+	return os.WriteFile(filepath.Join(configDir, "config"), []byte(config), 0644)
+}
+
+func setupKiro() error {
+	// Kiro uses YAML config with lifecycle hooks
+	config := `# Kiro Configuration with TokMan Integration
+
+hooks:
+  preToolUse:
+    - matcher: "Bash"
+      command: "tokman rewrite"
+  
+optimization:
+  cacheEnabled: true
+  tokenBudget: 4000
+`
+	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0644)
+}
+
+func setupKiloCode() error {
+	// Kilo Code uses similar config to Kiro
+	config := `# Kilo Code Configuration with TokMan Integration
+
+hooks:
+  preToolUse:
+    - matcher: "Bash"
+      command: "tokman rewrite"
+  
+optimization:
+  cacheEnabled: true
+  tokenBudget: 4000
+`
+	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0644)
+}
+
+func setupWindsurf() error {
+	var configDir string
+	if runtime.GOOS == "darwin" {
+		configDir = expandPath("~/Library/Application Support/Windsurf/User")
+	} else {
+		configDir = expandPath("~/.config/windsurf/User")
+	}
+
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+
+	settings := map[string]interface{}{
+		"windsurf.ai.tokenOptimization": true,
+		"windsurf.ai.cacheEnabled":      true,
+	}
+	return writeJSONConfig(filepath.Join(configDir, "settings.json"), settings)
+}
+
+func setupReplitAgent() error {
+	// Replit Agent uses .replit file
+	config := `# Replit Configuration with TokMan Integration
+
+[agent]
+token_optimization = true
+
+[env]
+TOKMAN_ENABLED = "true"
+`
+	return os.WriteFile(".replit", []byte(config), 0644)
+}
+
+func setupGeminiCLI() error {
+	configDir := expandPath("~/.gemini")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+
+	// Gemini CLI uses hooks in settings.json
+	settings := map[string]interface{}{
+		"hooks": map[string]interface{}{
+			"BeforeTool": []interface{}{
+				map[string]interface{}{
+					"matcher": "run_shell_command",
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "tokman hook gemini",
+						},
+					},
+				},
+			},
+		},
+	}
+	return writeJSONConfig(filepath.Join(configDir, "settings.json"), settings)
+}
+
+func setupOpenCode() error {
+	configDir := expandPath("~/.config/opencode")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+
+	// OpenCode uses TOML config
+	config := `# OpenCode Configuration with TokMan Integration
+
+[tools.shell]
+command = "tokman proxy"
+
+[plugins]
+tokman = { enabled = true, path = "~/.config/opencode/plugins/tokman.ts" }
+
+[optimization]
+cache_enabled = true
+token_budget = 4000
+`
+	return os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(config), 0644)
 }
 
 // === Status Functions ===
@@ -373,6 +649,147 @@ func statusCodexCLI() (*AgentStatus, error) {
 	return status, nil
 }
 
+func statusAdaL() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "adal",
+		Installed:  detectAdaL(),
+		ConfigPath: expandPath("~/.adal/config"),
+	}
+
+	if !status.Installed {
+		return status, nil
+	}
+
+	// Check for ADAL_SESSION_ID to confirm active session
+	if os.Getenv("ADAL_SESSION_ID") != "" {
+		status.LastActive = "current session"
+	}
+
+	// Get version
+	if output, err := exec.Command("adal", "--version").Output(); err == nil {
+		status.Version = strings.TrimSpace(string(output))
+	}
+
+	status.Configured = configExists("~/.adal/config")
+
+	return status, nil
+}
+
+func statusKiro() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "kiro",
+		Installed:  detectKiro(),
+		ConfigPath: expandPath("~/.kilorc"),
+	}
+
+	if !status.Installed {
+		return status, nil
+	}
+
+	if output, err := exec.Command("kiro", "--version").Output(); err == nil {
+		status.Version = strings.TrimSpace(string(output))
+	}
+
+	status.Configured = configExists("~/.kilorc")
+
+	return status, nil
+}
+
+func statusKiloCode() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "kilo-code",
+		Installed:  detectKiloCode(),
+		ConfigPath: expandPath("~/.kilorc"),
+	}
+
+	if !status.Installed {
+		return status, nil
+	}
+
+	if output, err := exec.Command("kilo", "--version").Output(); err == nil {
+		status.Version = strings.TrimSpace(string(output))
+	}
+
+	status.Configured = configExists("~/.kilorc")
+
+	return status, nil
+}
+
+func statusWindsurf() (*AgentStatus, error) {
+	var configPath string
+	if runtime.GOOS == "darwin" {
+		configPath = "~/Library/Application Support/Windsurf/User/settings.json"
+	} else {
+		configPath = "~/.config/windsurf/User/settings.json"
+	}
+
+	status := &AgentStatus{
+		Name:       "windsurf",
+		Installed:  detectWindsurf(),
+		ConfigPath: expandPath(configPath),
+	}
+
+	if status.Installed {
+		status.Configured = configExists(configPath)
+	}
+
+	return status, nil
+}
+
+func statusReplitAgent() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "replit-agent",
+		Installed:  detectReplitAgent(),
+		ConfigPath: ".replit",
+	}
+
+	if status.Installed {
+		status.Configured = configExists(".replit")
+	}
+
+	return status, nil
+}
+
+func statusGeminiCLI() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "gemini-cli",
+		Installed:  detectGeminiCLI(),
+		ConfigPath: expandPath("~/.gemini/settings.json"),
+	}
+
+	if !status.Installed {
+		return status, nil
+	}
+
+	if output, err := exec.Command("gemini", "--version").Output(); err == nil {
+		status.Version = strings.TrimSpace(string(output))
+	}
+
+	status.Configured = configExists("~/.gemini/settings.json")
+
+	return status, nil
+}
+
+func statusOpenCode() (*AgentStatus, error) {
+	status := &AgentStatus{
+		Name:       "opencode",
+		Installed:  detectOpenCode(),
+		ConfigPath: expandPath("~/.config/opencode/config.toml"),
+	}
+
+	if !status.Installed {
+		return status, nil
+	}
+
+	if output, err := exec.Command("opencode", "--version").Output(); err == nil {
+		status.Version = strings.TrimSpace(string(output))
+	}
+
+	status.Configured = configExists("~/.config/opencode/config.toml")
+
+	return status, nil
+}
+
 // === Utility Functions ===
 
 func configExists(path string) bool {
@@ -478,6 +895,37 @@ pip install aider-chat
 pipx install aider-chat`,
 		"codex-cli": `# Install Codex CLI (if available)
 # Check OpenAI's documentation for installation instructions`,
+		"adal": `# Install AdaL (SylphAI's AI Agent)
+pip install adal-cli
+
+# Or with pipx:
+pipx install adal-cli
+
+# Configure:
+adal config --init`,
+		"kiro": `# Install Kiro
+# Check the official Kiro documentation for installation instructions
+# Typically: npm install -g @kiro/cli`,
+		"kilo-code": `# Install Kilo Code
+# Check the official Kilo Code documentation for installation instructions`,
+		"windsurf": `# Install Windsurf
+# Download from: https://codeium.com/windsurf
+
+# On Linux:
+wget https://windsurf.sh/download/linux -O windsurf.AppImage
+chmod +x windsurf.AppImage`,
+		"replit-agent": `# Replit Agent is cloud-based
+# No local installation needed
+# Create a Replit project and enable the Agent feature`,
+		"gemini-cli": `# Install Gemini CLI
+npm install -g @anthropic/gemini-cli
+
+# Or download from Google's official source`,
+		"opencode": `# Install OpenCode
+go install github.com/opencode-ai/opencode@latest
+
+# Or:
+npm install -g opencode-cli`,
 	}
 
 	if inst, ok := instructions[name]; ok {
@@ -489,10 +937,17 @@ pipx install aider-chat`,
 // GetAgentBinaryPath returns the path to an agent's binary
 func GetAgentBinaryPath(name string) string {
 	binaries := map[string]string{
-		"claude-code": "claude",
-		"cursor":      "cursor",
-		"aider":       "aider",
-		"codex-cli":   "codex",
+		"claude-code":   "claude",
+		"cursor":        "cursor",
+		"aider":         "aider",
+		"codex-cli":     "codex",
+		"adal":          "adal",
+		"kiro":          "kiro",
+		"kilo-code":     "kilo",
+		"windsurf":      "windsurf",
+		"replit-agent":  "replit",
+		"gemini-cli":    "gemini",
+		"opencode":      "opencode",
 	}
 
 	if bin, ok := binaries[name]; ok {

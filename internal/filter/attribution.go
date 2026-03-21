@@ -7,6 +7,9 @@ import (
 	"unicode"
 )
 
+// Pre-compiled regex for tokenization hot path
+var reTokenize = regexp.MustCompile(`\S+|\s+`)
+
 // AttributionFilter implements ProCut-style attribution-based token pruning.
 // Research basis: "ProCut: Progressive Pruning via Attribution" (LinkedIn, 2025)
 // Achieves 78% token reduction by using importance scoring.
@@ -25,26 +28,26 @@ type AttributionFilter struct {
 type AttributionConfig struct {
 	// Enable attribution filtering
 	Enabled bool
-	
+
 	// Threshold for token importance (0.0-1.0)
 	// Tokens below this score are candidates for removal
 	ImportanceThreshold float64
-	
+
 	// Minimum content length to apply attribution
 	MinContentLength int
-	
+
 	// Enable caching of importance scores
 	CacheEnabled bool
-	
+
 	// Use positional bias (later tokens often less important)
 	PositionalBias bool
-	
+
 	// Use frequency-based importance (repeated tokens may be less important)
 	FrequencyBias bool
-	
+
 	// Use semantic markers (preserve keywords, numbers, code)
 	SemanticPreservation bool
-	
+
 	// Maximum tokens to analyze (for performance)
 	MaxAnalyzeTokens int
 }
@@ -81,58 +84,58 @@ func (a *AttributionFilter) Apply(input string, mode Mode) (string, int) {
 	if !a.config.Enabled {
 		return input, 0
 	}
-	
+
 	// Skip short content
 	if len(input) < a.config.MinContentLength {
 		return input, 0
 	}
-	
+
 	originalTokens := EstimateTokens(input)
-	
+
 	// Tokenize for analysis
 	tokens := a.tokenize(input)
 	if len(tokens) < 10 {
 		return input, 0
 	}
-	
+
 	// Calculate importance scores
 	scores := a.calculateImportance(tokens, input)
-	
+
 	// Apply pruning based on mode
 	threshold := a.config.ImportanceThreshold
 	if mode == ModeAggressive {
 		threshold += 0.1
 	}
-	
+
 	// Build output with high-importance tokens
 	// Always preserve whitespace to maintain structure
 	var output strings.Builder
 	var keptTokens int
-	
+
 	for i, token := range tokens {
 		// Always preserve whitespace
 		if strings.TrimSpace(token.text) == "" {
 			output.WriteString(token.text)
 			continue
 		}
-		
+
 		score := scores[i]
-		
+
 		if score >= threshold || a.shouldPreserve(token.text) {
 			output.WriteString(token.text)
 			keptTokens++
 		}
 	}
-	
+
 	result := output.String()
 	finalTokens := EstimateTokens(result)
 	saved := originalTokens - finalTokens
-	
+
 	// Return original if result is empty or we didn't save much
 	if len(result) == 0 || saved < 5 {
 		return input, 0
 	}
-	
+
 	return result, saved
 }
 
@@ -146,11 +149,10 @@ type token struct {
 // tokenize splits content into tokens
 func (a *AttributionFilter) tokenize(content string) []token {
 	var tokens []token
-	
-	// Simple tokenization by words and punctuation
-	re := regexp.MustCompile(`\S+|\s+`)
-	matches := re.FindAllStringIndex(content, -1)
-	
+
+	// Use pre-compiled regex for tokenization
+	matches := reTokenize.FindAllStringIndex(content, -1)
+
 	for _, m := range matches {
 		tokens = append(tokens, token{
 			text:  content[m[0]:m[1]],
@@ -158,7 +160,7 @@ func (a *AttributionFilter) tokenize(content string) []token {
 			end:   m[1],
 		})
 	}
-	
+
 	return tokens
 }
 
@@ -166,17 +168,17 @@ func (a *AttributionFilter) tokenize(content string) []token {
 func (a *AttributionFilter) calculateImportance(tokens []token, content string) []float64 {
 	n := len(tokens)
 	scores := make([]float64, n)
-	
+
 	// Track token frequencies for frequency bias
 	freq := make(map[string]int)
 	for _, t := range tokens {
 		freq[strings.ToLower(strings.TrimSpace(t.text))]++
 	}
-	
+
 	// Track positions for positional bias
 	for i, t := range tokens {
 		var score float64
-		
+
 		// 1. Positional importance (introduction and conclusion are important)
 		if a.config.PositionalBias {
 			pos := float64(i) / float64(n)
@@ -187,7 +189,7 @@ func (a *AttributionFilter) calculateImportance(tokens []token, content string) 
 				score += 0.3 * (pos - 0.8) / 0.2
 			}
 		}
-		
+
 		// 2. Frequency-based importance (unique tokens are more important)
 		if a.config.FrequencyBias {
 			text := strings.ToLower(strings.TrimSpace(t.text))
@@ -197,22 +199,22 @@ func (a *AttributionFilter) calculateImportance(tokens []token, content string) 
 				score -= 0.1 // Very common token
 			}
 		}
-		
+
 		// 3. Semantic importance
 		if a.config.SemanticPreservation {
 			score += a.semanticScore(t.text)
 		}
-		
+
 		// 4. Length-based importance (very short tokens often less important)
 		if len(strings.TrimSpace(t.text)) <= 2 && !isPunctuation(t.text) {
 			score -= 0.1
 		}
-		
+
 		// Ensure score is in [0, 1] range
 		// Lower baseline so filler words can be pruned
 		scores[i] = math.Max(0, math.Min(1, 0.3+score))
 	}
-	
+
 	// Normalize scores
 	if n > 0 {
 		maxScore := 0.0
@@ -227,7 +229,7 @@ func (a *AttributionFilter) calculateImportance(tokens []token, content string) 
 			}
 		}
 	}
-	
+
 	return scores
 }
 
@@ -237,19 +239,19 @@ func (a *AttributionFilter) semanticScore(text string) float64 {
 	if len(text) == 0 {
 		return 0
 	}
-	
+
 	var score float64
-	
+
 	// Preserve numbers
 	if isNumber(text) {
 		score += 0.4
 	}
-	
+
 	// Preserve code symbols
 	if isCodeSymbol(text) {
 		score += 0.3
 	}
-	
+
 	// Preserve keywords
 	keywords := []string{
 		"error", "fail", "success", "done", "complete", "warning",
@@ -258,7 +260,7 @@ func (a *AttributionFilter) semanticScore(text string) float64 {
 		"true", "false", "null", "nil", "undefined",
 		"http", "api", "url", "id", "key", "token",
 	}
-	
+
 	lower := strings.ToLower(text)
 	for _, kw := range keywords {
 		if strings.Contains(lower, kw) {
@@ -266,39 +268,39 @@ func (a *AttributionFilter) semanticScore(text string) float64 {
 			break
 		}
 	}
-	
+
 	// Preserve file paths
 	if isFilePath(text) {
 		score += 0.4
 	}
-	
+
 	// Preserve URLs
 	if isURL(text) {
 		score += 0.4
 	}
-	
+
 	// Preserve important punctuation
 	if text == ":" || text == "=" || text == "->" || text == "=>" {
 		score += 0.2
 	}
-	
+
 	return score
 }
 
 // shouldPreserve returns true if token must be kept regardless of score
 func (a *AttributionFilter) shouldPreserve(text string) bool {
 	text = strings.TrimSpace(text)
-	
+
 	// Always preserve whitespace structure
 	if text == "\n\n" {
 		return true
 	}
-	
+
 	// Preserve code blocks
 	if strings.HasPrefix(text, "```") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -370,11 +372,11 @@ func (a *AttributionFilter) SetEnabled(enabled bool) {
 // GetStats returns filter statistics
 func (a *AttributionFilter) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"enabled":       a.config.Enabled,
-		"threshold":     a.config.ImportanceThreshold,
-		"cache_size":    len(a.cache),
-		"positional":    a.config.PositionalBias,
-		"frequency":     a.config.FrequencyBias,
-		"semantic":      a.config.SemanticPreservation,
+		"enabled":    a.config.Enabled,
+		"threshold":  a.config.ImportanceThreshold,
+		"cache_size": len(a.cache),
+		"positional": a.config.PositionalBias,
+		"frequency":  a.config.FrequencyBias,
+		"semantic":   a.config.SemanticPreservation,
 	}
 }

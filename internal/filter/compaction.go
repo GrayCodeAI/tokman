@@ -13,6 +13,24 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/llm"
 )
 
+// Pre-compiled regexes for compaction hot paths (avoid per-call compilation)
+var (
+	// extractCritical patterns
+	reCriticalError = regexp.MustCompile(`(?i)(error|failed|exception)[:：]\s*(.+)`)
+	reCriticalFile  = regexp.MustCompile(`(?i)(file|path)[:：]\s*(.+)`)
+	reCriticalTodo  = regexp.MustCompile(`(?i)(todo|fixme|important|note)[:：]\s*(.+)`)
+
+	// extractKeyValuePairs patterns
+	reKVGeneral = regexp.MustCompile(`(?i)(\w+)\s*[:：=]\s*([^\n]+)`)
+	reKVDQuoted = regexp.MustCompile(`(?i)"(\w+)":\s*"([^"]+)"`)
+	reKVSQuoted = regexp.MustCompile(`(?i)'(\w+)':\s*'([^']+)'`)
+
+	// inferNextAction patterns
+	reNextColon  = regexp.MustCompile(`next[:：]\s*(.+)`)
+	reThenAction = regexp.MustCompile(`then\s+(.+)`)
+	reProceedTo  = regexp.MustCompile(`proceed\s+to\s+(.+)`)
+)
+
 // CompactionLayer provides semantic compression for chat/conversation content.
 // It creates state snapshots with 4 sections:
 //
@@ -686,29 +704,17 @@ func (c *CompactionLayer) summarizeTurn(content string) string {
 func (c *CompactionLayer) extractCritical(content string) []string {
 	var critical []string
 
-	// Patterns for critical information
-	patterns := []struct {
-		regex   string
-		extract func(matches []string) string
-	}{
-		{
-			regex:   `(?i)(error|failed|exception)[:：]\s*(.+)`,
-			extract: func(m []string) string { return m[1] + ": " + m[2] },
-		},
-		{
-			regex:   `(?i)(file|path)[:：]\s*(.+)`,
-			extract: func(m []string) string { return "file: " + m[2] },
-		},
-		{
-			regex:   `(?i)(todo|fixme|important|note)[:：]\s*(.+)`,
-			extract: func(m []string) string { return m[1] + ": " + m[2] },
-		},
+	// Use pre-compiled regexes for critical patterns
+	criticalRes := []*regexp.Regexp{reCriticalError, reCriticalFile, reCriticalTodo}
+	criticalExtracts := []func(m []string) string{
+		func(m []string) string { return m[1] + ": " + m[2] },
+		func(m []string) string { return "file: " + m[2] },
+		func(m []string) string { return m[1] + ": " + m[2] },
 	}
 
-	for _, p := range patterns {
-		re := regexp.MustCompile(p.regex)
+	for i, re := range criticalRes {
 		if matches := re.FindStringSubmatch(content); matches != nil {
-			critical = append(critical, p.extract(matches))
+			critical = append(critical, criticalExtracts[i](matches))
 		}
 	}
 
@@ -719,15 +725,9 @@ func (c *CompactionLayer) extractCritical(content string) []string {
 func (c *CompactionLayer) extractKeyValuePairs(content string) map[string]string {
 	kv := make(map[string]string)
 
-	// Common key-value patterns
-	patterns := []string{
-		`(?i)(\w+)\s*[:：=]\s*([^\n]+)`,
-		`(?i)"(\w+)":\s*"([^"]+)"`,
-		`(?i)'(\w+)':\s*'([^']+)'`,
-	}
-
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
+	// Use pre-compiled regexes for KV patterns
+	kvRes := []*regexp.Regexp{reKVGeneral, reKVDQuoted, reKVSQuoted}
+	for _, re := range kvRes {
 		matches := re.FindAllStringSubmatch(content, -1)
 		for _, m := range matches {
 			if len(m) >= 3 {
@@ -798,16 +798,11 @@ func (c *CompactionLayer) extractFocus(content string) string {
 func (c *CompactionLayer) inferNextAction(content string) string {
 	lower := strings.ToLower(content)
 
-	// Pattern-based inference
+	// Pattern-based inference using pre-compiled regexes
 	if strings.Contains(lower, "next") || strings.Contains(lower, "then") {
 		// Extract what follows
-		patterns := []string{
-			`next[:：]\s*(.+)`,
-			`then\s+(.+)`,
-			`proceed\s+to\s+(.+)`,
-		}
-		for _, p := range patterns {
-			re := regexp.MustCompile(p)
+		nextRes := []*regexp.Regexp{reNextColon, reThenAction, reProceedTo}
+		for _, re := range nextRes {
 			if matches := re.FindStringSubmatch(lower); matches != nil {
 				return strings.TrimSpace(matches[1])
 			}
