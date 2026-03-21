@@ -3,6 +3,7 @@ package filter
 import (
 	"bufio"
 	"container/heap"
+	"math"
 	"strings"
 )
 
@@ -331,12 +332,16 @@ func (h *H2OFilter) tokenize(content string) []h2oToken {
 // isWordChar is defined in ngram.go
 
 // calculateImportance calculates importance scores for each token
-// Simulates attention patterns without actual model
+// T13: Improved attention score simulation using:
+// 1. TF-IDF style weighting
+// 2. Local attention patterns (nearby tokens influence each other)
+// 3. Positional attention decay
+// 4. Structural importance scoring
 func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []float64 {
 	n := len(tokens)
 	scores := make([]float64, n)
 
-	// Track word frequency
+	// Track word frequency (document frequency)
 	freq := make(map[string]int)
 	for _, t := range tokens {
 		word := strings.ToLower(strings.TrimSpace(t.text))
@@ -345,7 +350,15 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 		}
 	}
 
-	// Track position weights
+	// Calculate IDF-like weights (rare words are more important)
+	totalWords := float64(len(freq))
+	idf := make(map[string]float64)
+	for word, count := range freq {
+		// IDF formula: log(N/df)
+		idf[word] = math.Log(totalWords / float64(count))
+	}
+
+	// Track position weights with improved attention simulation
 	for i, t := range tokens {
 		// Skip whitespace in scoring
 		if isWhitespace(t.text) {
@@ -354,24 +367,50 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 		}
 
 		var score float64
-
-		// 1. Positional importance (sinks and end)
-		pos := float64(i) / float64(n)
-
-		// Sinks: first few tokens get high scores
-		if i < h.config.SinkSize {
-			score += 1.0 - float64(i)/float64(h.config.SinkSize)*0.5
-		}
-
-		// Recent tokens: last portion gets boost
-		if pos > 0.8 {
-			score += 0.5 * (pos - 0.8) / 0.2
-		}
-
-		// 2. Semantic importance
 		word := strings.ToLower(t.text)
 
-		// Important keywords
+		// 1. Positional attention (sinks and recent)
+		pos := float64(i) / float64(n)
+
+		// Sinks: first few tokens get high scores (attention sink pattern)
+		if i < h.config.SinkSize {
+			score += 1.5 - float64(i)/float64(h.config.SinkSize)*0.5
+		}
+
+		// Recent tokens: last portion gets boost (local attention window)
+		if pos > 0.8 {
+			score += 0.6 * (pos - 0.8) / 0.2
+		}
+
+		// 2. TF-IDF style importance
+		if idfWeight, exists := idf[word]; exists {
+			tf := float64(freq[word]) / float64(n)
+			score += tf * idfWeight * 0.3 // Scale factor
+		}
+
+		// 3. Local attention pattern (tokens near high-scoring tokens get boost)
+		// Simulate how attention spreads to nearby context
+		windowSize := 5
+		start := i - windowSize
+		if start < 0 {
+			start = 0
+		}
+		end := i + windowSize
+		if end > n {
+			end = n
+		}
+		localDensity := 0.0
+		for j := start; j < end; j++ {
+			if j != i && !isWhitespace(tokens[j].text) {
+				localDensity += 1.0
+			}
+		}
+		// Dense regions often contain important code/data
+		if localDensity > float64(windowSize)*0.7 {
+			score += 0.2
+		}
+
+		// 4. Semantic importance (enhanced keyword matching)
 		keywords := []string{
 			"error", "fail", "warning", "success", "done", "complete",
 			"file", "path", "line", "function", "class", "method",
@@ -381,17 +420,17 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 		}
 		for _, kw := range keywords {
 			if strings.Contains(word, kw) {
-				score += 0.4
+				score += 0.5
 				break
 			}
 		}
 
-		// Numbers are important
+		// 5. Numbers are important (IDs, line numbers, values)
 		if isNumeric(t.text) {
-			score += 0.5
+			score += 0.6
 		}
 
-		// File paths and URLs (check if looks like part of a path)
+		// 6. File paths and URLs using SIMD-optimized detection
 		if isFilePath(t.text) || isURL(t.text) {
 			score += 0.8
 		}
@@ -399,7 +438,8 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 		if strings.Contains(t.text, "/") || strings.Contains(t.text, "\\") {
 			score += 0.7
 		}
-		// File extensions
+
+		// 7. File extensions
 		for _, ext := range []string{".go", ".py", ".js", ".ts", ".json", ".yaml", ".yml", ".toml", ".md"} {
 			if strings.HasSuffix(t.text, ext) {
 				score += 0.7
@@ -407,25 +447,25 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 			}
 		}
 
-		// Code symbols
+		// 8. Code symbols using SIMD check
 		if isCodeSymbol(t.text) {
 			score += 0.3
 		}
 
-		// 3. Frequency-based (unique words are often important)
+		// 9. Uniqueness boost (hapax legomena are often important)
 		if freq[word] == 1 && len(word) > 3 {
-			score += 0.2
+			score += 0.35
 		} else if freq[word] > 5 {
-			// Very common words get slight penalty
-			score -= 0.1
+			// Very common words get penalty
+			score -= 0.15
 		}
 
-		// 4. Structural markers
+		// 10. Structural markers
 		if strings.HasSuffix(t.text, ":") || strings.HasSuffix(t.text, "=") {
-			score += 0.3
+			score += 0.35
 		}
 
-		// 5. Length-based (very short tokens often less important)
+		// 11. Length-based adjustment
 		if len(t.text) <= 2 && !isCodeSymbol(t.text) && !isNumeric(t.text) {
 			score -= 0.15
 		}
