@@ -76,6 +76,24 @@ type PipelineCoordinator struct {
 
 	// Layer 14: Attention Sink Filter (StreamingLLM-style)
 	attentionSinkFilter *AttentionSinkFilter
+
+	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
+	metaTokenFilter *MetaTokenFilter
+
+	// Layer 16: Semantic Chunk Filter (ChunkKV style)
+	semanticChunkFilter *SemanticChunkFilter
+
+	// Layer 17: Sketch-based Reversible Store (KVReviver style)
+	sketchStoreFilter *SketchStoreFilter
+
+	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
+	lazyPrunerFilter *LazyPrunerFilter
+
+	// Layer 19: Semantic-Anchor Compression (SAC style)
+	semanticAnchorFilter *SemanticAnchorFilter
+
+	// Layer 20: Agent Memory Mode (Focus-inspired)
+	agentMemoryFilter *AgentMemoryFilter
 }
 
 // PipelineConfig holds configuration for the compression pipeline
@@ -136,6 +154,40 @@ type PipelineConfig struct {
 	EnableAttentionSink  bool
 	AttentionSinkCount   int
 	AttentionRecentCount int
+
+	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
+	EnableMetaToken  bool
+	MetaTokenWindow  int
+	MetaTokenMinSize int
+
+	// Layer 16: Semantic Chunk Filter (ChunkKV style)
+	EnableSemanticChunk    bool
+	SemanticChunkMethod    string // "auto", "code", "text", "mixed"
+	SemanticChunkMinSize   int
+	SemanticChunkThreshold float64
+
+	// Layer 17: Sketch-based Reversible Store (KVReviver style)
+	EnableSketchStore  bool
+	SketchBudgetRatio  float64
+	SketchMaxSize      int
+	SketchHeavyHitter  float64
+
+	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
+	EnableLazyPruner   bool
+	LazyBaseBudget     int
+	LazyDecayRate      float64
+	LazyRevivalBudget  int
+
+	// Layer 19: Semantic-Anchor Compression (SAC style)
+	EnableSemanticAnchor bool
+	SemanticAnchorRatio  float64
+	SemanticAnchorSpacing int
+
+	// Layer 20: Agent Memory Mode (Focus-inspired)
+	EnableAgentMemory       bool
+	AgentKnowledgeRetention float64
+	AgentHistoryPrune       float64
+	AgentConsolidationMax   int
 }
 
 // NewPipelineCoordinator creates a new 10-layer pipeline coordinator.
@@ -270,6 +322,87 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 		}
 	}
 
+	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
+	if cfg.EnableMetaToken {
+		metaCfg := DefaultMetaTokenConfig()
+		if cfg.MetaTokenWindow > 0 {
+			metaCfg.WindowSize = cfg.MetaTokenWindow
+		}
+		if cfg.MetaTokenMinSize > 0 {
+			metaCfg.MinPattern = cfg.MetaTokenMinSize
+		}
+		p.metaTokenFilter = NewMetaTokenFilterWithConfig(metaCfg)
+	}
+
+	// Layer 16: Semantic Chunk Filter (ChunkKV style)
+	if cfg.EnableSemanticChunk {
+		semanticCfg := DefaultSemanticChunkConfig()
+		if cfg.SemanticChunkMinSize > 0 {
+			semanticCfg.MinChunkSize = cfg.SemanticChunkMinSize
+		}
+		if cfg.SemanticChunkThreshold > 0 {
+			semanticCfg.ImportanceThreshold = cfg.SemanticChunkThreshold
+		}
+		p.semanticChunkFilter = NewSemanticChunkFilterWithConfig(semanticCfg)
+	}
+
+	// Layer 17: Sketch-based Reversible Store (KVReviver style)
+	if cfg.EnableSketchStore {
+		sketchCfg := DefaultSketchStoreConfig()
+		if cfg.SketchBudgetRatio > 0 {
+			sketchCfg.BudgetRatio = cfg.SketchBudgetRatio
+		}
+		if cfg.SketchMaxSize > 0 {
+			sketchCfg.MaxSketchSize = cfg.SketchMaxSize
+		}
+		if cfg.SketchHeavyHitter > 0 {
+			sketchCfg.HeavyHitterRatio = cfg.SketchHeavyHitter
+		}
+		p.sketchStoreFilter = NewSketchStoreFilterWithConfig(sketchCfg)
+	}
+
+	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
+	if cfg.EnableLazyPruner {
+		lazyCfg := DefaultLazyPrunerConfig()
+		if cfg.LazyBaseBudget > 0 {
+			lazyCfg.BaseBudget = cfg.LazyBaseBudget
+		}
+		if cfg.LazyDecayRate > 0 {
+			lazyCfg.DecayRate = cfg.LazyDecayRate
+		}
+		if cfg.LazyRevivalBudget > 0 {
+			lazyCfg.RevivalBudget = cfg.LazyRevivalBudget
+		}
+		p.lazyPrunerFilter = NewLazyPrunerFilterWithConfig(lazyCfg)
+	}
+
+	// Layer 19: Semantic-Anchor Compression (SAC style)
+	if cfg.EnableSemanticAnchor {
+		anchorCfg := DefaultSemanticAnchorConfig()
+		if cfg.SemanticAnchorRatio > 0 {
+			anchorCfg.AnchorRatio = cfg.SemanticAnchorRatio
+		}
+		if cfg.SemanticAnchorSpacing > 0 {
+			anchorCfg.MinAnchorSpacing = cfg.SemanticAnchorSpacing
+		}
+		p.semanticAnchorFilter = NewSemanticAnchorFilterWithConfig(anchorCfg)
+	}
+
+	// Layer 20: Agent Memory Mode (Focus-inspired)
+	if cfg.EnableAgentMemory {
+		agentCfg := DefaultAgentMemoryConfig()
+		if cfg.AgentKnowledgeRetention > 0 {
+			agentCfg.KnowledgeRetentionRatio = cfg.AgentKnowledgeRetention
+		}
+		if cfg.AgentHistoryPrune > 0 {
+			agentCfg.HistoryPruneRatio = cfg.AgentHistoryPrune
+		}
+		if cfg.AgentConsolidationMax > 0 {
+			agentCfg.KnowledgeMaxSize = cfg.AgentConsolidationMax
+		}
+		p.agentMemoryFilter = NewAgentMemoryFilterWithConfig(agentCfg)
+	}
+
 	return p
 }
 
@@ -390,6 +523,39 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	// Layer 14: Attention Sink Filter (StreamingLLM-style)
 	if p.attentionSinkFilter != nil {
 		output = p.processLayer14(output, stats)
+		if p.shouldEarlyExit(stats) {
+			return output, p.finalizeStats(stats, output)
+		}
+	}
+
+	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
+	if p.metaTokenFilter != nil {
+		output = p.processLayer15(output, stats)
+	}
+
+	// Layer 16: Semantic Chunk Filter (ChunkKV style)
+	if p.semanticChunkFilter != nil {
+		output = p.processLayer16(output, stats)
+	}
+
+	// Layer 17: Sketch-based Reversible Store (KVReviver style)
+	if p.sketchStoreFilter != nil {
+		output = p.processLayer17(output, stats)
+	}
+
+	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
+	if p.lazyPrunerFilter != nil {
+		output = p.processLayer18(output, stats)
+	}
+
+	// Layer 19: Semantic-Anchor Compression (SAC style)
+	if p.semanticAnchorFilter != nil {
+		output = p.processLayer19(output, stats)
+	}
+
+	// Layer 20: Agent Memory Mode (Focus-inspired)
+	if p.agentMemoryFilter != nil {
+		output = p.processLayer20(output, stats)
 	}
 
 	// Layer 10: Budget Enforcement (Strict token limits)
@@ -538,6 +704,54 @@ func (p *PipelineCoordinator) processLayer14(input string, stats *PipelineStats)
 	return output
 }
 
+// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
+func (p *PipelineCoordinator) processLayer15(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.metaTokenFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["15_meta_token"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// Layer 16: Semantic Chunk Filter (ChunkKV style)
+func (p *PipelineCoordinator) processLayer16(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.semanticChunkFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["16_semantic_chunk"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// Layer 17: Sketch-based Reversible Store (KVReviver style)
+func (p *PipelineCoordinator) processLayer17(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.sketchStoreFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["17_sketch_store"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
+func (p *PipelineCoordinator) processLayer18(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.lazyPrunerFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["18_lazy_pruner"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// Layer 19: Semantic-Anchor Compression (SAC style)
+func (p *PipelineCoordinator) processLayer19(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.semanticAnchorFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["19_semantic_anchor"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// Layer 20: Agent Memory Mode (Focus-inspired)
+func (p *PipelineCoordinator) processLayer20(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.agentMemoryFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["20_agent_memory"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
 // Layer 10: Budget Enforcement
 func (p *PipelineCoordinator) processLayer10(input string, stats *PipelineStats) string {
 	output := input
@@ -595,7 +809,9 @@ func (s *PipelineStats) String() string {
 	layerOrder := []string{
 		"1_entropy", "2_perplexity", "3_goal_driven", "4_ast_preserve",
 		"5_contrastive", "6_ngram", "7_evaluator", "8_gist", "9_hierarchical",
-		"neural", "11_compaction", "12_attribution", "13_h2o", "10_session", "10_budget",
+		"neural", "11_compaction", "12_attribution", "13_h2o", "14_attention_sink",
+		"15_meta_token", "16_semantic_chunk", "17_sketch_store", "18_lazy_pruner",
+		"19_semantic_anchor", "20_agent_memory", "10_session", "10_budget",
 	}
 
 	for _, layer := range layerOrder {
@@ -619,6 +835,12 @@ func QuickProcess(input string, mode Mode) (string, int) {
 		EnableAttribution:   true,
 		EnableH2O:           true,
 		EnableAttentionSink: true,
+		EnableMetaToken:     true,
+		EnableSemanticChunk: true,
+		EnableSketchStore:   true,
+		EnableLazyPruner:    true,
+		EnableSemanticAnchor: true,
+		EnableAgentMemory:   true,
 	})
 
 	output, stats := p.Process(input)
@@ -636,6 +858,12 @@ func QuickProcessWithBudget(input string, mode Mode, budget int) (string, int) {
 		EnableAttribution:   true,
 		EnableH2O:           true,
 		EnableAttentionSink: true,
+		EnableMetaToken:     true,
+		EnableSemanticChunk: true,
+		EnableSketchStore:   true,
+		EnableLazyPruner:    true,
+		EnableSemanticAnchor: true,
+		EnableAgentMemory:   true,
 	})
 
 	output, stats := p.Process(input)
@@ -653,6 +881,12 @@ func QuickProcessWithQuery(input string, mode Mode, query string) (string, int) 
 		EnableAttribution:   true,
 		EnableH2O:           true,
 		EnableAttentionSink: true,
+		EnableMetaToken:     true,
+		EnableSemanticChunk: true,
+		EnableSketchStore:   true,
+		EnableLazyPruner:    true,
+		EnableSemanticAnchor: true,
+		EnableAgentMemory:   true,
 	})
 
 	output, stats := p.Process(input)
@@ -672,6 +906,12 @@ func QuickProcessFull(input string, mode Mode, query string, budget int, llmEnab
 		EnableAttribution:   true,
 		EnableH2O:           true,
 		EnableAttentionSink: true,
+		EnableMetaToken:     true,
+		EnableSemanticChunk: true,
+		EnableSketchStore:   true,
+		EnableLazyPruner:    true,
+		EnableSemanticAnchor: true,
+		EnableAgentMemory:   true,
 	})
 
 	output, stats := p.Process(input)
