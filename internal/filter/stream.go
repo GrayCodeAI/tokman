@@ -41,7 +41,7 @@ func (s *StreamingProcessor) Write(data []byte) (int, error) {
 		// Process and clear buffer
 		content := s.buffer.String()
 		s.buffer.Reset()
-		
+
 		// Apply compression
 		compressed, _ := s.coordinator.Process(content)
 		// Return compressed content via callback or channel
@@ -105,21 +105,21 @@ func (w *StreamingWriter) Close() error {
 
 // StreamChunk represents a chunk of streaming content with metadata
 type StreamChunk struct {
-	Content     string
+	Content      string
 	IsCompressed bool
-	TokensSaved int
+	TokensSaved  int
 }
 
 // StreamChannel creates a channel-based streaming processor
 func StreamChannel(config PipelineConfig) (chan<- string, <-chan StreamChunk) {
 	input := make(chan string, 100)
 	output := make(chan StreamChunk, 100)
-	
+
 	processor := NewStreamingProcessor(config)
-	
+
 	go func() {
 		defer close(output)
-		
+
 		for content := range input {
 			compressed, stats := processor.coordinator.Process(content)
 			output <- StreamChunk{
@@ -128,15 +128,15 @@ func StreamChannel(config PipelineConfig) (chan<- string, <-chan StreamChunk) {
 				TokensSaved:  stats.TotalSaved,
 			}
 		}
-		
+
 		// Flush remaining
 		if remaining := processor.Flush(); remaining != "" {
 			output <- StreamChunk{
-				Content: remaining,
+				Content:      remaining,
 				IsCompressed: false,
 			}
 		}
 	}()
-	
+
 	return input, output
 }

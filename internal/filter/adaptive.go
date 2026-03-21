@@ -8,17 +8,17 @@ import (
 // Uses heuristic analysis to optimize compression for different input patterns.
 type AdaptiveLayerSelector struct {
 	// Thresholds for content type detection
-	codeThreshold      float64
-	logThreshold       float64
+	codeThreshold         float64
+	logThreshold          float64
 	conversationThreshold float64
 }
 
 // NewAdaptiveLayerSelector creates a new adaptive selector
 func NewAdaptiveLayerSelector() *AdaptiveLayerSelector {
 	return &AdaptiveLayerSelector{
-		codeThreshold:          0.15,
-		logThreshold:           0.3,
-		conversationThreshold:  0.2,
+		codeThreshold:         0.15,
+		logThreshold:          0.3,
+		conversationThreshold: 0.2,
 	}
 }
 

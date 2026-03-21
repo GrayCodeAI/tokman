@@ -36,17 +36,17 @@ func init() {
 
 func runLayers(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	
+
 	fmt.Println("╔═══════════════════════════════════════════════════════════════════════╗")
 	fmt.Println("║           TOKMAN 10-LAYER COMPRESSION PIPELINE                        ║")
 	fmt.Println("╠═══════════════════════════════════════════════════════════════════════╣")
-	
+
 	layers := []struct {
-		num       int
-		name      string
-		research  string
+		num         int
+		name        string
+		research    string
 		compression string
-		desc      string
+		desc        string
 	}{
 		{1, "Entropy Filtering", "Selective Context (Mila 2023)", "2-3x",
 			"Removes low-information tokens based on entropy scores. Tokens that appear frequently with little variation are pruned."},
@@ -69,7 +69,7 @@ func runLayers(cmd *cobra.Command, args []string) {
 		{10, "Budget Enforcement", "Industry Standard", "Guaranteed",
 			"Strict token limit enforcement with intelligent truncation preserving critical content."},
 	}
-	
+
 	for _, l := range layers {
 		fmt.Printf("║ Layer %d: %-20s %-15s          ║\n", l.num, l.name, "("+l.compression+")")
 		fmt.Printf("║   Research: %-56s ║\n", l.research)
@@ -78,7 +78,7 @@ func runLayers(cmd *cobra.Command, args []string) {
 		}
 		fmt.Println("╟───────────────────────────────────────────────────────────────────────╢")
 	}
-	
+
 	fmt.Println("║ PIPELINE ORDER:                                                       ║")
 	fmt.Println("║   Statistical → Semantic → Structural → Budget                       ║")
 	fmt.Println("║                                                                       ║")
@@ -89,7 +89,7 @@ func runLayers(cmd *cobra.Command, args []string) {
 	fmt.Println("║   • Configurable layer thresholds                                     ║")
 	fmt.Println("║   • Cache for repeated compressions                                  ║")
 	fmt.Println("╚═══════════════════════════════════════════════════════════════════════╝")
-	
+
 	if !verbose {
 		fmt.Println("\n💡 Use --verbose for detailed algorithm explanations")
 	}
@@ -99,11 +99,11 @@ func wrapText(s string, width int) string {
 	if len(s) <= width {
 		return s
 	}
-	
+
 	var result string
 	words := splitWords(s)
 	lineLen := 0
-	
+
 	for _, word := range words {
 		if lineLen+len(word) > width {
 			result += "║   " + word
@@ -116,7 +116,7 @@ func wrapText(s string, width int) string {
 			lineLen += len(word) + 1
 		}
 	}
-	
+
 	return result
 }
 

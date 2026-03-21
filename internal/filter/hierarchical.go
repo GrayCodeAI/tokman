@@ -26,8 +26,8 @@ type HierarchicalFilter struct {
 // NewHierarchicalFilter creates a new hierarchical summarization filter.
 func NewHierarchicalFilter() *HierarchicalFilter {
 	return &HierarchicalFilter{
-		lineThreshold:      500,  // 500 lines = ~10K tokens
-		maxDepth:           3,    // 3 levels: overview, summary, detail
+		lineThreshold:      500, // 500 lines = ~10K tokens
+		maxDepth:           3,   // 3 levels: overview, summary, detail
 		useSemanticScoring: true,
 	}
 }
@@ -41,29 +41,29 @@ func (f *HierarchicalFilter) Name() string {
 func (f *HierarchicalFilter) Apply(input string, mode Mode) (string, int) {
 	lines := strings.Split(input, "\n")
 	lineCount := len(lines)
-	
+
 	// Don't process small outputs
 	if lineCount < f.lineThreshold {
 		return input, 0
 	}
-	
+
 	// Segment into logical sections
 	sections := f.segmentIntoSections(lines)
 	if len(sections) == 0 {
 		return input, 0
 	}
-	
+
 	// Score each section
 	scored := f.scoreSections(sections)
-	
+
 	// Build hierarchical output based on mode
 	output := f.buildHierarchicalOutput(scored, mode, lineCount)
-	
+
 	tokensSaved := EstimateTokens(input) - EstimateTokens(output)
 	if tokensSaved < 0 {
 		tokensSaved = 0
 	}
-	
+
 	return output, tokensSaved
 }
 
@@ -83,13 +83,13 @@ func (f *HierarchicalFilter) segmentIntoSections(lines []string) []section {
 	var currentSection []string
 	sectionStart := 0
 	currentLevel := 0
-	
+
 	for i, line := range lines {
 		level := f.detectSectionLevel(line)
-		
+
 		// Check for section boundary
 		isBoundary := f.isSectionBoundary(line, i, lines)
-		
+
 		if isBoundary && len(currentSection) > 0 {
 			// Save current section
 			sections = append(sections, section{
@@ -102,10 +102,10 @@ func (f *HierarchicalFilter) segmentIntoSections(lines []string) []section {
 			sectionStart = i
 			currentLevel = level
 		}
-		
+
 		currentSection = append(currentSection, line)
 	}
-	
+
 	// Add final section
 	if len(currentSection) > 0 {
 		sections = append(sections, section{
@@ -115,66 +115,66 @@ func (f *HierarchicalFilter) segmentIntoSections(lines []string) []section {
 			level:     currentLevel,
 		})
 	}
-	
+
 	return sections
 }
 
 // detectSectionLevel determines the nesting level of a section
 func (f *HierarchicalFilter) detectSectionLevel(line string) int {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Headers and dividers indicate top-level sections
 	if strings.HasPrefix(trimmed, "===") ||
 		strings.HasPrefix(trimmed, "---") ||
 		strings.HasPrefix(trimmed, "##") {
 		return 0
 	}
-	
+
 	// Subsection markers
 	if strings.HasPrefix(trimmed, "---") ||
 		strings.HasPrefix(trimmed, "###") {
 		return 1
 	}
-	
+
 	return 2 // Default to detail level
 }
 
 // isSectionBoundary detects if a line starts a new section
 func (f *HierarchicalFilter) isSectionBoundary(line string, idx int, lines []string) bool {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Visual dividers
 	if strings.HasPrefix(trimmed, "===") ||
 		strings.HasPrefix(trimmed, "---") ||
 		strings.HasPrefix(trimmed, "+++") {
 		return true
 	}
-	
+
 	// Markdown headers
 	if strings.HasPrefix(trimmed, "#") {
 		return true
 	}
-	
+
 	// Test output boundaries
 	if strings.Contains(trimmed, "test result:") ||
 		strings.Contains(trimmed, "running ") && strings.Contains(trimmed, " tests") {
 		return true
 	}
-	
+
 	// Build phase boundaries
 	if strings.Contains(trimmed, "Compiling ") ||
 		strings.Contains(trimmed, "Building ") ||
 		strings.Contains(trimmed, "Finished ") {
 		return true
 	}
-	
+
 	// File markers (git diff, error messages)
 	if strings.HasPrefix(trimmed, "diff --git") ||
 		strings.Contains(trimmed, "error[") ||
 		strings.Contains(trimmed, "error: ") {
 		return true
 	}
-	
+
 	// Empty line after substantial content
 	if trimmed == "" && idx > 0 && idx < len(lines)-1 {
 		prevTrimmed := strings.TrimSpace(lines[idx-1])
@@ -186,7 +186,7 @@ func (f *HierarchicalFilter) isSectionBoundary(line string, idx int, lines []str
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -199,14 +199,14 @@ func (f *HierarchicalFilter) scoreSections(sections []section) []section {
 		}
 		return sections
 	}
-	
+
 	// Use semantic scoring
 	sf := NewSemanticFilter()
 	for i := range sections {
 		sections[i].score = f.calculateSectionScore(sections[i], sf)
 		sections[i].summary = f.generateSectionSummary(sections[i])
 	}
-	
+
 	return sections
 }
 
@@ -215,7 +215,7 @@ func (f *HierarchicalFilter) calculateSectionScore(s section, sf *SemanticFilter
 	score := 0.0
 	content := s.content
 	lower := strings.ToLower(content)
-	
+
 	// High importance indicators (weight: 1.0)
 	highKeywords := []string{
 		"error", "failed", "failure", "fatal", "panic",
@@ -227,7 +227,7 @@ func (f *HierarchicalFilter) calculateSectionScore(s section, sf *SemanticFilter
 			score += 0.2
 		}
 	}
-	
+
 	// Medium importance indicators (weight: 0.5)
 	mediumKeywords := []string{
 		"warning", "deprecated", "todo", "fixme",
@@ -239,7 +239,7 @@ func (f *HierarchicalFilter) calculateSectionScore(s section, sf *SemanticFilter
 			score += 0.1
 		}
 	}
-	
+
 	// File references (very important for debugging)
 	if strings.Contains(content, ".go:") ||
 		strings.Contains(content, ".rs:") ||
@@ -248,25 +248,25 @@ func (f *HierarchicalFilter) calculateSectionScore(s section, sf *SemanticFilter
 		strings.Contains(content, ".ts:") {
 		score += 0.3
 	}
-	
+
 	// Stack traces
 	if strings.Contains(content, "at ") ||
 		strings.Contains(content, "Traceback") ||
 		strings.Contains(content, "stack trace") {
 		score += 0.4
 	}
-	
+
 	// Length penalty (longer sections are less dense)
 	lineCount := s.endLine - s.startLine + 1
 	if lineCount > 100 {
 		score *= 0.8
 	}
-	
+
 	// Clamp to [0, 1]
 	if score > 1.0 {
 		score = 1.0
 	}
-	
+
 	return score
 }
 
@@ -276,17 +276,17 @@ func (f *HierarchicalFilter) generateSectionSummary(s section) string {
 	if len(lines) == 0 {
 		return "[empty section]"
 	}
-	
+
 	// Find the most representative line
 	var bestLine string
 	bestScore := -1.0
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		
+
 		// Score this line
 		score := f.scoreLineForSummary(trimmed)
 		if score > bestScore {
@@ -294,16 +294,16 @@ func (f *HierarchicalFilter) generateSectionSummary(s section) string {
 			bestLine = trimmed
 		}
 	}
-	
+
 	if bestLine == "" {
 		return "[section]"
 	}
-	
+
 	// Truncate if needed
 	if len(bestLine) > 80 {
 		return bestLine[:77] + "..."
 	}
-	
+
 	return bestLine
 }
 
@@ -311,7 +311,7 @@ func (f *HierarchicalFilter) generateSectionSummary(s section) string {
 func (f *HierarchicalFilter) scoreLineForSummary(line string) float64 {
 	lower := strings.ToLower(line)
 	score := 0.0
-	
+
 	// Prefer lines with key information
 	if strings.Contains(lower, "error") || strings.Contains(lower, "failed") {
 		score += 0.5
@@ -319,12 +319,12 @@ func (f *HierarchicalFilter) scoreLineForSummary(line string) float64 {
 	if strings.Contains(lower, "test") || strings.Contains(lower, "pass") {
 		score += 0.3
 	}
-	
+
 	// Prefer shorter lines
 	if len(line) < 60 {
 		score += 0.2
 	}
-	
+
 	// Avoid pure symbols or numbers
 	hasLetters := false
 	for _, r := range line {
@@ -336,36 +336,36 @@ func (f *HierarchicalFilter) scoreLineForSummary(line string) float64 {
 	if !hasLetters {
 		score -= 0.5
 	}
-	
+
 	return score
 }
 
 // buildHierarchicalOutput constructs the compressed output
 func (f *HierarchicalFilter) buildHierarchicalOutput(sections []section, mode Mode, totalLines int) string {
 	var output []string
-	
+
 	// Add header showing compression stats
 	output = append(output, f.formatHeader(totalLines, len(sections)))
-	
+
 	// Determine thresholds based on mode
 	highThreshold, midThreshold := f.getThresholds(mode)
-	
+
 	for _, s := range sections {
 		switch {
 		case s.score >= highThreshold:
 			// Keep full content
 			output = append(output, s.content)
-			
+
 		case s.score >= midThreshold:
 			// Keep summary with line range
 			output = append(output, f.formatSummarySection(s))
-			
+
 		default:
 			// Skip low-importance sections
 			// Optionally: add a one-liner indicating skipped content
 		}
 	}
-	
+
 	return strings.Join(output, "\n")
 }
 

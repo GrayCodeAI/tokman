@@ -13,15 +13,15 @@ import (
 // LLMCompressor provides LLM-based intelligent compression
 // Uses local or API-based LLMs for context-aware token reduction
 type LLMCompressor struct {
-	Provider       string        // openai, anthropic, ollama, local
-	Model          string        // gpt-4, claude-3-sonnet, llama3, etc.
-	APIKey         string        // API key for cloud providers
-	BaseURL        string        // Custom endpoint (for Ollama, etc.)
-	Timeout        time.Duration // Request timeout
-	MaxTokens      int           // Max output tokens
-	Temperature    float64       // Sampling temperature
-	CacheEnabled   bool          // Enable response caching
-	Cache          map[string]string
+	Provider     string        // openai, anthropic, ollama, local
+	Model        string        // gpt-4, claude-3-sonnet, llama3, etc.
+	APIKey       string        // API key for cloud providers
+	BaseURL      string        // Custom endpoint (for Ollama, etc.)
+	Timeout      time.Duration // Request timeout
+	MaxTokens    int           // Max output tokens
+	Temperature  float64       // Sampling temperature
+	CacheEnabled bool          // Enable response caching
+	Cache        map[string]string
 }
 
 // LLMCompressConfig holds configuration for LLM compression
@@ -45,12 +45,12 @@ type CompressionRequest struct {
 
 // CompressionResult represents the compression result
 type CompressionResult struct {
-	Output       string
-	OriginalTokens int
+	Output           string
+	OriginalTokens   int
 	CompressedTokens int
-	Reduction    float64
-	Method       string
-	Cached       bool
+	Reduction        float64
+	Method           string
+	Cached           bool
 }
 
 // NewLLMCompressor creates a new LLM compressor
@@ -61,7 +61,7 @@ func NewLLMCompressor(cfg LLMCompressConfig) *LLMCompressor {
 	if cfg.Temperature == 0 {
 		cfg.Temperature = 0.3
 	}
-	
+
 	return &LLMCompressor{
 		Provider:     cfg.Provider,
 		Model:        cfg.Model,
@@ -88,8 +88,8 @@ func (l *LLMCompressor) Compress(req CompressionRequest) (*CompressionResult, er
 				OriginalTokens:   origTokens,
 				CompressedTokens: compTokens,
 				Reduction:        float64(origTokens-compTokens) / float64(origTokens) * 100,
-				Method:          "llm-cache",
-				Cached:          true,
+				Method:           "llm-cache",
+				Cached:           true,
 			}, nil
 		}
 	}
@@ -112,8 +112,8 @@ func (l *LLMCompressor) Compress(req CompressionRequest) (*CompressionResult, er
 		OriginalTokens:   origTokens,
 		CompressedTokens: compTokens,
 		Reduction:        float64(origTokens-compTokens) / float64(origTokens) * 100,
-		Method:          "llm-" + l.Provider,
-		Cached:          false,
+		Method:           "llm-" + l.Provider,
+		Cached:           false,
 	}
 
 	// Cache result
@@ -128,7 +128,7 @@ func (l *LLMCompressor) Compress(req CompressionRequest) (*CompressionResult, er
 // buildPrompt creates the compression prompt based on intent
 func (l *LLMCompressor) buildPrompt(req CompressionRequest) string {
 	var intentInstruction string
-	
+
 	switch req.QueryIntent {
 	case "debug":
 		intentInstruction = `Focus on: errors, warnings, stack traces, and relevant code paths.

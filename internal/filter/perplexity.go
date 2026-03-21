@@ -18,11 +18,11 @@ import (
 type PerplexityFilter struct {
 	// Budget controller settings
 	targetRatio float64 // Target compression ratio
-	
+
 	// Iterative pruning settings
 	iterationSteps int
 	pruneRatio     float64
-	
+
 	// Context window for perplexity calculation
 	contextWindow int
 }
@@ -30,10 +30,10 @@ type PerplexityFilter struct {
 // NewPerplexityFilter creates a new perplexity-based filter
 func NewPerplexityFilter() *PerplexityFilter {
 	return &PerplexityFilter{
-		targetRatio:    0.3,  // Keep 30% of tokens
-		iterationSteps: 3,    // Number of pruning iterations
-		pruneRatio:     0.7,  // Prune 30% each iteration
-		contextWindow:  10,   // Words to consider for context
+		targetRatio:    0.3, // Keep 30% of tokens
+		iterationSteps: 3,   // Number of pruning iterations
+		pruneRatio:     0.7, // Prune 30% each iteration
+		contextWindow:  10,  // Words to consider for context
 	}
 }
 
@@ -47,15 +47,15 @@ func (f *PerplexityFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
-	
+
 	original := len(input)
 	output := input
-	
+
 	// Iterative pruning
 	for i := 0; i < f.iterationSteps; i++ {
 		output = f.pruneIteration(output, mode)
 	}
-	
+
 	saved := (original - len(output)) / 4
 	return output, saved
 }
@@ -64,12 +64,12 @@ func (f *PerplexityFilter) Apply(input string, mode Mode) (string, int) {
 func (f *PerplexityFilter) pruneIteration(input string, mode Mode) string {
 	lines := strings.Split(input, "\n")
 	var result []string
-	
+
 	for _, line := range lines {
 		processed := f.pruneLine(line, mode)
 		result = append(result, processed)
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -79,10 +79,10 @@ func (f *PerplexityFilter) pruneLine(line string, mode Mode) string {
 	if len(words) < 5 {
 		return line // Keep short lines intact
 	}
-	
+
 	// Score each token
 	scores := f.scoreTokens(words)
-	
+
 	// Sort indices by score
 	indices := make([]int, len(words))
 	for i := range indices {
@@ -91,23 +91,23 @@ func (f *PerplexityFilter) pruneLine(line string, mode Mode) string {
 	sort.Slice(indices, func(i, j int) bool {
 		return scores[indices[i]] > scores[indices[j]]
 	})
-	
+
 	// Determine how many to keep
 	keepCount := int(float64(len(words)) * f.targetRatio)
 	if keepCount < 3 {
 		keepCount = 3 // Keep at least 3 words
 	}
-	
+
 	// Build set of indices to keep
 	keepSet := make(map[int]bool)
 	for i := 0; i < keepCount && i < len(indices); i++ {
 		keepSet[indices[i]] = true
 	}
-	
+
 	// Always keep first and last word for context
 	keepSet[0] = true
 	keepSet[len(words)-1] = true
-	
+
 	// Build result preserving order
 	var result []string
 	for i, word := range words {
@@ -115,7 +115,7 @@ func (f *PerplexityFilter) pruneLine(line string, mode Mode) string {
 			result = append(result, word)
 		}
 	}
-	
+
 	return strings.Join(result, " ")
 }
 
@@ -127,21 +127,21 @@ func (f *PerplexityFilter) pruneLine(line string, mode Mode) string {
 // - Special characters (code/symbols = more important)
 func (f *PerplexityFilter) scoreTokens(words []string) []float64 {
 	scores := make([]float64, len(words))
-	
+
 	// Count local frequency
 	freq := make(map[string]int)
 	for _, w := range words {
 		freq[strings.ToLower(w)]++
 	}
-	
+
 	for i, word := range words {
 		// Base score: inverse frequency (rare = important)
 		localFreq := freq[strings.ToLower(word)]
 		freqScore := 1.0 / float64(localFreq)
-		
+
 		// Length score: longer words often carry more meaning
 		lenScore := math.Log(float64(len(word)) + 1)
-		
+
 		// Position score: beginning and end are more important
 		posScore := 1.0
 		if i == 0 || i == len(words)-1 {
@@ -149,17 +149,17 @@ func (f *PerplexityFilter) scoreTokens(words []string) []float64 {
 		} else if i < 3 || i >= len(words)-3 {
 			posScore = 1.5
 		}
-		
+
 		// Special content score: code, numbers, symbols
 		specialScore := 1.0
 		if isCodeToken(word) || isNumeric(word) {
 			specialScore = 3.0
 		}
-		
+
 		// Combine scores
 		scores[i] = freqScore * lenScore * posScore * specialScore
 	}
-	
+
 	return scores
 }
 
@@ -178,7 +178,7 @@ func isCodeToken(word string) bool {
 	if strings.HasPrefix(word, "$") || strings.HasPrefix(word, "@") {
 		return true
 	}
-	
+
 	// CamelCase or PascalCase
 	hasUpper := false
 	hasLower := false
@@ -190,7 +190,7 @@ func isCodeToken(word string) bool {
 			hasLower = true
 		}
 	}
-	
+
 	return hasUpper && hasLower && len(word) > 3
 }
 

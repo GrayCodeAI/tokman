@@ -15,17 +15,17 @@ const SchemaVersion = 1
 
 // FilterConfig represents a single TOML filter configuration
 type FilterConfig struct {
-	MatchCommand      string            `toml:"match_command"`
-	StripANSI         bool              `toml:"strip_ansi"`
-	Replace           []ReplaceRule     `toml:"replace"`
-	MatchOutput       []MatchOutputRule `toml:"match_output"`
-	StripLinesMatching []string         `toml:"strip_lines_matching"`
-	KeepLinesMatching  []string         `toml:"keep_lines_matching"`
-	TruncateLinesAt    int              `toml:"truncate_lines_at"`
-	Head               int              `toml:"head"`
-	Tail               int              `toml:"tail"`
-	MaxLines           int              `toml:"max_lines"`
-	OnEmpty            string           `toml:"on_empty"`
+	MatchCommand       string            `toml:"match_command"`
+	StripANSI          bool              `toml:"strip_ansi"`
+	Replace            []ReplaceRule     `toml:"replace"`
+	MatchOutput        []MatchOutputRule `toml:"match_output"`
+	StripLinesMatching []string          `toml:"strip_lines_matching"`
+	KeepLinesMatching  []string          `toml:"keep_lines_matching"`
+	TruncateLinesAt    int               `toml:"truncate_lines_at"`
+	Head               int               `toml:"head"`
+	Tail               int               `toml:"tail"`
+	MaxLines           int               `toml:"max_lines"`
+	OnEmpty            string            `toml:"on_empty"`
 }
 
 // ReplaceRule defines a regex replacement rule
@@ -46,7 +46,7 @@ type MatchOutputRule struct {
 
 // TOMLFilter represents a parsed TOML filter file
 type TOMLFilter struct {
-	SchemaVersion int                    `toml:"schema_version"`
+	SchemaVersion int                     `toml:"schema_version"`
 	Filters       map[string]FilterConfig `toml:"-"`
 	RawContent    map[string]interface{}  `toml:"-"`
 }

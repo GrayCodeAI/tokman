@@ -44,7 +44,7 @@ func NewSessionTracker() *SessionTracker {
 	// Default session file in user's cache directory
 	cacheDir := getCacheDir()
 	sessionFile := filepath.Join(cacheDir, "tokman", "session.json")
-	
+
 	return &SessionTracker{
 		sessionFile: sessionFile,
 		seenHashes:  make(map[string]seenEntry),
@@ -61,16 +61,16 @@ func NewSessionTrackerWithConfig(cfg SessionConfig) *SessionTracker {
 	if cfg.MaxEntries == 0 {
 		cfg.MaxEntries = 10000
 	}
-	
+
 	st := &SessionTracker{
 		sessionFile: cfg.SessionFile,
 		seenHashes:  make(map[string]seenEntry),
 		maxEntries:  cfg.MaxEntries,
 	}
-	
+
 	// Load existing session data
 	st.load()
-	
+
 	return st
 }
 
@@ -82,18 +82,18 @@ func (f *SessionTracker) Name() string {
 // Apply applies session tracking to avoid repetition.
 func (f *SessionTracker) Apply(input string, mode Mode) (string, int) {
 	original := len(input)
-	
+
 	// Don't process very short inputs
 	if original < 50 {
 		return input, 0
 	}
-	
+
 	// Segment input and check each segment
 	output := f.processSegments(input, mode)
-	
+
 	bytesSaved := original - len(output)
 	tokensSaved := bytesSaved / 4
-	
+
 	return output, tokensSaved
 }
 
@@ -102,10 +102,10 @@ func (f *SessionTracker) processSegments(input string, mode Mode) string {
 	lines := strings.Split(input, "\n")
 	var result []string
 	var currentSegment []string
-	
+
 	for _, line := range lines {
 		currentSegment = append(currentSegment, line)
-		
+
 		// Check segment at boundaries (empty lines or every 10 lines)
 		if strings.TrimSpace(line) == "" || len(currentSegment) >= 10 {
 			segment := strings.Join(currentSegment, "\n")
@@ -114,41 +114,41 @@ func (f *SessionTracker) processSegments(input string, mode Mode) string {
 			currentSegment = nil
 		}
 	}
-	
+
 	// Process remaining segment
 	if len(currentSegment) > 0 {
 		segment := strings.Join(currentSegment, "\n")
 		processed := f.processSegment(segment, mode)
 		result = append(result, processed)
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
 // processSegment processes a single segment
 func (f *SessionTracker) processSegment(segment string, mode Mode) string {
 	hash := f.hashContent(segment)
-	
+
 	f.mu.RLock()
 	entry, seen := f.seenHashes[hash]
 	f.mu.RUnlock()
-	
+
 	if seen {
 		// Update entry
 		entry.LastSeen = time.Now()
 		entry.Count++
-		
+
 		f.mu.Lock()
 		f.seenHashes[hash] = entry
 		f.mu.Unlock()
-		
+
 		// If seen multiple times, compress to marker
 		if entry.Count >= 3 && len(segment) > 100 {
 			// Return a compressed marker
 			summary := f.summarizeSegment(segment)
 			return "[seen x" + itoa(entry.Count) + ": " + summary + "]"
 		}
-		
+
 		// If seen twice, add marker but keep content
 		if entry.Count >= 2 {
 			return segment + " [seen]"
@@ -166,7 +166,7 @@ func (f *SessionTracker) processSegment(segment string, mode Mode) string {
 		}
 		f.mu.Unlock()
 	}
-	
+
 	return segment
 }
 
@@ -175,10 +175,10 @@ func (f *SessionTracker) hashContent(content string) string {
 	// Normalize content for hashing
 	normalized := strings.TrimSpace(content)
 	normalized = strings.ToLower(normalized)
-	
+
 	// Remove timestamps and numbers for better matching
 	normalized = removeTimestamps(normalized)
-	
+
 	hash := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(hash[:8]) // Use first 8 bytes (16 hex chars)
 }
@@ -189,7 +189,7 @@ func (f *SessionTracker) summarizeSegment(segment string) string {
 	if len(lines) == 0 {
 		return "empty"
 	}
-	
+
 	// Find the most meaningful line
 	var bestLine string
 	for _, line := range lines {
@@ -197,25 +197,25 @@ func (f *SessionTracker) summarizeSegment(segment string) string {
 		if trimmed == "" {
 			continue
 		}
-		
+
 		// Skip pure numbers or timestamps
 		if isOnlyNumbers(trimmed) {
 			continue
 		}
-		
+
 		bestLine = trimmed
 		break
 	}
-	
+
 	if bestLine == "" {
 		return itoa(len(lines)) + " lines"
 	}
-	
+
 	// Truncate
 	if len(bestLine) > 50 {
 		bestLine = bestLine[:47] + "..."
 	}
-	
+
 	return bestLine
 }
 
@@ -223,18 +223,18 @@ func (f *SessionTracker) summarizeSegment(segment string) string {
 func removeTimestamps(content string) string {
 	// Remove common timestamp patterns
 	patterns := []string{
-		`\d{4}-\d{2}-\d{2}`,           // 2024-01-01
-		`\d{2}:\d{2}:\d{2}`,           // 12:34:56
-		`\d{4}/\d{2}/\d{2}`,           // 2024/01/01
-		`\d{2}-\d{2}-\d{4}`,           // 01-01-2024
+		`\d{4}-\d{2}-\d{2}`, // 2024-01-01
+		`\d{2}:\d{2}:\d{2}`, // 12:34:56
+		`\d{4}/\d{2}/\d{2}`, // 2024/01/01
+		`\d{2}-\d{2}-\d{4}`, // 01-01-2024
 	}
-	
+
 	result := content
 	for _, pattern := range patterns {
 		// Simple removal without regex
 		result = removePattern(result, pattern)
 	}
-	
+
 	return result
 }
 
@@ -277,13 +277,13 @@ func isOnlyNumbers(s string) bool {
 func (f *SessionTracker) load() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	
+
 	data, err := os.ReadFile(f.sessionFile)
 	if err != nil {
 		// File doesn't exist - that's fine
 		return nil
 	}
-	
+
 	return json.Unmarshal(data, &f.seenHashes)
 }
 
@@ -291,18 +291,18 @@ func (f *SessionTracker) load() error {
 func (f *SessionTracker) Save() error {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(f.sessionFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	
+
 	data, err := json.MarshalIndent(f.seenHashes, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(f.sessionFile, data, 0644)
 }
 
@@ -310,9 +310,9 @@ func (f *SessionTracker) Save() error {
 func (f *SessionTracker) Clear() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	
+
 	f.seenHashes = make(map[string]seenEntry)
-	
+
 	// Remove session file
 	return os.Remove(f.sessionFile)
 }
@@ -321,7 +321,7 @@ func (f *SessionTracker) Clear() error {
 func (f *SessionTracker) Stats() SessionStats {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	
+
 	total := 0
 	multi := 0
 	for _, entry := range f.seenHashes {
@@ -330,7 +330,7 @@ func (f *SessionTracker) Stats() SessionStats {
 			multi++
 		}
 	}
-	
+
 	return SessionStats{
 		UniqueEntries:    len(f.seenHashes),
 		TotalOccurrences: total,
@@ -351,12 +351,12 @@ func getCacheDir() string {
 	if cacheDir := os.Getenv("XDG_CACHE_HOME"); cacheDir != "" {
 		return cacheDir
 	}
-	
+
 	// Fall back to ~/.cache
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "/tmp"
 	}
-	
+
 	return filepath.Join(homeDir, ".cache")
 }

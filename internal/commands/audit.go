@@ -38,7 +38,7 @@ func init() {
 
 func runAudit(cmd *cobra.Command, args []string) error {
 	start := time.Now()
-	
+
 	// Parse flags
 	modeStr, _ := cmd.Flags().GetString("mode")
 	budget, _ := cmd.Flags().GetInt("budget")
@@ -46,7 +46,7 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	showLayers, _ := cmd.Flags().GetBool("layers")
 	validate, _ := cmd.Flags().GetBool("validate")
 	jsonOutput, _ := cmd.Flags().GetBool("json")
-	
+
 	// Convert mode
 	var mode filter.Mode
 	switch modeStr {
@@ -57,11 +57,11 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	default:
 		mode = filter.ModeAggressive
 	}
-	
+
 	// Read input
 	var input string
 	var err error
-	
+
 	if len(args) > 0 && args[0] != "-" {
 		// Read from file
 		data, err := os.ReadFile(args[0])
@@ -81,36 +81,36 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		}
 		input = string(data)
 	}
-	
+
 	if input == "" {
 		return fmt.Errorf("input is empty")
 	}
-	
+
 	// Load config
 	cfg, err := config.Load("")
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	// Create pipeline manager
 	pipelineCfg := convertConfigToPipeline(cfg.Pipeline)
 	manager := filter.NewPipelineManager(filter.ManagerConfig{
-		MaxContextTokens:  cfg.Pipeline.MaxContextTokens,
-		ChunkSize:         cfg.Pipeline.ChunkSize,
-		StreamThreshold:   cfg.Pipeline.StreamThreshold,
-		TeeOnFailure:      cfg.Pipeline.TeeOnFailure,
-		FailSafeMode:      cfg.Pipeline.FailSafeMode,
-		ValidateOutput:    validate,
+		MaxContextTokens:   cfg.Pipeline.MaxContextTokens,
+		ChunkSize:          cfg.Pipeline.ChunkSize,
+		StreamThreshold:    cfg.Pipeline.StreamThreshold,
+		TeeOnFailure:       cfg.Pipeline.TeeOnFailure,
+		FailSafeMode:       cfg.Pipeline.FailSafeMode,
+		ValidateOutput:     validate,
 		ShortCircuitBudget: cfg.Pipeline.ShortCircuitBudget,
-		CacheEnabled:      false, // Disable cache for accurate audit
-		PipelineCfg:       pipelineCfg,
+		CacheEnabled:       false, // Disable cache for accurate audit
+		PipelineCfg:        pipelineCfg,
 	})
-	
+
 	// Create command context
 	ctx := filter.CommandContext{
 		Intent: query,
 	}
-	
+
 	// Process with budget if specified
 	var result *filter.ProcessResult
 	if budget > 0 {
@@ -120,20 +120,20 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	} else {
 		result, err = manager.Process(input, mode, ctx)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("processing failed: %w", err)
 	}
-	
+
 	duration := time.Since(start)
-	
+
 	// Output results
 	if jsonOutput {
 		auditOutputJSON(result, duration)
 	} else {
 		outputText(result, duration, showLayers)
 	}
-	
+
 	return nil
 }
 
@@ -142,14 +142,14 @@ func outputText(result *filter.ProcessResult, duration time.Duration, showLayers
 	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
 	fmt.Println("║                    TOKMAN COMPRESSION AUDIT                     ║")
 	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
-	
+
 	// Token stats
 	fmt.Printf("║ Original Tokens:     %10d                           ║\n", result.OriginalTokens)
 	fmt.Printf("║ Final Tokens:        %10d                           ║\n", result.FinalTokens)
 	fmt.Printf("║ Tokens Saved:        %10d                           ║\n", result.SavedTokens)
 	fmt.Printf("║ Compression Ratio:   %10.1f%%                          ║\n", result.ReductionPercent)
 	fmt.Printf("║ Processing Time:     %10v                           ║\n", duration.Round(time.Microsecond))
-	
+
 	// Additional info
 	if result.CacheHit {
 		fmt.Println("║ Cache:               HIT (cached result)                   ║")
@@ -166,20 +166,20 @@ func outputText(result *filter.ProcessResult, duration time.Duration, showLayers
 	if result.TeeFile != "" {
 		fmt.Printf("║ Tee File:            %-36s ║\n", auditTruncate(result.TeeFile, 36))
 	}
-	
+
 	// Layer breakdown
 	if showLayers && len(result.LayerStats) > 0 {
 		fmt.Println("╠════════════════════════════════════════════════════════════════╣")
 		fmt.Println("║ LAYER BREAKDOWN:                                               ║")
 		fmt.Println("╠════════════════════════════════════════════════════════════════╣")
-		
+
 		// Ordered layers
 		layerOrder := []string{
 			"1_entropy", "2_perplexity", "3_goal_driven", "4_ast_preserve",
 			"5_contrastive", "6_ngram", "7_evaluator", "8_gist", "9_hierarchical",
 			"neural", "10_session", "10_budget", "10_total",
 		}
-		
+
 		totalLayers := 0
 		for _, layer := range layerOrder {
 			if stat, ok := result.LayerStats[layer]; ok && stat.TokensSaved > 0 {
@@ -187,15 +187,15 @@ func outputText(result *filter.ProcessResult, duration time.Duration, showLayers
 				totalLayers++
 			}
 		}
-		
+
 		if totalLayers == 0 {
 			fmt.Println("║   (No layers contributed significant savings)                 ║")
 		}
 	}
-	
+
 	// Footer
 	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
-	
+
 	// Quality assessment
 	if result.ReductionPercent > 50 {
 		fmt.Println("\n✅ Excellent compression! Significant token savings.")
@@ -225,7 +225,7 @@ func auditOutputJSON(result *filter.ProcessResult, duration time.Duration) {
 		result.ReductionPercent, duration.Milliseconds(),
 		result.CacheHit, result.Chunks, result.Validated,
 		result.Warning, result.TeeFile)
-	
+
 	first := true
 	for layer, stat := range result.LayerStats {
 		if !first {
@@ -234,7 +234,7 @@ func auditOutputJSON(result *filter.ProcessResult, duration time.Duration) {
 		fmt.Printf(`    "%s": {"tokens_saved": %d}`, layer, stat.TokensSaved)
 		first = false
 	}
-	
+
 	fmt.Println("\n  }\n}")
 }
 
@@ -248,20 +248,20 @@ func auditTruncate(s string, maxLen int) string {
 // convertConfigToPipeline converts config.PipelineConfig to filter.PipelineConfig
 func convertConfigToPipeline(cfg config.PipelineConfig) filter.PipelineConfig {
 	return filter.PipelineConfig{
-		Mode:                 filter.ModeMinimal, // Will be overridden by manager
-		QueryIntent:          "",
-		Budget:               cfg.DefaultBudget,
-		LLMEnabled:           false,
-		SessionTracking:      true,
-		NgramEnabled:         cfg.EnableNgram,
-		PromptTemplate:       "",
-		EnableEntropy:        cfg.EnableEntropy,
-		EnablePerplexity:     cfg.EnablePerplexity,
-		EnableGoalDriven:     cfg.EnableGoalDriven,
-		EnableAST:            cfg.EnableAST,
-		EnableContrastive:    cfg.EnableContrastive,
-		EnableEvaluator:      cfg.EnableEvaluator,
-		EnableGist:           cfg.EnableGist,
-		EnableHierarchical:   cfg.EnableHierarchical,
+		Mode:               filter.ModeMinimal, // Will be overridden by manager
+		QueryIntent:        "",
+		Budget:             cfg.DefaultBudget,
+		LLMEnabled:         false,
+		SessionTracking:    true,
+		NgramEnabled:       cfg.EnableNgram,
+		PromptTemplate:     "",
+		EnableEntropy:      cfg.EnableEntropy,
+		EnablePerplexity:   cfg.EnablePerplexity,
+		EnableGoalDriven:   cfg.EnableGoalDriven,
+		EnableAST:          cfg.EnableAST,
+		EnableContrastive:  cfg.EnableContrastive,
+		EnableEvaluator:    cfg.EnableEvaluator,
+		EnableGist:         cfg.EnableGist,
+		EnableHierarchical: cfg.EnableHierarchical,
 	}
 }

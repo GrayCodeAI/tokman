@@ -937,17 +937,17 @@ npm install -g opencode-cli`,
 // GetAgentBinaryPath returns the path to an agent's binary
 func GetAgentBinaryPath(name string) string {
 	binaries := map[string]string{
-		"claude-code":   "claude",
-		"cursor":        "cursor",
-		"aider":         "aider",
-		"codex-cli":     "codex",
-		"adal":          "adal",
-		"kiro":          "kiro",
-		"kilo-code":     "kilo",
-		"windsurf":      "windsurf",
-		"replit-agent":  "replit",
-		"gemini-cli":    "gemini",
-		"opencode":      "opencode",
+		"claude-code":  "claude",
+		"cursor":       "cursor",
+		"aider":        "aider",
+		"codex-cli":    "codex",
+		"adal":         "adal",
+		"kiro":         "kiro",
+		"kilo-code":    "kilo",
+		"windsurf":     "windsurf",
+		"replit-agent": "replit",
+		"gemini-cli":   "gemini",
+		"opencode":     "opencode",
 	}
 
 	if bin, ok := binaries[name]; ok {

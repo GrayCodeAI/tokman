@@ -58,10 +58,10 @@ func (s *SessionSummary) AdoptionPct() float64 {
 
 // ExtractedCommand represents a command extracted from a session file
 type ExtractedCommand struct {
-	Command    string
-	OutputLen  int
-	SessionID  string
-	IsError    bool
+	Command   string
+	OutputLen int
+	SessionID string
+	IsError   bool
 }
 
 func runSession() error {
@@ -414,5 +414,3 @@ func progressBar(pct float64, width int) string {
 	empty := width - filled
 	return strings.Repeat("@", filled) + strings.Repeat(".", empty)
 }
-
-

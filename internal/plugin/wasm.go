@@ -16,23 +16,23 @@ import (
 
 // WasmPlugin wraps a WASM module as a Plugin
 type WasmPlugin struct {
-	mu       sync.RWMutex
-	name     string
-	version  string
-	desc     string
-	filters  []filter.Filter
-	ctx      context.Context
-	runtime  wazero.Runtime
-	module   api.Module
-	config   map[string]interface{}
+	mu      sync.RWMutex
+	name    string
+	version string
+	desc    string
+	filters []filter.Filter
+	ctx     context.Context
+	runtime wazero.Runtime
+	module  api.Module
+	config  map[string]interface{}
 }
 
 // wasmFilter wraps a WASM filter function
 type wasmFilter struct {
-	name     string
-	desc     string
-	plugin   *WasmPlugin
-	fnName   string
+	name   string
+	desc   string
+	plugin *WasmPlugin
+	fnName string
 }
 
 // LoadWasmPlugin loads a WASM plugin from file

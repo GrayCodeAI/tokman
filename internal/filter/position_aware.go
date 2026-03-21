@@ -49,7 +49,7 @@ func (f *PositionAwareFilter) Apply(input string, mode Mode) (string, int) {
 	reordered := f.reorderByImportance(scored)
 
 	output := strings.Join(reordered, "\n\n")
-	
+
 	// No token savings - this is a quality improvement
 	return output, 0
 }
@@ -69,7 +69,7 @@ func (f *PositionAwareFilter) segmentOutput(input string) []string {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Empty line can be a segment boundary
 		if trimmed == "" && len(currentSegment) > 0 {
 			segments = append(segments, strings.Join(currentSegment, "\n"))

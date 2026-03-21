@@ -14,11 +14,11 @@ func TestPositionAwareFilter_Name(t *testing.T) {
 
 func TestPositionAwareFilter_ShortInput(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	// Short input should pass through unchanged
 	input := "short input"
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	if output != input {
 		t.Error("short input should not be reordered")
 	}
@@ -29,7 +29,7 @@ func TestPositionAwareFilter_ShortInput(t *testing.T) {
 
 func TestPositionAwareFilter_ImportanceScore(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	tests := []struct {
 		name     string
 		segment  string
@@ -43,7 +43,7 @@ func TestPositionAwareFilter_ImportanceScore(t *testing.T) {
 		{"success", "Success! All tests passed", 0.0},
 		{"empty", "", 0.0},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := f.importanceScore(tt.segment)
@@ -56,7 +56,7 @@ func TestPositionAwareFilter_ImportanceScore(t *testing.T) {
 
 func TestPositionAwareFilter_HasFileReference(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	tests := []struct {
 		segment  string
 		expected bool
@@ -66,7 +66,7 @@ func TestPositionAwareFilter_HasFileReference(t *testing.T) {
 		{"File \"test.py\", line 50", false}, // Different pattern
 		{"no reference here", false},
 	}
-	
+
 	for _, tt := range tests {
 		result := f.hasFileReference(tt.segment)
 		if result != tt.expected {
@@ -77,7 +77,7 @@ func TestPositionAwareFilter_HasFileReference(t *testing.T) {
 
 func TestPositionAwareFilter_Reordering(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	// Create input where error is buried in middle
 	input := `Building project...
 
@@ -93,12 +93,12 @@ Compiling module4...
 Compiling module5...
 
 Finished build`
-	
+
 	output, _ := f.Apply(input, ModeMinimal)
-	
+
 	// Error should appear near beginning and end
 	lines := strings.Split(output, "\n")
-	
+
 	// Find where ERROR appears
 	firstErrorIdx := -1
 	for i, line := range lines {
@@ -107,13 +107,13 @@ Finished build`
 			break
 		}
 	}
-	
+
 	// Error should appear
 	if firstErrorIdx == -1 {
 		t.Error("ERROR should appear in output")
 		return
 	}
-	
+
 	// For quality improvement, we verify error is present
 	// The reordering ensures it's at prominent positions
 	if !strings.Contains(output, "ERROR:") {
@@ -126,7 +126,7 @@ Finished build`
 
 func TestPositionAwareFilter_StructuralBoundary(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	tests := []struct {
 		line     string
 		expected bool
@@ -140,7 +140,7 @@ func TestPositionAwareFilter_StructuralBoundary(t *testing.T) {
 		{"normal line", false},
 		{"", false},
 	}
-	
+
 	for _, tt := range tests {
 		result := f.isStructuralBoundary(tt.line)
 		if result != tt.expected {
@@ -152,7 +152,7 @@ func TestPositionAwareFilter_StructuralBoundary(t *testing.T) {
 func TestPositionAwareFilter_Integration(t *testing.T) {
 	// Test that position filter works in engine
 	engine := NewEngine(ModeMinimal)
-	
+
 	// Verify position filter IS in default engine (improves LLM recall)
 	found := false
 	for _, f := range engine.filters {
@@ -168,15 +168,15 @@ func TestPositionAwareFilter_Integration(t *testing.T) {
 
 func TestPositionAwareFilter_PreservesContent(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	input := `Segment 1: Normal content
 Segment 2: More normal content
 Segment 3: ERROR critical issue here
 Segment 4: Success message
 Segment 5: Another normal segment`
-	
+
 	output, _ := f.Apply(input, ModeMinimal)
-	
+
 	// All content should still be present (just reordered)
 	if !strings.Contains(output, "Segment 1") {
 		t.Error("should preserve Segment 1")
@@ -191,7 +191,7 @@ Segment 5: Another normal segment`
 
 func TestPositionAwareFilter_RealWorldOutput(t *testing.T) {
 	f := NewPositionAwareFilter()
-	
+
 	// Realistic test output with buried error
 	input := `running 100 tests
 test test_001 ... ok
@@ -211,9 +211,9 @@ test test_009 ... ok
 test test_010 ... ok
 
 test result: FAILED. 9 passed; 1 failed`
-	
+
 	output, _ := f.Apply(input, ModeMinimal)
-	
+
 	// Error should be present
 	if !strings.Contains(output, "ERROR in test_006") {
 		t.Error("should contain error message")
@@ -228,7 +228,7 @@ test result: FAILED. 9 passed; 1 failed`
 
 func BenchmarkPositionAwareFilter_Apply(b *testing.B) {
 	f := NewPositionAwareFilter()
-	
+
 	// Large output
 	var lines []string
 	for i := 0; i < 50; i++ {
@@ -239,9 +239,9 @@ func BenchmarkPositionAwareFilter_Apply(b *testing.B) {
 	for i := 0; i < 50; i++ {
 		lines = append(lines, "Processing step"+itoa(i))
 	}
-	
+
 	input := strings.Join(lines, "\n")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Apply(input, ModeMinimal)

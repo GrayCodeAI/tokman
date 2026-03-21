@@ -10,14 +10,14 @@ import (
 
 // PromptTemplate represents a custom prompt template for LLM summarization
 type PromptTemplate struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	SystemPrompt string           `json:"system_prompt"`
-	UserPrompt  string            `json:"user_prompt"`
-	Intent      string            `json:"intent"`      // debug, review, test, build, general
-	Variables   map[string]string `json:"variables"`   // Custom variables for template
-	MaxTokens   int               `json:"max_tokens"`
-	Temperature float64           `json:"temperature"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	SystemPrompt string            `json:"system_prompt"`
+	UserPrompt   string            `json:"user_prompt"`
+	Intent       string            `json:"intent"`    // debug, review, test, build, general
+	Variables    map[string]string `json:"variables"` // Custom variables for template
+	MaxTokens    int               `json:"max_tokens"`
+	Temperature  float64           `json:"temperature"`
 }
 
 // PromptTemplateManager manages custom prompt templates
@@ -35,23 +35,23 @@ func NewPromptTemplateManager(templatesDir string) *PromptTemplateManager {
 		templates:    make(map[string]PromptTemplate),
 		cache:        make(map[string]string),
 	}
-	
+
 	// Load built-in templates
 	m.loadBuiltinTemplates()
-	
+
 	// Load custom templates from disk
 	if templatesDir != "" {
 		m.loadTemplates()
 	}
-	
+
 	return m
 }
 
 // loadBuiltinTemplates loads the default templates
 func (m *PromptTemplateManager) loadBuiltinTemplates() {
 	m.templates["debug"] = PromptTemplate{
-		Name:        "debug",
-		Description: "Focus on errors, stack traces, and failure causes",
+		Name:         "debug",
+		Description:  "Focus on errors, stack traces, and failure causes",
 		SystemPrompt: "You are a code context compressor for debugging. Extract only critical debugging information.",
 		UserPrompt: `Focus on:
 - Error messages and types
@@ -72,10 +72,10 @@ Summary:`,
 		MaxTokens:   300,
 		Temperature: 0.2,
 	}
-	
+
 	m.templates["review"] = PromptTemplate{
-		Name:        "review",
-		Description: "Focus on code changes and potential issues",
+		Name:         "review",
+		Description:  "Focus on code changes and potential issues",
 		SystemPrompt: "You are a code review assistant. Extract key changes and potential concerns.",
 		UserPrompt: `Focus on:
 - Modified functions and classes
@@ -91,10 +91,10 @@ Review Summary:`,
 		MaxTokens:   400,
 		Temperature: 0.3,
 	}
-	
+
 	m.templates["test"] = PromptTemplate{
-		Name:        "test",
-		Description: "Focus on test results and coverage",
+		Name:         "test",
+		Description:  "Focus on test results and coverage",
 		SystemPrompt: "You are a test result summarizer. Extract test outcomes and failures.",
 		UserPrompt: `Focus on:
 - Pass/fail counts
@@ -110,10 +110,10 @@ Test Summary:`,
 		MaxTokens:   250,
 		Temperature: 0.2,
 	}
-	
+
 	m.templates["build"] = PromptTemplate{
-		Name:        "build",
-		Description: "Focus on build status and errors",
+		Name:         "build",
+		Description:  "Focus on build status and errors",
 		SystemPrompt: "You are a build output summarizer. Extract build status and issues.",
 		UserPrompt: `Focus on:
 - Build success/failure status
@@ -129,10 +129,10 @@ Build Summary:`,
 		MaxTokens:   250,
 		Temperature: 0.2,
 	}
-	
+
 	m.templates["deploy"] = PromptTemplate{
-		Name:        "deploy",
-		Description: "Focus on deployment status and health",
+		Name:         "deploy",
+		Description:  "Focus on deployment status and health",
 		SystemPrompt: "You are a deployment status summarizer. Extract deployment information.",
 		UserPrompt: `Focus on:
 - Deployment status and version
@@ -148,10 +148,10 @@ Deployment Summary:`,
 		MaxTokens:   200,
 		Temperature: 0.2,
 	}
-	
+
 	m.templates["search"] = PromptTemplate{
-		Name:        "search",
-		Description: "Focus on file names and definitions",
+		Name:         "search",
+		Description:  "Focus on file names and definitions",
 		SystemPrompt: "You are a code search assistant. Extract relevant identifiers.",
 		UserPrompt: `Focus on:
 - File names and paths
@@ -167,10 +167,10 @@ Search Results:`,
 		MaxTokens:   300,
 		Temperature: 0.2,
 	}
-	
+
 	m.templates["concise"] = PromptTemplate{
-		Name:        "concise",
-		Description: "General concise summary",
+		Name:         "concise",
+		Description:  "General concise summary",
 		SystemPrompt: "You are a concise summarizer. Create brief, accurate summaries.",
 		UserPrompt: `Summarize the key points in 3-5 sentences:
 
@@ -181,10 +181,10 @@ Summary:`,
 		MaxTokens:   200,
 		Temperature: 0.3,
 	}
-	
+
 	m.templates["detailed"] = PromptTemplate{
-		Name:        "detailed",
-		Description: "Detailed technical summary",
+		Name:         "detailed",
+		Description:  "Detailed technical summary",
 		SystemPrompt: "You are a technical summarizer. Create detailed, accurate summaries preserving all critical information.",
 		UserPrompt: `Create a detailed summary preserving:
 - All file paths and line numbers
@@ -207,33 +207,33 @@ func (m *PromptTemplateManager) loadTemplates() error {
 	if m.templatesDir == "" {
 		return nil
 	}
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(m.templatesDir); os.IsNotExist(err) {
 		return nil
 	}
-	
+
 	// Read all template files
 	files, err := filepath.Glob(filepath.Join(m.templatesDir, "*.json"))
 	if err != nil {
 		return err
 	}
-	
+
 	for _, file := range files {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			continue
 		}
-		
+
 		var template PromptTemplate
 		if err := json.Unmarshal(data, &template); err != nil {
 			continue
 		}
-		
+
 		// Override built-in with custom
 		m.templates[template.Name] = template
 	}
-	
+
 	return nil
 }
 
@@ -241,7 +241,7 @@ func (m *PromptTemplateManager) loadTemplates() error {
 func (m *PromptTemplateManager) GetTemplate(name string) (PromptTemplate, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	template, ok := m.templates[name]
 	return template, ok
 }
@@ -250,17 +250,17 @@ func (m *PromptTemplateManager) GetTemplate(name string) (PromptTemplate, bool) 
 func (m *PromptTemplateManager) GetTemplateForIntent(intent string) PromptTemplate {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	// Try exact match first
 	if template, ok := m.templates[intent]; ok {
 		return template
 	}
-	
+
 	// Fall back to general
 	if template, ok := m.templates["concise"]; ok {
 		return template
 	}
-	
+
 	// Return minimal default
 	return PromptTemplate{
 		Name:        "default",
@@ -274,12 +274,12 @@ func (m *PromptTemplateManager) GetTemplateForIntent(intent string) PromptTempla
 func (m *PromptTemplateManager) ListTemplates() []PromptTemplate {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	templates := make([]PromptTemplate, 0, len(m.templates))
 	for _, t := range m.templates {
 		templates = append(templates, t)
 	}
-	
+
 	return templates
 }
 
@@ -287,7 +287,7 @@ func (m *PromptTemplateManager) ListTemplates() []PromptTemplate {
 func (m *PromptTemplateManager) AddTemplate(template PromptTemplate) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Validate template
 	if template.Name == "" {
 		return ErrTemplateNameRequired
@@ -295,7 +295,7 @@ func (m *PromptTemplateManager) AddTemplate(template PromptTemplate) error {
 	if template.UserPrompt == "" {
 		return ErrPromptRequired
 	}
-	
+
 	// Set defaults
 	if template.MaxTokens == 0 {
 		template.MaxTokens = 300
@@ -303,18 +303,18 @@ func (m *PromptTemplateManager) AddTemplate(template PromptTemplate) error {
 	if template.Temperature == 0 {
 		template.Temperature = 0.3
 	}
-	
+
 	// Save to memory
 	m.templates[template.Name] = template
-	
+
 	// Invalidate cache
 	delete(m.cache, template.Name)
-	
+
 	// Save to disk
 	if m.templatesDir != "" {
 		return m.saveTemplate(template)
 	}
-	
+
 	return nil
 }
 
@@ -322,7 +322,7 @@ func (m *PromptTemplateManager) AddTemplate(template PromptTemplate) error {
 func (m *PromptTemplateManager) RemoveTemplate(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Don't allow removing built-in templates
 	builtin := []string{"debug", "review", "test", "build", "deploy", "search", "concise", "detailed"}
 	for _, b := range builtin {
@@ -330,16 +330,16 @@ func (m *PromptTemplateManager) RemoveTemplate(name string) error {
 			return ErrCannotRemoveBuiltin
 		}
 	}
-	
+
 	delete(m.templates, name)
 	delete(m.cache, name)
-	
+
 	// Remove from disk
 	if m.templatesDir != "" {
 		file := filepath.Join(m.templatesDir, name+".json")
 		os.Remove(file)
 	}
-	
+
 	return nil
 }
 
@@ -348,17 +348,17 @@ func (m *PromptTemplateManager) saveTemplate(template PromptTemplate) error {
 	if m.templatesDir == "" {
 		return nil
 	}
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(m.templatesDir, 0755); err != nil {
 		return err
 	}
-	
+
 	data, err := json.MarshalIndent(template, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	file := filepath.Join(m.templatesDir, template.Name+".json")
 	return os.WriteFile(file, data, 0644)
 }
@@ -373,22 +373,22 @@ func (m *PromptTemplateManager) BuildPrompt(template PromptTemplate, content str
 		return cached
 	}
 	m.mu.RUnlock()
-	
+
 	// Build prompt
 	var sb strings.Builder
-	
+
 	// Add system prompt if present
 	if template.SystemPrompt != "" {
 		sb.WriteString(template.SystemPrompt)
 		sb.WriteString("\n\n")
 	}
-	
+
 	// Process user prompt with variable substitution
 	prompt := template.UserPrompt
-	
+
 	// Replace {{content}}
 	prompt = strings.ReplaceAll(prompt, "{{content}}", content)
-	
+
 	// Replace custom variables - function parameters take priority over template defaults
 	// Apply function parameters first (overrides), then template defaults for remaining
 	for key, value := range variables {
@@ -397,16 +397,16 @@ func (m *PromptTemplateManager) BuildPrompt(template PromptTemplate, content str
 	for key, value := range template.Variables {
 		prompt = strings.ReplaceAll(prompt, "{{"+key+"}}", value)
 	}
-	
+
 	sb.WriteString(prompt)
-	
+
 	result := sb.String()
-	
+
 	// Cache result
 	m.mu.Lock()
 	m.cache[cacheKey] = result
 	m.mu.Unlock()
-	
+
 	return result
 }
 

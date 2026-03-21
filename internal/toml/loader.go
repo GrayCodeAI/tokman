@@ -14,10 +14,10 @@ var builtinFilters embed.FS
 
 // Loader handles loading TOML filters from multiple sources
 type Loader struct {
-	parser        *Parser
-	trustedPaths  map[string]bool
-	trustedFile   string
-	mu            sync.RWMutex
+	parser       *Parser
+	trustedPaths map[string]bool
+	trustedFile  string
+	mu           sync.RWMutex
 }
 
 // LoaderConfig configures the filter loader

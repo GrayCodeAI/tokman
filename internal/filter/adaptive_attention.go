@@ -18,13 +18,13 @@ import (
 // Key insight: Attention patterns reveal token importance.
 type AdaptiveAttentionFilter struct {
 	// Attention simulation parameters
-	attentionWindow  int
-	attentionDecay   float64
-	
+	attentionWindow int
+	attentionDecay  float64
+
 	// Downsampling parameters
-	downsampleRatio  float64
-	minKeepRatio     float64
-	
+	downsampleRatio float64
+	minKeepRatio    float64
+
 	// Threshold settings
 	highAttnThreshold float64
 	lowAttnThreshold  float64
@@ -52,16 +52,16 @@ func (f *AdaptiveAttentionFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
-	
+
 	original := len(input)
-	
+
 	// Calculate attention scores for each line
 	lines := strings.Split(input, "\n")
 	scores := f.calculateAttentionScores(lines)
-	
+
 	// Apply adaptive downsampling
 	output := f.adaptiveDownsample(lines, scores, mode)
-	
+
 	saved := (original - len(output)) / 4
 	return output, saved
 }
@@ -69,21 +69,21 @@ func (f *AdaptiveAttentionFilter) Apply(input string, mode Mode) (string, int) {
 // calculateAttentionScores simulates attention scoring for lines
 func (f *AdaptiveAttentionFilter) calculateAttentionScores(lines []string) []float64 {
 	scores := make([]float64, len(lines))
-	
+
 	for i := range lines {
 		// Position-based attention (U-curve - higher at edges)
 		posScore := f.positionAttention(i, len(lines))
-		
+
 		// Content-based attention
 		contentScore := f.contentAttention(lines[i])
-		
+
 		// Context-based attention (influence of nearby high-attention lines)
 		contextScore := f.contextAttention(lines, i)
-		
+
 		// Combine scores
 		scores[i] = posScore*0.3 + contentScore*0.5 + contextScore*0.2
 	}
-	
+
 	return scores
 }
 
@@ -93,63 +93,63 @@ func (f *AdaptiveAttentionFilter) positionAttention(index, total int) float64 {
 	if total <= 1 {
 		return 1.0
 	}
-	
+
 	// Normalize position
 	pos := float64(index) / float64(total-1)
-	
+
 	// U-curve: higher at edges, lower in middle
 	center := 0.5
 	distance := math.Abs(pos - center)
-	
+
 	// Base score from U-curve
 	score := distance * 2.0
-	
+
 	// Boost very beginning and end
 	if pos < 0.1 {
 		score = 0.9 + pos
 	} else if pos > 0.9 {
 		score = 1.9 - pos
 	}
-	
+
 	return score
 }
 
 // contentAttention calculates content-based attention score
 func (f *AdaptiveAttentionFilter) contentAttention(line string) float64 {
 	score := 0.5 // Base score
-	
+
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Empty lines get low attention
 	if trimmed == "" {
 		return 0.1
 	}
-	
+
 	// Code content gets high attention
 	if f.isCodeContent(trimmed) {
 		score += 0.3
 	}
-	
+
 	// Error/warning content gets very high attention
 	if f.isErrorContent(trimmed) {
 		score += 0.5
 	}
-	
+
 	// Structural markers get high attention
 	if f.isStructuralMarker(trimmed) {
 		score += 0.2
 	}
-	
+
 	// Length factor: longer lines may carry more information
 	if len(trimmed) > 100 {
 		score += 0.1
 	}
-	
+
 	// Penalize repetitive content
 	if f.isRepetitive(trimmed) {
 		score -= 0.3
 	}
-	
+
 	// Clamp to [0, 1]
 	if score < 0 {
 		score = 0
@@ -157,7 +157,7 @@ func (f *AdaptiveAttentionFilter) contentAttention(line string) float64 {
 	if score > 1 {
 		score = 1
 	}
-	
+
 	return score
 }
 
@@ -166,7 +166,7 @@ func (f *AdaptiveAttentionFilter) contextAttention(lines []string, index int) fl
 	if len(lines) == 0 {
 		return 0.5
 	}
-	
+
 	// Look at nearby lines
 	windowStart := index - f.attentionWindow/2
 	if windowStart < 0 {
@@ -176,22 +176,22 @@ func (f *AdaptiveAttentionFilter) contextAttention(lines []string, index int) fl
 	if windowEnd > len(lines) {
 		windowEnd = len(lines)
 	}
-	
+
 	// Calculate context score
 	var nearbyScore float64
 	var weight float64
-	
+
 	for i := windowStart; i < windowEnd; i++ {
 		distance := math.Abs(float64(i - index))
 		w := math.Pow(f.attentionDecay, distance)
-		
+
 		// Content attention of nearby line
 		if i != index {
 			nearbyScore += f.contentAttention(lines[i]) * w
 			weight += w
 		}
 	}
-	
+
 	if weight > 0 {
 		return nearbyScore / weight
 	}
@@ -229,19 +229,19 @@ func (f *AdaptiveAttentionFilter) isErrorContent(line string) bool {
 // isStructuralMarker checks if line is a structural marker
 func (f *AdaptiveAttentionFilter) isStructuralMarker(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	
+
 	// Markdown headings
 	if strings.HasPrefix(trimmed, "#") {
 		return true
 	}
-	
+
 	// File separators
 	if strings.HasPrefix(trimmed, "---") ||
 		strings.HasPrefix(trimmed, "===") ||
 		strings.HasPrefix(trimmed, "```") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -252,7 +252,7 @@ func (f *AdaptiveAttentionFilter) isRepetitive(line string) bool {
 	if len(trimmed) < 4 {
 		return false
 	}
-	
+
 	// Check if all characters are the same
 	first := trimmed[0]
 	for _, c := range trimmed {
@@ -268,10 +268,10 @@ func (f *AdaptiveAttentionFilter) adaptiveDownsample(lines []string, scores []fl
 	if len(lines) == 0 {
 		return ""
 	}
-	
+
 	var result []string
 	lastKept := -10
-	
+
 	// Determine thresholds based on mode
 	highThresh := f.highAttnThreshold
 	lowThresh := f.lowAttnThreshold
@@ -279,10 +279,10 @@ func (f *AdaptiveAttentionFilter) adaptiveDownsample(lines []string, scores []fl
 		highThresh = 0.8
 		lowThresh = 0.4
 	}
-	
+
 	for i, score := range scores {
 		keep := false
-		
+
 		if score >= highThresh {
 			// High attention: always keep
 			keep = true
@@ -298,24 +298,24 @@ func (f *AdaptiveAttentionFilter) adaptiveDownsample(lines []string, scores []fl
 				keep = true
 			}
 		}
-		
+
 		// Always keep structural lines
 		if f.isStructuralMarker(lines[i]) {
 			keep = true
 		}
-		
+
 		// Enforce minimum keep ratio
 		keptRatio := float64(len(result)) / float64(i+1)
 		if keptRatio < f.minKeepRatio && i > 0 {
 			keep = true
 		}
-		
+
 		if keep {
 			result = append(result, lines[i])
 			lastKept = i
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 

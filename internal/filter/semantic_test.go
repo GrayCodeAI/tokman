@@ -14,11 +14,11 @@ func TestSemanticFilter_Name(t *testing.T) {
 
 func TestSemanticFilter_ShortInput(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Very short input should pass through unchanged
 	input := "short"
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	if output != input {
 		t.Errorf("short input should not be filtered: got %q", output)
 	}
@@ -29,7 +29,7 @@ func TestSemanticFilter_ShortInput(t *testing.T) {
 
 func TestSemanticFilter_HighImportanceContent(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Content with errors should be kept
 	input := `Running tests...
 test_auth.py:42: ERROR: Authentication failed
@@ -43,9 +43,9 @@ Stack trace:
   at main() in app.py:100
 
 test result: FAILED. 2 passed; 2 failed; 0 ignored`
-	
+
 	output, _ := f.Apply(input, ModeMinimal)
-	
+
 	// Should keep error-related content
 	if !strings.Contains(output, "ERROR") {
 		t.Error("expected output to contain 'ERROR'")
@@ -60,13 +60,13 @@ test result: FAILED. 2 passed; 2 failed; 0 ignored`
 
 func TestSemanticFilter_LowImportanceContent(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Repetitive low-importance content should be compressed
 	input := strings.Repeat("Success: operation completed successfully\n", 50)
 	input += strings.Repeat("OK: task done\n", 50)
-	
+
 	output, saved := f.Apply(input, ModeAggressive)
-	
+
 	// Should compress significantly
 	if saved == 0 {
 		t.Error("expected some token savings for low-importance repetitive content")
@@ -78,7 +78,7 @@ func TestSemanticFilter_LowImportanceContent(t *testing.T) {
 
 func TestSemanticFilter_ModeThresholds(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Mixed content with some important, some noise
 	input := `Building project...
 Compiling module1...
@@ -99,16 +99,16 @@ error: cannot find type 'User' in scope
    |     ^^^^^^^^^^ not found in this scope
 
 Finished compilation with errors`
-	
+
 	// Test different modes
 	outputMinimal, _ := f.Apply(input, ModeMinimal)
 	outputAggressive, _ := f.Apply(input, ModeAggressive)
-	
+
 	// Aggressive should be shortest
 	if len(outputAggressive) > len(outputMinimal) {
 		t.Error("aggressive mode should produce shorter output than minimal")
 	}
-	
+
 	// All modes should keep the error
 	if !strings.Contains(outputAggressive, "ERROR") {
 		t.Error("aggressive mode should keep ERROR content")
@@ -120,7 +120,7 @@ Finished compilation with errors`
 
 func TestSemanticFilter_SegmentBoundary(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Test boundary detection
 	tests := []struct {
 		line     string
@@ -134,7 +134,7 @@ func TestSemanticFilter_SegmentBoundary(t *testing.T) {
 		{"Compiling module", []string{"prev", "Compiling module", "next"}, 1, true},
 		{"normal line", []string{"prev", "normal line", "next"}, 1, false},
 	}
-	
+
 	for _, tt := range tests {
 		result := f.isSegmentBoundary(tt.line, tt.lines, tt.idx)
 		if result != tt.expected {
@@ -145,7 +145,7 @@ func TestSemanticFilter_SegmentBoundary(t *testing.T) {
 
 func TestSemanticFilter_ScoreSegment(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	tests := []struct {
 		name     string
 		segment  string
@@ -177,7 +177,7 @@ func TestSemanticFilter_ScoreSegment(t *testing.T) {
 			maxScore: 0.8,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := f.scoreSegment(tt.segment)
@@ -191,7 +191,7 @@ func TestSemanticFilter_ScoreSegment(t *testing.T) {
 
 func TestSemanticFilter_UniqueTokenRatio(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	tests := []struct {
 		name     string
 		segment  string
@@ -213,7 +213,7 @@ func TestSemanticFilter_UniqueTokenRatio(t *testing.T) {
 			expected: 0.8, // 4 unique out of 5: error, in, test, found (error repeated once)
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ratio := f.uniqueTokenRatio(tt.segment)
@@ -228,20 +228,20 @@ func TestSemanticFilter_UniqueTokenRatio(t *testing.T) {
 
 func TestSemanticFilter_KeywordDensity(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// High importance keywords should increase score
 	highScore := f.keywordDensity("ERROR: Failed to compile - critical failure")
-	
+
 	// Low importance keywords should decrease score
 	lowScore := f.keywordDensity("Success! OK! Done! Complete! success ok done")
-	
+
 	// Medium importance should be in between
 	mediumScore := f.keywordDensity("Warning: deprecated function in build")
-	
+
 	if highScore <= lowScore {
 		t.Errorf("high importance keywords should score higher: high=%v, low=%v", highScore, lowScore)
 	}
-	
+
 	if mediumScore <= lowScore {
 		t.Errorf("medium importance should score higher than low: medium=%v, low=%v", mediumScore, lowScore)
 	}
@@ -249,7 +249,7 @@ func TestSemanticFilter_KeywordDensity(t *testing.T) {
 
 func TestSemanticFilter_StructuralMarkers(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	tests := []struct {
 		name     string
 		segment  string
@@ -276,7 +276,7 @@ func TestSemanticFilter_StructuralMarkers(t *testing.T) {
 			minScore: 0.0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := f.structuralMarkers(tt.segment)
@@ -290,13 +290,13 @@ func TestSemanticFilter_StructuralMarkers(t *testing.T) {
 
 func TestSemanticFilter_CharEntropy(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// High entropy (varied characters)
 	highEntropy := f.charEntropy("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%")
-	
+
 	// Low entropy (repetitive)
 	lowEntropy := f.charEntropy("aaaaaaaaaaaaaaaaaaaaaaaa")
-	
+
 	if highEntropy <= lowEntropy {
 		t.Errorf("varied text should have higher entropy: high=%v, low=%v", highEntropy, lowEntropy)
 	}
@@ -304,22 +304,22 @@ func TestSemanticFilter_CharEntropy(t *testing.T) {
 
 func TestSemanticFilter_CompressSegment(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Long segment should be compressed
 	longSegment := strings.Repeat("line content\n", 10)
 	compressed := f.compressSegment(longSegment)
-	
+
 	if !strings.Contains(compressed, "...") {
 		t.Error("compressed segment should contain ellipsis")
 	}
 	if !strings.Contains(compressed, "lines omitted") {
 		t.Error("compressed segment should indicate lines omitted")
 	}
-	
+
 	// Short segment should not be compressed
 	shortSegment := "line1\nline2\nline3"
 	notCompressed := f.compressSegment(shortSegment)
-	
+
 	if notCompressed != shortSegment {
 		t.Error("short segment should not be compressed")
 	}
@@ -328,7 +328,7 @@ func TestSemanticFilter_CompressSegment(t *testing.T) {
 func TestSemanticFilter_Integration(t *testing.T) {
 	// Test the semantic filter in the full engine
 	engine := NewEngine(ModeMinimal)
-	
+
 	// Verify semantic filter is included
 	found := false
 	for _, f := range engine.filters {
@@ -337,7 +337,7 @@ func TestSemanticFilter_Integration(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Error("semantic filter should be included in engine")
 	}
@@ -345,7 +345,7 @@ func TestSemanticFilter_Integration(t *testing.T) {
 
 func TestSemanticFilter_RealWorldTestOutput(t *testing.T) {
 	f := NewSemanticFilter()
-	
+
 	// Realistic test output
 	input := `running 150 tests
 test test_auth_login ... ok
@@ -372,9 +372,9 @@ test test_cache_get ... ok
 test test_cache_set ... ok
 
 test result: FAILED. 149 passed; 1 failed; 0 ignored; finished in 0.45s`
-	
+
 	output, _ := f.Apply(input, ModeMinimal)
-	
+
 	// Should keep the failed test details
 	if !strings.Contains(output, "FAILED") {
 		t.Error("should keep FAILED markers")
@@ -392,7 +392,7 @@ test result: FAILED. 149 passed; 1 failed; 0 ignored; finished in 0.45s`
 
 func BenchmarkSemanticFilter_Apply(b *testing.B) {
 	f := NewSemanticFilter()
-	
+
 	// Create a realistic large output
 	var lines []string
 	for i := 0; i < 100; i++ {
@@ -401,9 +401,9 @@ func BenchmarkSemanticFilter_Apply(b *testing.B) {
 	lines = append(lines, "ERROR: Failed to compile module50")
 	lines = append(lines, "error: undefined reference")
 	lines = append(lines, "  --> src/main.rs:100:5")
-	
+
 	input := strings.Join(lines, "\n")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Apply(input, ModeMinimal)

@@ -7,7 +7,7 @@ import (
 
 func TestAttentionSinkFilter_Basic(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	// Create content with enough lines to actually filter
 	// Need more than 4 sinks + anchors + 8 recent lines
 	content := `CRITICAL ERROR: System failure detected
@@ -30,23 +30,23 @@ Filler line 11 that should be filtered out completely.
 Filler line 12 that should be filtered out completely.
 
 FINAL RESULT: Operation completed successfully after retry.`
-	
+
 	output, saved := filter.Apply(content, ModeMinimal)
-	
+
 	t.Logf("Original tokens: %d", EstimateTokens(content))
 	t.Logf("Saved tokens: %d", saved)
 	t.Logf("Output length: %d chars", len(output))
-	
+
 	// Should have saved some tokens
 	if saved <= 0 {
 		t.Errorf("Expected tokens saved > 0, got %d", saved)
 	}
-	
+
 	// Should preserve sink tokens (first lines)
 	if !strings.Contains(output, "CRITICAL") {
 		t.Error("Expected output to contain 'CRITICAL' (attention sink)")
 	}
-	
+
 	// Should preserve recent tokens (last lines)
 	if !strings.Contains(output, "FINAL RESULT") {
 		t.Error("Expected output to contain 'FINAL RESULT' (recent token)")
@@ -55,7 +55,7 @@ FINAL RESULT: Operation completed successfully after retry.`
 
 func TestAttentionSinkFilter_Anchors(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	content := `Starting process...
 Line 1 content here
 Line 2 content here
@@ -69,9 +69,9 @@ Line 9 content here
 Warning: This is a warning message
 Line 11 content here
 Process complete.`
-	
+
 	output, _ := filter.Apply(content, ModeMinimal)
-	
+
 	// Anchor patterns should be preserved
 	if !strings.Contains(output, "Error:") {
 		t.Error("Expected output to contain 'Error:' (anchor pattern)")
@@ -83,7 +83,7 @@ Process complete.`
 
 func TestAttentionSinkFilter_SinkPreservation(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	// First meaningful lines should always be preserved
 	content := `IMPORTANT: This is the first line
 This is the second line of content
@@ -95,9 +95,9 @@ This is the seventh line
 This is the eighth line
 This is the ninth line
 This is the tenth line and final.`
-	
+
 	output, _ := filter.Apply(content, ModeMinimal)
-	
+
 	// First 4 meaningful lines should be preserved
 	if !strings.Contains(output, "IMPORTANT") {
 		t.Error("Expected output to contain first line (attention sink)")
@@ -110,11 +110,11 @@ This is the tenth line and final.`
 func TestAttentionSinkFilter_Disabled(t *testing.T) {
 	filter := NewAttentionSinkFilter()
 	filter.SetEnabled(false)
-	
+
 	content := "This is some content that should not be processed because the filter is disabled."
-	
+
 	output, saved := filter.Apply(content, ModeMinimal)
-	
+
 	if output != content {
 		t.Error("Expected unchanged output when disabled")
 	}
@@ -125,11 +125,11 @@ func TestAttentionSinkFilter_Disabled(t *testing.T) {
 
 func TestAttentionSinkFilter_ShortContent(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	content := "Short"
-	
+
 	output, saved := filter.Apply(content, ModeMinimal)
-	
+
 	// Short content should be returned unchanged
 	if output != content {
 		t.Error("Expected unchanged output for short content")
@@ -141,13 +141,13 @@ func TestAttentionSinkFilter_ShortContent(t *testing.T) {
 
 func TestAttentionSinkFilter_Stats(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	stats := filter.GetStats()
-	
+
 	if stats == nil {
 		t.Error("Expected non-nil stats")
 	}
-	
+
 	if _, ok := stats["enabled"]; !ok {
 		t.Error("Expected 'enabled' in stats")
 	}
@@ -161,18 +161,18 @@ func TestAttentionSinkFilter_Stats(t *testing.T) {
 
 func TestAttentionSinkFilter_RecentPreservation(t *testing.T) {
 	filter := NewAttentionSinkFilter()
-	
+
 	// Build content with many lines
 	var lines []string
 	for i := 0; i < 50; i++ {
 		lines = append(lines, "Line content number "+string(rune('0'+i%10)))
 	}
 	lines = append(lines, "FINAL LINE: This must be preserved")
-	
+
 	content := strings.Join(lines, "\n")
-	
+
 	output, _ := filter.Apply(content, ModeMinimal)
-	
+
 	// Last lines should be preserved
 	if !strings.Contains(output, "FINAL LINE") {
 		t.Error("Expected output to contain last line (recent token)")

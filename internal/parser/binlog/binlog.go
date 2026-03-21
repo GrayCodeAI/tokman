@@ -59,16 +59,16 @@ type RestoreSummary struct {
 
 // Record types from MSBuild binlog format
 const (
-	RecordBuildStarted  = 1
-	RecordBuildFinished = 2
-	RecordProjectStarted = 3
-	RecordProjectFinished = 4
-	RecordError         = 9
-	RecordWarning       = 10
-	RecordMessage       = 11
+	RecordBuildStarted         = 1
+	RecordBuildFinished        = 2
+	RecordProjectStarted       = 3
+	RecordProjectFinished      = 4
+	RecordError                = 9
+	RecordWarning              = 10
+	RecordMessage              = 11
 	RecordCriticalBuildMessage = 13
-	RecordNameValueList = 23
-	RecordString        = 24
+	RecordNameValueList        = 23
+	RecordString               = 24
 )
 
 // Flags for event fields
@@ -384,7 +384,7 @@ func parseBinlogEvents(reader *binReader) (*ParsedBinlog, error) {
 
 // ParsedEventFields holds parsed event field data
 type ParsedEventFields struct {
-	message       string
+	message        string
 	timestampTicks int64
 }
 
@@ -447,13 +447,13 @@ func readOptionalString(reader *binReader, parsed *ParsedBinlog) (string, error)
 	if strLen < 0 {
 		return "", nil
 	}
-	
+
 	// Check if it's a deduplicated string reference
 	if int(strLen) < len(parsed.stringRecords) && strLen < 100 {
 		// Likely a reference to the string table
 		// For now, read the actual string
 	}
-	
+
 	buf := make([]byte, strLen)
 	_, err = io.ReadFull(reader.reader, buf)
 	return string(buf), err

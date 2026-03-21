@@ -65,27 +65,27 @@ func NewSummarizer(cfg Config) *Summarizer {
 // NewSummarizerFromEnv creates a summarizer from environment variables
 func NewSummarizerFromEnv() *Summarizer {
 	cfg := DefaultConfig()
-	
+
 	// Check for explicit provider
 	if provider := os.Getenv("TOKMAN_LLM_PROVIDER"); provider != "" {
 		cfg.Provider = Provider(provider)
 	}
-	
+
 	// Check for model
 	if model := os.Getenv("TOKMAN_LLM_MODEL"); model != "" {
 		cfg.Model = model
 	}
-	
+
 	// Check for base URL
 	if baseURL := os.Getenv("TOKMAN_LLM_BASE_URL"); baseURL != "" {
 		cfg.BaseURL = baseURL
 	}
-	
+
 	// Auto-detect provider if not set
 	if cfg.Provider == ProviderNone {
 		cfg.Provider = detectProvider()
 	}
-	
+
 	return NewSummarizer(cfg)
 }
 
@@ -95,12 +95,12 @@ func detectProvider() Provider {
 	if isServiceRunning("http://localhost:11434/api/tags") {
 		return ProviderOllama
 	}
-	
+
 	// Try LM Studio
 	if isServiceRunning("http://localhost:1234/v1/models") {
 		return ProviderLMStudio
 	}
-	
+
 	return ProviderNone
 }
 
@@ -153,23 +153,23 @@ func (s *Summarizer) Summarize(req SummaryRequest) (*SummaryResponse, error) {
 	if !s.IsAvailable() {
 		return nil, fmt.Errorf("LLM provider not available")
 	}
-	
+
 	// Build prompt based on intent
 	prompt := s.buildPrompt(req)
-	
+
 	// Call the LLM
 	response, err := s.callLLM(prompt, req.MaxTokens)
 	if err != nil {
 		return nil, fmt.Errorf("LLM call failed: %w", err)
 	}
-	
+
 	// Calculate compression ratio
 	originalTokens := len(req.Content) / 4
 	compression := float64(originalTokens) / float64(response.TokensUsed)
 	if response.TokensUsed == 0 {
 		compression = 1.0
 	}
-	
+
 	return &SummaryResponse{
 		Summary:     response.Content,
 		TokensUsed:  response.TokensUsed,
@@ -182,10 +182,10 @@ func (s *Summarizer) Summarize(req SummaryRequest) (*SummaryResponse, error) {
 // buildPrompt constructs the summarization prompt
 func (s *Summarizer) buildPrompt(req SummaryRequest) string {
 	var prompt strings.Builder
-	
+
 	// System context
 	prompt.WriteString("You are a code context compressor. Your task is to create concise summaries that preserve all critical information for an AI coding agent.\n\n")
-	
+
 	// Intent-specific instructions
 	switch req.Intent {
 	case "debug":
@@ -201,14 +201,14 @@ func (s *Summarizer) buildPrompt(req SummaryRequest) string {
 	default:
 		prompt.WriteString("Focus on: key information, actionable items, and important context.\n")
 	}
-	
+
 	// Format instructions
 	prompt.WriteString("\nFormat rules:\n")
 	prompt.WriteString("- Keep file paths and line numbers exact\n")
 	prompt.WriteString("- Preserve error messages verbatim when critical\n")
 	prompt.WriteString("- Use bullet points for lists\n")
 	prompt.WriteString("- Maximum 3-5 sentences total\n\n")
-	
+
 	// Add the content
 	prompt.WriteString("Content to summarize:\n```\n")
 	maxContent := 8000 // Limit context window
@@ -219,7 +219,7 @@ func (s *Summarizer) buildPrompt(req SummaryRequest) string {
 		prompt.WriteString(req.Content)
 	}
 	prompt.WriteString("\n```\n\nSummary:")
-	
+
 	return prompt.String()
 }
 
@@ -247,7 +247,7 @@ type ollamaRequest struct {
 	Prompt  string `json:"prompt"`
 	Stream  bool   `json:"stream"`
 	Options struct {
-		NumPredict int `json:"num_predict"`
+		NumPredict  int     `json:"num_predict"`
 		Temperature float64 `json:"temperature"`
 	} `json:"options"`
 }
@@ -270,28 +270,28 @@ func (s *Summarizer) callOllama(prompt string, maxTokens int) (*llmResponse, err
 	}
 	req.Options.NumPredict = maxTokens
 	req.Options.Temperature = 0.3 // Low temperature for consistent summaries
-	
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	client := &http.Client{Timeout: s.timeout}
 	resp, err := client.Post(s.baseURL+"/api/generate", "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("ollama returned status %d", resp.StatusCode)
 	}
-	
+
 	var result ollamaResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	return &llmResponse{
 		Content:    result.Response,
 		TokensUsed: len(result.Response) / 4, // Approximate
@@ -337,32 +337,32 @@ func (s *Summarizer) callOpenAICompat(prompt string, maxTokens int) (*llmRespons
 		MaxTokens:   maxTokens,
 		Temperature: 0.3,
 	}
-	
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	client := &http.Client{Timeout: s.timeout}
 	resp, err := client.Post(s.baseURL+"/v1/chat/completions", "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
-	
+
 	var result openAIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.Choices) == 0 {
 		return nil, fmt.Errorf("no response from LLM")
 	}
-	
+
 	return &llmResponse{
 		Content:    result.Choices[0].Message.Content,
 		TokensUsed: result.Usage.CompletionTokens,
@@ -376,11 +376,11 @@ func (s *Summarizer) StreamSummary(req SummaryRequest, callback func(string)) (*
 	if !s.IsAvailable() {
 		return nil, fmt.Errorf("LLM provider not available")
 	}
-	
+
 	if s.provider == ProviderOllama {
 		return s.streamOllama(req, callback)
 	}
-	
+
 	// Non-streaming fallback
 	return s.Summarize(req)
 }
@@ -388,7 +388,7 @@ func (s *Summarizer) StreamSummary(req SummaryRequest, callback func(string)) (*
 // streamOllama streams from Ollama API
 func (s *Summarizer) streamOllama(req SummaryRequest, callback func(string)) (*SummaryResponse, error) {
 	prompt := s.buildPrompt(req)
-	
+
 	ollamaReq := ollamaRequest{
 		Model:  s.model,
 		Prompt: prompt,
@@ -396,38 +396,38 @@ func (s *Summarizer) streamOllama(req SummaryRequest, callback func(string)) (*S
 	}
 	ollamaReq.Options.NumPredict = req.MaxTokens
 	ollamaReq.Options.Temperature = 0.3
-	
+
 	body, err := json.Marshal(ollamaReq)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	client := &http.Client{Timeout: s.timeout}
 	resp, err := client.Post(s.baseURL+"/api/generate", "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var fullContent strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
-	
+
 	for scanner.Scan() {
 		var chunk ollamaResponse
 		if err := json.Unmarshal(scanner.Bytes(), &chunk); err != nil {
 			continue
 		}
-		
+
 		if chunk.Response != "" {
 			fullContent.WriteString(chunk.Response)
 			callback(chunk.Response)
 		}
-		
+
 		if chunk.Done {
 			break
 		}
 	}
-	
+
 	content := fullContent.String()
 	return &SummaryResponse{
 		Summary:     content,
@@ -443,7 +443,7 @@ func (s *Summarizer) ListModels() ([]string, error) {
 	if !s.IsAvailable() {
 		return nil, fmt.Errorf("LLM provider not available")
 	}
-	
+
 	switch s.provider {
 	case ProviderOllama:
 		return s.listOllamaModels()
@@ -462,23 +462,23 @@ func (s *Summarizer) listOllamaModels() ([]string, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result struct {
 		Models []struct {
 			Name string `json:"name"`
 		} `json:"models"`
 	}
-	
+
 	body, _ := io.ReadAll(resp.Body)
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
-	
+
 	models := make([]string, len(result.Models))
 	for i, m := range result.Models {
 		models[i] = m.Name
 	}
-	
+
 	return models, nil
 }
 
@@ -490,23 +490,23 @@ func (s *Summarizer) listOpenAIModels() ([]string, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result struct {
 		Data []struct {
 			ID string `json:"id"`
 		} `json:"data"`
 	}
-	
+
 	body, _ := io.ReadAll(resp.Body)
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
-	
+
 	models := make([]string, len(result.Data))
 	for i, m := range result.Data {
 		models[i] = m.ID
 	}
-	
+
 	return models, nil
 }
 

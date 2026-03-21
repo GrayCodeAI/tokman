@@ -32,7 +32,7 @@ Examples:
   tokman grep "func " . -t go
   tokman grep -r "error" . --max-len 60 --max 20`,
 	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
-	RunE: runGrep,
+	RunE:               runGrep,
 }
 
 func init() {
@@ -47,7 +47,7 @@ func runGrep(cmd *cobra.Command, args []string) error {
 
 	// Use standard grep with all args passed through
 	grepArgs := append([]string{}, args...)
-	
+
 	// Add --color=never to avoid ANSI codes
 	grepArgs = append([]string{"--color=never"}, grepArgs...)
 
@@ -59,7 +59,7 @@ func runGrep(cmd *cobra.Command, args []string) error {
 
 	err := c.Run()
 	output := stdout.String()
-	
+
 	// Grep returns exit code 1 when no matches - that's not an error for us
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {

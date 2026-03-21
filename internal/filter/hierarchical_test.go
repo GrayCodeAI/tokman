@@ -15,9 +15,9 @@ func TestHierarchicalFilter_Name(t *testing.T) {
 func TestHierarchicalFilter_SmallInput(t *testing.T) {
 	f := NewHierarchicalFilter()
 	input := "line 1\nline 2\nline 3"
-	
+
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	// Should not process small inputs
 	if output != input {
 		t.Error("expected small input to pass through unchanged")
@@ -30,7 +30,7 @@ func TestHierarchicalFilter_SmallInput(t *testing.T) {
 func TestHierarchicalFilter_LargeInput(t *testing.T) {
 	f := NewHierarchicalFilter()
 	f.SetLineThreshold(10) // Lower threshold for testing
-	
+
 	// Create a large input with sections
 	var lines []string
 	for i := 0; i < 100; i++ {
@@ -40,9 +40,9 @@ func TestHierarchicalFilter_LargeInput(t *testing.T) {
 		lines = append(lines, "line "+string(rune('0'+i%10)))
 	}
 	input := strings.Join(lines, "\n")
-	
+
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	// Should process and compress
 	if output == input {
 		t.Error("expected large input to be compressed")
@@ -50,7 +50,7 @@ func TestHierarchicalFilter_LargeInput(t *testing.T) {
 	if saved <= 0 {
 		t.Error("expected positive token savings")
 	}
-	
+
 	// Should include hierarchical header
 	if !strings.Contains(output, "Hierarchical Summary") {
 		t.Error("expected hierarchical summary header")
@@ -59,7 +59,7 @@ func TestHierarchicalFilter_LargeInput(t *testing.T) {
 
 func TestHierarchicalFilter_SectionBoundary(t *testing.T) {
 	f := NewHierarchicalFilter()
-	
+
 	tests := []struct {
 		line     string
 		expected bool
@@ -75,7 +75,7 @@ func TestHierarchicalFilter_SectionBoundary(t *testing.T) {
 		{"regular line", false},
 		{"", false}, // Empty line needs context
 	}
-	
+
 	for _, tt := range tests {
 		result := f.isSectionBoundary(tt.line, 0, []string{tt.line})
 		if result != tt.expected {
@@ -87,18 +87,18 @@ func TestHierarchicalFilter_SectionBoundary(t *testing.T) {
 func TestHierarchicalFilter_ScoreSection(t *testing.T) {
 	f := NewHierarchicalFilter()
 	sf := NewSemanticFilter()
-	
+
 	tests := []struct {
-		content   string
-		minScore  float64
-		maxScore  float64
+		content  string
+		minScore float64
+		maxScore float64
 	}{
-		{"error: failed to compile", 0.2, 1.0}, // High importance keywords boost score
-		{"warning: deprecated", 0.1, 0.8},      // Medium importance keywords
-		{"success: build complete", 0.0, 0.3},  // Low importance keywords
+		{"error: failed to compile", 0.2, 1.0},       // High importance keywords boost score
+		{"warning: deprecated", 0.1, 0.8},            // Medium importance keywords
+		{"success: build complete", 0.0, 0.3},        // Low importance keywords
 		{"file.go:42: undefined variable", 0.3, 1.0}, // File reference + error keyword
 	}
-	
+
 	for _, tt := range tests {
 		s := section{content: tt.content}
 		score := f.calculateSectionScore(s, sf)
@@ -110,11 +110,11 @@ func TestHierarchicalFilter_ScoreSection(t *testing.T) {
 
 func TestHierarchicalFilter_GenerateSummary(t *testing.T) {
 	f := NewHierarchicalFilter()
-	
+
 	tests := []struct {
-		content    string
-		contains   string
-		maxLen     int
+		content  string
+		contains string
+		maxLen   int
 	}{
 		{
 			"line 1\nerror: something failed\nline 3",
@@ -127,11 +127,11 @@ func TestHierarchicalFilter_GenerateSummary(t *testing.T) {
 			80,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		s := section{content: tt.content}
 		summary := f.generateSectionSummary(s)
-		
+
 		if len(summary) > tt.maxLen {
 			t.Errorf("summary too long: %q (max %d)", summary, tt.maxLen)
 		}
@@ -140,17 +140,17 @@ func TestHierarchicalFilter_GenerateSummary(t *testing.T) {
 
 func TestHierarchicalFilter_Thresholds(t *testing.T) {
 	f := NewHierarchicalFilter()
-	
+
 	tests := []struct {
-		mode         Mode
-		highMin      float64
-		midMin       float64
+		mode    Mode
+		highMin float64
+		midMin  float64
 	}{
 		{ModeAggressive, 0.6, 0.3},
 		{ModeMinimal, 0.4, 0.2},
 		{ModeNone, 0.5, 0.25},
 	}
-	
+
 	for _, tt := range tests {
 		high, mid := f.getThresholds(tt.mode)
 		if high < tt.highMin {
@@ -165,7 +165,7 @@ func TestHierarchicalFilter_Thresholds(t *testing.T) {
 func TestHierarchicalFilter_SetLineThreshold(t *testing.T) {
 	f := NewHierarchicalFilter()
 	f.SetLineThreshold(100)
-	
+
 	if f.lineThreshold != 100 {
 		t.Errorf("expected threshold 100, got %v", f.lineThreshold)
 	}
@@ -174,7 +174,7 @@ func TestHierarchicalFilter_SetLineThreshold(t *testing.T) {
 func TestHierarchicalFilter_SetMaxDepth(t *testing.T) {
 	f := NewHierarchicalFilter()
 	f.SetMaxDepth(5)
-	
+
 	if f.maxDepth != 5 {
 		t.Errorf("expected max depth 5, got %v", f.maxDepth)
 	}

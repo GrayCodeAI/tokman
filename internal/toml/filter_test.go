@@ -8,10 +8,10 @@ import (
 
 func TestTOMLFilterEngine_Apply(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   FilterConfig
-		input    string
-		wantLen  int // approximate expected length
+		name    string
+		config  FilterConfig
+		input   string
+		wantLen int // approximate expected length
 	}{
 		{
 			name: "strip ansi",
@@ -26,40 +26,40 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 			config: FilterConfig{
 				StripLinesMatching: []string{"^DEBUG:.*"},
 			},
-			input:    "DEBUG: line1\nINFO: line2\nDEBUG: line3\nINFO: line4",
-			wantLen:  20, // "INFO: line2\nINFO: line4"
+			input:   "DEBUG: line1\nINFO: line2\nDEBUG: line3\nINFO: line4",
+			wantLen: 20, // "INFO: line2\nINFO: line4"
 		},
 		{
 			name: "keep lines matching",
 			config: FilterConfig{
 				KeepLinesMatching: []string{"ERROR:.*"},
 			},
-			input:    "INFO: line1\nERROR: line2\nINFO: line3\nERROR: line4",
-			wantLen:  22, // "ERROR: line2\nERROR: line4"
+			input:   "INFO: line1\nERROR: line2\nINFO: line3\nERROR: line4",
+			wantLen: 22, // "ERROR: line2\nERROR: line4"
 		},
 		{
 			name: "truncate lines",
 			config: FilterConfig{
 				TruncateLinesAt: 10,
 			},
-			input:    "short\nthis is a very long line that should be truncated\nanother short",
-			wantLen:  38, // "short\nthis is a ...\nanother short"
+			input:   "short\nthis is a very long line that should be truncated\nanother short",
+			wantLen: 38, // "short\nthis is a ...\nanother short"
 		},
 		{
 			name: "head only",
 			config: FilterConfig{
 				Head: 2,
 			},
-			input:    "line1\nline2\nline3\nline4\nline5",
-			wantLen:  30, // "line1\nline2\n... [3 lines truncated]"
+			input:   "line1\nline2\nline3\nline4\nline5",
+			wantLen: 30, // "line1\nline2\n... [3 lines truncated]"
 		},
 		{
 			name: "tail only",
 			config: FilterConfig{
 				Tail: 2,
 			},
-			input:    "line1\nline2\nline3\nline4\nline5",
-			wantLen:  32, // "... [3 lines truncated]\nline4\nline5"
+			input:   "line1\nline2\nline3\nline4\nline5",
+			wantLen: 32, // "... [3 lines truncated]\nline4\nline5"
 		},
 		{
 			name: "head and tail",
@@ -67,16 +67,16 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 				Head: 1,
 				Tail: 1,
 			},
-			input:    "line1\nline2\nline3\nline4\nline5",
-			wantLen:  40, // "line1\n... [3 lines truncated] ...\nline5"
+			input:   "line1\nline2\nline3\nline4\nline5",
+			wantLen: 40, // "line1\n... [3 lines truncated] ...\nline5"
 		},
 		{
 			name: "max lines",
 			config: FilterConfig{
 				MaxLines: 4,
 			},
-			input:    "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8",
-			wantLen:  50, // halves + truncation message
+			input:   "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8",
+			wantLen: 50, // halves + truncation message
 		},
 		{
 			name: "on empty",
@@ -84,8 +84,8 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 				StripLinesMatching: []string{".*"},
 				OnEmpty:            "No output",
 			},
-			input:    "this will all be stripped",
-			wantLen:  9, // "No output"
+			input:   "this will all be stripped",
+			wantLen: 9, // "No output"
 		},
 		{
 			name: "replace patterns",
@@ -95,8 +95,8 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 					{Pattern: "hello", Replacement: "hi"},
 				},
 			},
-			input:    "foo is hello world",
-			wantLen:  16, // "bar is hi world"
+			input:   "foo is hello world",
+			wantLen: 16, // "bar is hi world"
 		},
 	}
 
@@ -229,9 +229,9 @@ func TestMatchOutputUnless(t *testing.T) {
 			config: FilterConfig{
 				MatchOutput: []MatchOutputRule{
 					{
-						Pattern:  "Build succeeded",
-						Message:  "✓ Build OK",
-						Unless:   "error|warning|ERROR|WARNING",
+						Pattern: "Build succeeded",
+						Message: "✓ Build OK",
+						Unless:  "error|warning|ERROR|WARNING",
 					},
 				},
 			},
@@ -243,9 +243,9 @@ func TestMatchOutputUnless(t *testing.T) {
 			config: FilterConfig{
 				MatchOutput: []MatchOutputRule{
 					{
-						Pattern:  "Build succeeded",
-						Message:  "✓ Build OK",
-						Unless:   "error|warning|ERROR|WARNING",
+						Pattern: "Build succeeded",
+						Message: "✓ Build OK",
+						Unless:  "error|warning|ERROR|WARNING",
 					},
 				},
 			},

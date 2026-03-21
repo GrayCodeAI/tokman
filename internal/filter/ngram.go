@@ -32,42 +32,42 @@ func NewNgramAbbreviator() *NgramAbbreviator {
 func initAbbreviations() map[string]string {
 	return map[string]string{
 		// Programming keywords
-		"function":    "fn",
-		"return":      "ret",
-		"const":       "cst",
-		"var":         "vr",
-		"let":         "lt",
-		"import":      "imp",
-		"export":      "exp",
-		"async":       "asc",
-		"await":       "awt",
-		"static":      "stc",
-		"public":      "pub",
-		"private":     "prv",
-		"protected":   "ptd",
-		"interface":   "iface",
-		"implements":  "impl",
-		"extends":     "ext",
-		"namespace":   "ns",
-		"package":     "pkg",
-		"module":      "mod",
-		"class":       "cls",
-		"struct":      "str",
-		"enum":        "en",
-		"constructor": "ctor",
-		"destructor":  "dtor",
-		"parameter":   "param",
-		"argument":    "arg",
-		"variable":    "var",
-		"constant":    "const",
-		"initialize":  "init",
+		"function":      "fn",
+		"return":        "ret",
+		"const":         "cst",
+		"var":           "vr",
+		"let":           "lt",
+		"import":        "imp",
+		"export":        "exp",
+		"async":         "asc",
+		"await":         "awt",
+		"static":        "stc",
+		"public":        "pub",
+		"private":       "prv",
+		"protected":     "ptd",
+		"interface":     "iface",
+		"implements":    "impl",
+		"extends":       "ext",
+		"namespace":     "ns",
+		"package":       "pkg",
+		"module":        "mod",
+		"class":         "cls",
+		"struct":        "str",
+		"enum":          "en",
+		"constructor":   "ctor",
+		"destructor":    "dtor",
+		"parameter":     "param",
+		"argument":      "arg",
+		"variable":      "var",
+		"constant":      "const",
+		"initialize":    "init",
 		"configuration": "cfg",
-		"environment": "env",
-		"development": "dev",
-		"production":  "prod",
-		"staging":     "stag",
-		"testing":     "test",
-		
+		"environment":   "env",
+		"development":   "dev",
+		"production":    "prod",
+		"staging":       "stag",
+		"testing":       "test",
+
 		// Common words
 		"information": "info",
 		"message":     "msg",
@@ -106,64 +106,64 @@ func initAbbreviations() map[string]string {
 func initCodePatterns() map[string]string {
 	return map[string]string{
 		// Type declarations
-		"undefined":      "undef",
-		"null":           "nil",
-		"boolean":        "bool",
-		"integer":        "int",
-		"float":          "flt",
-		"double":         "dbl",
-		"string":         "str",
-		"character":      "chr",
-		"object":         "obj",
-		"array":          "arr",
-		"function":       "fn",
-		"promise":        "pm",
-		"async":          "asc",
-		"await":          "awt",
-		
+		"undefined": "undef",
+		"null":      "nil",
+		"boolean":   "bool",
+		"integer":   "int",
+		"float":     "flt",
+		"double":    "dbl",
+		"string":    "str",
+		"character": "chr",
+		"object":    "obj",
+		"array":     "arr",
+		"function":  "fn",
+		"promise":   "pm",
+		"async":     "asc",
+		"await":     "awt",
+
 		// Common operations
-		"toString":       "toStr",
-		"parseInt":       "toInt",
-		"parseFloat":     "toFlt",
-		"length":         "len",
-		"indexOf":        "idxOf",
-		"substring":      "substr",
-		"replace":        "repl",
-		"contains":       "has",
-		"startsWith":     "startsW",
-		"endsWith":       "endsW",
-		"toLowerCase":    "toLower",
-		"toUpperCase":    "toUpper",
-		"trim":           "trm",
-		"split":          "splt",
-		"join":           "jn",
-		"push":           "psh",
-		"pop":            "pp",
-		"shift":          "shft",
-		"unshift":        "unshft",
-		"slice":          "slc",
-		"splice":         "splc",
-		"forEach":        "each",
-		"map":            "mp",
-		"filter":         "flt",
-		"reduce":         "red",
-		"find":           "fnd",
-		"some":           "sm",
-		"every":          "evry",
-		"includes":       "incl",
-		"sort":           "srt",
-		"reverse":        "rev",
-		"concat":         "cat",
-		"spread":         "sprd",
-		
+		"toString":    "toStr",
+		"parseInt":    "toInt",
+		"parseFloat":  "toFlt",
+		"length":      "len",
+		"indexOf":     "idxOf",
+		"substring":   "substr",
+		"replace":     "repl",
+		"contains":    "has",
+		"startsWith":  "startsW",
+		"endsWith":    "endsW",
+		"toLowerCase": "toLower",
+		"toUpperCase": "toUpper",
+		"trim":        "trm",
+		"split":       "splt",
+		"join":        "jn",
+		"push":        "psh",
+		"pop":         "pp",
+		"shift":       "shft",
+		"unshift":     "unshft",
+		"slice":       "slc",
+		"splice":      "splc",
+		"forEach":     "each",
+		"map":         "mp",
+		"filter":      "flt",
+		"reduce":      "red",
+		"find":        "fnd",
+		"some":        "sm",
+		"every":       "evry",
+		"includes":    "incl",
+		"sort":        "srt",
+		"reverse":     "rev",
+		"concat":      "cat",
+		"spread":      "sprd",
+
 		// Common patterns
-		"console.log":    "log",
-		"console.error":  "logErr",
-		"console.warn":   "logWarn",
-		"console.info":   "logInfo",
-		"return null":    "ret nil",
-		"return true":    "ret T",
-		"return false":   "ret F",
+		"console.log":      "log",
+		"console.error":    "logErr",
+		"console.warn":     "logWarn",
+		"console.info":     "logInfo",
+		"return null":      "ret nil",
+		"return true":      "ret T",
+		"return false":     "ret F",
 		"return undefined": "ret undef",
 	}
 }
@@ -172,72 +172,72 @@ func initCodePatterns() map[string]string {
 func initCLIPatterns() map[string]string {
 	return map[string]string{
 		// Status messages
-		"Successfully":  "✓",
-		"successfully":  "✓",
-		"Success":       "✓",
-		"success":       "✓",
-		"Failed":        "✗",
-		"failed":        "✗",
-		"Failure":       "✗",
-		"failure":       "✗",
-		"Error":         "ERR",
-		"error":         "err",
-		"Warning":       "WARN",
-		"warning":       "warn",
-		"Complete":      "DONE",
-		"complete":      "done",
-		"Finished":      "DONE",
-		"finished":      "done",
-		"Running":       "RUN",
-		"running":       "run",
-		"Starting":      "START",
-		"starting":      "start",
-		"Processing":    "PROC",
-		"processing":    "proc",
-		"Building":      "BUILD",
-		"building":      "build",
-		"Compiling":     "COMP",
-		"compiling":     "comp",
-		"Downloading":   "DL",
-		"downloading":   "dl",
-		"Uploading":     "UL",
-		"uploading":     "ul",
-		"Installing":    "INST",
-		"installing":    "inst",
-		"Uninstalling":  "UNINST",
-		"uninstalling":  "uninst",
-		"Updating":      "UPD",
-		"updating":      "upd",
-		"Creating":      "CREAT",
-		"creating":      "creat",
-		"Deleting":      "DEL",
-		"deleting":      "del",
-		"Modifying":     "MOD",
-		"modifying":     "mod",
-		"Skipping":      "SKIP",
-		"skipping":      "skip",
-		"Ignoring":      "IGN",
-		"ignoring":      "ign",
-		"Checking":      "CHK",
-		"checking":      "chk",
-		"Validating":    "VAL",
-		"validating":    "val",
-		"Verifying":     "VER",
-		"verifying":     "ver",
-		
+		"Successfully": "✓",
+		"successfully": "✓",
+		"Success":      "✓",
+		"success":      "✓",
+		"Failed":       "✗",
+		"failed":       "✗",
+		"Failure":      "✗",
+		"failure":      "✗",
+		"Error":        "ERR",
+		"error":        "err",
+		"Warning":      "WARN",
+		"warning":      "warn",
+		"Complete":     "DONE",
+		"complete":     "done",
+		"Finished":     "DONE",
+		"finished":     "done",
+		"Running":      "RUN",
+		"running":      "run",
+		"Starting":     "START",
+		"starting":     "start",
+		"Processing":   "PROC",
+		"processing":   "proc",
+		"Building":     "BUILD",
+		"building":     "build",
+		"Compiling":    "COMP",
+		"compiling":    "comp",
+		"Downloading":  "DL",
+		"downloading":  "dl",
+		"Uploading":    "UL",
+		"uploading":    "ul",
+		"Installing":   "INST",
+		"installing":   "inst",
+		"Uninstalling": "UNINST",
+		"uninstalling": "uninst",
+		"Updating":     "UPD",
+		"updating":     "upd",
+		"Creating":     "CREAT",
+		"creating":     "creat",
+		"Deleting":     "DEL",
+		"deleting":     "del",
+		"Modifying":    "MOD",
+		"modifying":    "mod",
+		"Skipping":     "SKIP",
+		"skipping":     "skip",
+		"Ignoring":     "IGN",
+		"ignoring":     "ign",
+		"Checking":     "CHK",
+		"checking":     "chk",
+		"Validating":   "VAL",
+		"validating":   "val",
+		"Verifying":    "VER",
+		"verifying":    "ver",
+
 		// Common CLI phrases
-		"Please wait":   "...",
-		"please wait":   "...",
-		"In progress":   "...",
-		"in progress":   "...",
-		"No changes":    "(no changes)",
-		"no changes":    "(no changes)",
-		"Not found":     "(not found)",
-		"not found":     "(not found)",
-		"None":          "(none)",
-		"none":          "(none)",
-		"Empty":         "(empty)",
-		"empty":         "(empty)",
+		"Please wait": "...",
+		"please wait": "...",
+		"In progress": "...",
+		"in progress": "...",
+		"No changes":  "(no changes)",
+		"no changes":  "(no changes)",
+		"Not found":   "(not found)",
+		"not found":   "(not found)",
+		"None":        "(none)",
+		"none":        "(none)",
+		"Empty":       "(empty)",
+		"empty":       "(empty)",
 	}
 }
 
@@ -249,18 +249,18 @@ func (f *NgramAbbreviator) Name() string {
 // Apply applies n-gram abbreviation to the input.
 func (f *NgramAbbreviator) Apply(input string, mode Mode) (string, int) {
 	original := len(input)
-	
+
 	// Don't process very short inputs
 	if original < 100 {
 		return input, 0
 	}
-	
+
 	// Apply abbreviations
 	output := f.applyAbbreviations(input, mode)
-	
+
 	bytesSaved := original - len(output)
 	tokensSaved := bytesSaved / 4
-	
+
 	return output, tokensSaved
 }
 
@@ -268,25 +268,25 @@ func (f *NgramAbbreviator) Apply(input string, mode Mode) (string, int) {
 func (f *NgramAbbreviator) applyAbbreviations(input string, mode Mode) string {
 	// Detect context: code vs CLI
 	isCode := f.detectCodeContext(input)
-	
+
 	output := input
-	
+
 	// Apply CLI patterns first (more aggressive)
 	for pattern, abbrev := range f.cliPatterns {
 		// Case-sensitive replacement for CLI patterns
 		output = strings.ReplaceAll(output, pattern, abbrev)
 	}
-	
+
 	// Apply code patterns (more careful)
 	if isCode {
 		output = f.applyCodeAbbreviations(output, mode)
 	}
-	
+
 	// Apply general abbreviations
 	for pattern, abbrev := range f.abbreviations {
 		output = f.safeReplace(output, pattern, abbrev)
 	}
-	
+
 	return output
 }
 
@@ -299,25 +299,25 @@ func (f *NgramAbbreviator) detectCodeContext(input string) bool {
 		"const ", "let ", "var ",
 		"=>", "{", "}",
 	}
-	
+
 	for _, ind := range codeIndicators {
 		if strings.Contains(input, ind) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // applyCodeAbbreviations applies code-specific abbreviations
 func (f *NgramAbbreviator) applyCodeAbbreviations(input string, mode Mode) string {
 	output := input
-	
+
 	for pattern, abbrev := range f.codePatterns {
 		// Only replace whole words
 		output = f.replaceWord(output, pattern, abbrev)
 	}
-	
+
 	return output
 }
 
@@ -334,13 +334,13 @@ func (f *NgramAbbreviator) replaceWord(input, pattern, replacement string) strin
 	inputRunes := []rune(input)
 	patternRunes := []rune(pattern)
 	patternLen := len(patternRunes)
-	
+
 	i := 0
 	for i < len(inputRunes) {
 		// Check if we have a word match
 		if i+patternLen <= len(inputRunes) {
 			match := true
-			
+
 			// Check word match (case-insensitive for keywords)
 			for j := 0; j < patternLen; j++ {
 				if toLower(inputRunes[i+j]) != patternRunes[j] {
@@ -348,7 +348,7 @@ func (f *NgramAbbreviator) replaceWord(input, pattern, replacement string) strin
 					break
 				}
 			}
-			
+
 			// Check word boundaries
 			if match {
 				// Check before
@@ -360,7 +360,7 @@ func (f *NgramAbbreviator) replaceWord(input, pattern, replacement string) strin
 					match = false
 				}
 			}
-			
+
 			if match {
 				// Add replacement
 				result = append(result, []rune(replacement)...)
@@ -368,11 +368,11 @@ func (f *NgramAbbreviator) replaceWord(input, pattern, replacement string) strin
 				continue
 			}
 		}
-		
+
 		result = append(result, inputRunes[i])
 		i++
 	}
-	
+
 	return string(result)
 }
 
@@ -393,7 +393,7 @@ func isWordChar(r rune) bool {
 func (f *NgramAbbreviator) GetAbbreviationLegend() string {
 	legend := "Abbreviations: "
 	count := 0
-	
+
 	for pattern, abbrev := range f.abbreviations {
 		if count > 0 {
 			legend += ", "
@@ -405,6 +405,6 @@ func (f *NgramAbbreviator) GetAbbreviationLegend() string {
 			break
 		}
 	}
-	
+
 	return legend
 }

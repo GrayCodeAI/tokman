@@ -15,9 +15,9 @@ func TestMultiFileFilter_Name(t *testing.T) {
 func TestMultiFileFilter_SingleFile(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{})
 	input := "single file content\nno markers"
-	
+
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	if output != input {
 		t.Error("expected single file to pass through unchanged")
 	}
@@ -30,7 +30,7 @@ func TestMultiFileFilter_MultipleFiles(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{
 		PreserveBoundaries: true,
 	})
-	
+
 	input := `=== File: main.go ===
 package main
 import "fmt"
@@ -40,19 +40,19 @@ func main() { fmt.Println("hello") }
 package main
 import "fmt"
 func helper() { fmt.Println("helper") }`
-	
+
 	output, saved := f.Apply(input, ModeMinimal)
-	
+
 	// Should detect multiple files
 	if output == input {
 		t.Error("expected multi-file input to be processed")
 	}
-	
+
 	// Should preserve file markers
 	if !strings.Contains(output, "File:") {
 		t.Error("expected file markers to be preserved")
 	}
-	
+
 	// Token savings may be 0 if no deduplication occurs (expected for small similar content)
 	// The key test is that the filter processes without error
 	_ = saved // Verify it runs without panic
@@ -60,7 +60,7 @@ func helper() { fmt.Println("helper") }`
 
 func TestMultiFileFilter_ParseFiles(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{})
-	
+
 	tests := []struct {
 		input       string
 		expectCount int
@@ -71,7 +71,7 @@ func TestMultiFileFilter_ParseFiles(t *testing.T) {
 		{"// File: test.go\ncontent", 1},
 		{"no markers here", 1}, // Single file fallback
 	}
-	
+
 	for _, tt := range tests {
 		files := f.parseFiles(tt.input)
 		if len(files) != tt.expectCount {
@@ -82,7 +82,7 @@ func TestMultiFileFilter_ParseFiles(t *testing.T) {
 
 func TestMultiFileFilter_SameModule(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{})
-	
+
 	tests := []struct {
 		file1    string
 		file2    string
@@ -93,7 +93,7 @@ func TestMultiFileFilter_SameModule(t *testing.T) {
 		{"main.go", "utils.go", true},
 		{"a/b/c/file.go", "a/b/c/other.go", true},
 	}
-	
+
 	for _, tt := range tests {
 		result := f.sameModule(tt.file1, tt.file2)
 		if result != tt.expected {
@@ -104,22 +104,22 @@ func TestMultiFileFilter_SameModule(t *testing.T) {
 
 func TestMultiFileFilter_CalculateSimilarity(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{})
-	
+
 	tests := []struct {
-		content1  string
-		content2  string
-		minSim    float64
-		maxSim    float64
+		content1 string
+		content2 string
+		minSim   float64
+		maxSim   float64
 	}{
 		{"identical content here", "identical content here", 0.9, 1.0},
 		{"completely different text", "totally other words", 0.0, 0.3},
 		{"shared words mixed content", "shared words other stuff", 0.3, 0.8}, // Adjusted range
 	}
-	
+
 	for _, tt := range tests {
 		sim := f.calculateSimilarity(tt.content1, tt.content2)
 		if sim < tt.minSim || sim > tt.maxSim {
-			t.Errorf("calculateSimilarity(%q, %q) = %v, expected [%v, %v]", 
+			t.Errorf("calculateSimilarity(%q, %q) = %v, expected [%v, %v]",
 				tt.content1[:20], tt.content2[:20], sim, tt.minSim, tt.maxSim)
 		}
 	}
@@ -129,7 +129,7 @@ func TestMultiFileFilter_AggressiveMode(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{
 		PreserveBoundaries: true,
 	})
-	
+
 	input := `=== File: main.go ===
 package main
 import "fmt"
@@ -139,9 +139,9 @@ func main() { fmt.Println("hello") }
 package main
 import "fmt"
 export func Helper() { fmt.Println("helper") }`
-	
+
 	output, _ := f.Apply(input, ModeAggressive)
-	
+
 	// Should show file markers in aggressive mode
 	if !strings.Contains(output, "File:") {
 		t.Error("expected aggressive mode to preserve file markers")
@@ -154,7 +154,7 @@ export func Helper() { fmt.Println("helper") }`
 
 func TestMultiFileFilter_ConfigDefaults(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{})
-	
+
 	if f.maxCombinedSize != 50000 {
 		t.Errorf("expected default maxCombinedSize 50000, got %d", f.maxCombinedSize)
 	}
@@ -166,7 +166,7 @@ func TestMultiFileFilter_ConfigDefaults(t *testing.T) {
 func TestMultiFileFilter_SetPreserveBoundaries(t *testing.T) {
 	f := NewMultiFileFilter(MultiFileConfig{PreserveBoundaries: false})
 	f.SetPreserveBoundaries(true)
-	
+
 	if !f.preserveBoundaries {
 		t.Error("expected preserveBoundaries to be true")
 	}

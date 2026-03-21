@@ -17,15 +17,15 @@ import (
 // Key insight: LLMs can understand compressed "gist" representations.
 type GistFilter struct {
 	// Gist markers
-	gistMarker    string
-	chunkMarker   string
-	
+	gistMarker  string
+	chunkMarker string
+
 	// Compression settings
-	maxChunkSize  int
-	minChunkSize  int
-	
+	maxChunkSize int
+	minChunkSize int
+
 	// Semantic patterns
-	patterns      []gistPattern
+	patterns []gistPattern
 }
 
 type gistPattern struct {
@@ -42,7 +42,7 @@ func NewGistFilter() *GistFilter {
 		maxChunkSize: 500,
 		minChunkSize: 50,
 	}
-	
+
 	g.initPatterns()
 	return g
 }
@@ -52,22 +52,22 @@ func (f *GistFilter) initPatterns() {
 	f.patterns = []gistPattern{
 		// Stack traces
 		{pattern: "stack_trace", replacement: "[stack]", priority: 10},
-		
+
 		// Import blocks
 		{pattern: "import_block", replacement: "[imports]", priority: 8},
-		
+
 		// Test output
 		{pattern: "test_output", replacement: "[tests]", priority: 7},
-		
+
 		// Build logs
 		{pattern: "build_log", replacement: "[build]", priority: 6},
-		
+
 		// Git diff
 		{pattern: "git_diff", replacement: "[diff]", priority: 5},
-		
+
 		// JSON blocks
 		{pattern: "json_block", replacement: "[json]", priority: 4},
-		
+
 		// Repeated patterns
 		{pattern: "repeated", replacement: "[×N]", priority: 3},
 	}
@@ -83,15 +83,15 @@ func (f *GistFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
-	
+
 	original := len(input)
-	
+
 	// Identify semantic chunks
 	chunks := f.identifyChunks(input)
-	
+
 	// Create gist representations
 	output := f.createGist(input, chunks, mode)
-	
+
 	saved := (original - len(output)) / 4
 	return output, saved
 }
@@ -100,11 +100,11 @@ func (f *GistFilter) Apply(input string, mode Mode) (string, int) {
 func (f *GistFilter) identifyChunks(input string) []chunk {
 	var chunks []chunk
 	lines := strings.Split(input, "\n")
-	
+
 	var current chunk
 	var inBlock bool
 	var blockType string
-	
+
 	for i, line := range lines {
 		// Detect block starts
 		if !inBlock {
@@ -143,13 +143,13 @@ func (f *GistFilter) identifyChunks(input string) []chunk {
 			}
 		}
 	}
-	
+
 	// Close any remaining block
 	if inBlock {
 		current.end = len(lines) - 1
 		chunks = append(chunks, current)
 	}
-	
+
 	return chunks
 }
 
@@ -220,11 +220,11 @@ func (f *GistFilter) isBlockEnd(line, blockType string) bool {
 func (f *GistFilter) createGist(input string, chunks []chunk, mode Mode) string {
 	lines := strings.Split(input, "\n")
 	var result []string
-	
+
 	// Track which lines are in chunks
 	inChunk := make(map[int]bool)
 	chunkTypes := make(map[int]string)
-	
+
 	for _, c := range chunks {
 		// Only gist large chunks in aggressive mode
 		if mode == ModeAggressive || c.end-c.start > 20 {
@@ -234,7 +234,7 @@ func (f *GistFilter) createGist(input string, chunks []chunk, mode Mode) string 
 			}
 		}
 	}
-	
+
 	// Build output
 	lastGisted := -1
 	for i, line := range lines {
@@ -250,7 +250,7 @@ func (f *GistFilter) createGist(input string, chunks []chunk, mode Mode) string 
 			result = append(result, line)
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 

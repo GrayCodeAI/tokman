@@ -9,11 +9,11 @@ import (
 // TestIntegrationFullPipeline tests the complete 14-layer pipeline
 func TestIntegrationFullPipeline(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          string
-		mode           Mode
-		minReduction   float64
-		shouldBeValid  bool
+		name          string
+		input         string
+		mode          Mode
+		minReduction  float64
+		shouldBeValid bool
 	}{
 		{
 			name: "git_status_output",
@@ -90,8 +90,8 @@ jkl345mno678   postgres:14    "docker-entrypoint.s…"   5 hours ago    Up 5 hou
 			shouldBeValid: true,
 		},
 		{
-			name: "aggressive_mode",
-			input: strings.Repeat("This is a test line with some content that should be filtered aggressively.\n", 100),
+			name:          "aggressive_mode",
+			input:         strings.Repeat("This is a test line with some content that should be filtered aggressively.\n", 100),
 			mode:          ModeAggressive,
 			minReduction:  50.0,
 			shouldBeValid: true,
@@ -101,12 +101,12 @@ jkl345mno678   postgres:14    "docker-entrypoint.s…"   5 hours ago    Up 5 hou
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewPipelineCoordinator(PipelineConfig{
-				Mode:               tt.mode,
-				SessionTracking:    true,
-				NgramEnabled:       true,
-				EnableCompaction:   true,
-				EnableAttribution:  true,
-				EnableH2O:          true,
+				Mode:                tt.mode,
+				SessionTracking:     true,
+				NgramEnabled:        true,
+				EnableCompaction:    true,
+				EnableAttribution:   true,
+				EnableH2O:           true,
 				EnableAttentionSink: true,
 				CompactionThreshold: 50,
 			})
@@ -141,12 +141,12 @@ func TestIntegrationBudgetEnforcement(t *testing.T) {
 	for _, budget := range budgets {
 		t.Run(fmt.Sprintf("budget_%d", budget), func(t *testing.T) {
 			p := NewPipelineCoordinator(PipelineConfig{
-				Mode:            ModeAggressive,
-				Budget:          budget,
-				SessionTracking: true,
-				NgramEnabled:    true,
-				EnableAttribution: true,
-				EnableH2O:       true,
+				Mode:                ModeAggressive,
+				Budget:              budget,
+				SessionTracking:     true,
+				NgramEnabled:        true,
+				EnableAttribution:   true,
+				EnableH2O:           true,
 				EnableAttentionSink: true,
 			})
 
@@ -207,11 +207,11 @@ Layer 14: Attention Sink`
 	for _, query := range queries {
 		t.Run(fmt.Sprintf("query_%s", strings.ReplaceAll(query, " ", "_")), func(t *testing.T) {
 			p := NewPipelineCoordinator(PipelineConfig{
-				Mode:            ModeMinimal,
-				QueryIntent:     query,
-				SessionTracking: true,
+				Mode:              ModeMinimal,
+				QueryIntent:       query,
+				SessionTracking:   true,
 				EnableContrastive: true,
-				EnableGoalDriven: true,
+				EnableGoalDriven:  true,
 			})
 
 			output, stats := p.Process(input)
@@ -236,18 +236,18 @@ func TestIntegrationLargeContext(t *testing.T) {
 	input := generateLargeContext(25000)
 
 	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:            ModeMinimal,
-		EnableEntropy:   true,
-		EnablePerplexity: false, // Skip slow layers for test
-		EnableGoalDriven: false,
-		EnableAST:       true,
-		EnableContrastive: false,
-		EnableEvaluator: true,
-		EnableGist:      true,
-		EnableHierarchical: false,
-		EnableCompaction: false,
-		EnableAttribution: true,
-		EnableH2O:       true,
+		Mode:                ModeMinimal,
+		EnableEntropy:       true,
+		EnablePerplexity:    false, // Skip slow layers for test
+		EnableGoalDriven:    false,
+		EnableAST:           true,
+		EnableContrastive:   false,
+		EnableEvaluator:     true,
+		EnableGist:          true,
+		EnableHierarchical:  false,
+		EnableCompaction:    false,
+		EnableAttribution:   true,
+		EnableH2O:           true,
 		EnableAttentionSink: true,
 	})
 
@@ -340,21 +340,21 @@ Command: go build
 FINAL STATUS: Complete`
 
 	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:               ModeAggressive,
-		SessionTracking:    true,
-		NgramEnabled:       true,
-		QueryIntent:        "debug",
-		EnableEntropy:      true,
-		EnablePerplexity:   true,
-		EnableGoalDriven:   true,
-		EnableAST:          true,
-		EnableContrastive:  true,
-		EnableEvaluator:    true,
-		EnableGist:         true,
-		EnableHierarchical: true,
-		EnableCompaction:   false, // Not conversation content
-		EnableAttribution:  true,
-		EnableH2O:          true,
+		Mode:                ModeAggressive,
+		SessionTracking:     true,
+		NgramEnabled:        true,
+		QueryIntent:         "debug",
+		EnableEntropy:       true,
+		EnablePerplexity:    true,
+		EnableGoalDriven:    true,
+		EnableAST:           true,
+		EnableContrastive:   true,
+		EnableEvaluator:     true,
+		EnableGist:          true,
+		EnableHierarchical:  true,
+		EnableCompaction:    false, // Not conversation content
+		EnableAttribution:   true,
+		EnableH2O:           true,
 		EnableAttentionSink: true,
 	})
 

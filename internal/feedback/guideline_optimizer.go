@@ -14,10 +14,10 @@ import (
 // When an agent fails a task, analyze what context was missing or excessive,
 // and learn guidelines to prevent similar failures in the future.
 type GuidelineOptimizer struct {
-	guidelines []CompressionGuideline
-	failures   []AgentFailure
-	mu         sync.RWMutex
-	filePath   string
+	guidelines    []CompressionGuideline
+	failures      []AgentFailure
+	mu            sync.RWMutex
+	filePath      string
 	maxGuidelines int
 }
 
@@ -31,27 +31,27 @@ type CompressionGuideline struct {
 
 // AgentFailure represents a failure event to learn from
 type AgentFailure struct {
-	Task       string `json:"task"`        // What the agent was trying to do
-	Compressed string `json:"compressed"`  // What the agent received
-	Issue      string `json:"issue"`       // Why it failed
-	Missing    string `json:"missing"`     // What context was needed
-	Timestamp  string `json:"timestamp"`   // When it happened
+	Task       string `json:"task"`       // What the agent was trying to do
+	Compressed string `json:"compressed"` // What the agent received
+	Issue      string `json:"issue"`      // Why it failed
+	Missing    string `json:"missing"`    // What context was needed
+	Timestamp  string `json:"timestamp"`  // When it happened
 }
 
 // NewGuidelineOptimizer creates a new guideline optimizer
 func NewGuidelineOptimizer(dataDir string) *GuidelineOptimizer {
 	filePath := filepath.Join(dataDir, "guidelines.json")
-	
+
 	opt := &GuidelineOptimizer{
 		guidelines:    make([]CompressionGuideline, 0),
 		failures:      make([]AgentFailure, 0),
 		filePath:      filePath,
 		maxGuidelines: 100, // Keep top 100 guidelines
 	}
-	
+
 	// Load existing guidelines
 	opt.load()
-	
+
 	return opt
 }
 
@@ -59,21 +59,21 @@ func NewGuidelineOptimizer(dataDir string) *GuidelineOptimizer {
 func (o *GuidelineOptimizer) AnalyzeFailure(failure AgentFailure) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	// Store failure
 	o.failures = append(o.failures, failure)
-	
+
 	// Keep only last 100 failures for analysis
 	if len(o.failures) > 100 {
 		o.failures = o.failures[1:]
 	}
-	
+
 	// Extract what was missing
 	pattern := o.extractPattern(failure.Missing)
 	if pattern == "" {
 		return
 	}
-	
+
 	// Check if we already have this guideline
 	for i, g := range o.guidelines {
 		if g.Pattern == pattern {
@@ -83,7 +83,7 @@ func (o *GuidelineOptimizer) AnalyzeFailure(failure AgentFailure) {
 			return
 		}
 	}
-	
+
 	// Add new guideline
 	guideline := CompressionGuideline{
 		Pattern:    pattern,
@@ -91,14 +91,14 @@ func (o *GuidelineOptimizer) AnalyzeFailure(failure AgentFailure) {
 		Source:     failure.Task,
 		ApplyCount: 0,
 	}
-	
+
 	o.guidelines = append(o.guidelines, guideline)
-	
+
 	// Trim to max guidelines (keep highest confidence)
 	if len(o.guidelines) > o.maxGuidelines {
 		o.trimGuidelines()
 	}
-	
+
 	o.save()
 }
 
@@ -107,9 +107,9 @@ func (o *GuidelineOptimizer) extractPattern(missing string) string {
 	if missing == "" {
 		return ""
 	}
-	
+
 	lower := strings.ToLower(missing)
-	
+
 	// Common patterns to look for
 	patterns := map[string]string{
 		"test name":     "keep test names in output",
@@ -121,13 +121,13 @@ func (o *GuidelineOptimizer) extractPattern(missing string) string {
 		"assertion":     "keep assertion failures visible",
 		"version":       "show version info for deployments",
 	}
-	
+
 	for keyword, pattern := range patterns {
 		if strings.Contains(lower, keyword) {
 			return pattern
 		}
 	}
-	
+
 	// If no pattern matches, return a generic one based on the first 50 chars
 	if len(missing) > 50 {
 		return "keep context about: " + missing[:50]
@@ -139,18 +139,18 @@ func (o *GuidelineOptimizer) extractPattern(missing string) string {
 func (o *GuidelineOptimizer) EnhanceOutput(original, filtered string) string {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if len(o.guidelines) == 0 {
 		return filtered
 	}
-	
+
 	output := filtered
-	
+
 	for _, g := range o.guidelines {
 		if g.Confidence < 0.7 {
 			continue // Only apply high-confidence guidelines
 		}
-		
+
 		// Check if original contains relevant pattern
 		origMatches := o.countKeywordMatches(original, g.Pattern)
 		if origMatches > 0 {
@@ -162,7 +162,7 @@ func (o *GuidelineOptimizer) EnhanceOutput(original, filtered string) string {
 			}
 		}
 	}
-	
+
 	return output
 }
 
@@ -170,17 +170,17 @@ func (o *GuidelineOptimizer) EnhanceOutput(original, filtered string) string {
 func (o *GuidelineOptimizer) countKeywordMatches(content, pattern string) int {
 	lower := strings.ToLower(content)
 	patternLower := strings.ToLower(pattern)
-	
+
 	fillers := map[string]bool{
 		"keep": true, "in": true, "the": true, "a": true, "an": true,
 		"for": true, "to": true, "and": true, "or": true, "with": true,
 		"from": true, "about": true, "output": true, "visible": true,
 		"context": true,
 	}
-	
+
 	keywords := strings.Fields(patternLower)
 	matches := 0
-	
+
 	for _, kw := range keywords {
 		if len(kw) < 3 || fillers[kw] {
 			continue
@@ -193,7 +193,7 @@ func (o *GuidelineOptimizer) countKeywordMatches(content, pattern string) int {
 			matches++
 		}
 	}
-	
+
 	return matches
 }
 
@@ -201,7 +201,7 @@ func (o *GuidelineOptimizer) countKeywordMatches(content, pattern string) int {
 func (o *GuidelineOptimizer) matchesGuideline(content, pattern string) bool {
 	lower := strings.ToLower(content)
 	patternLower := strings.ToLower(pattern)
-	
+
 	// Extract key terms from pattern (skip common filler words)
 	fillers := map[string]bool{
 		"keep": true, "in": true, "the": true, "a": true, "an": true,
@@ -209,11 +209,11 @@ func (o *GuidelineOptimizer) matchesGuideline(content, pattern string) bool {
 		"from": true, "about": true, "output": true, "visible": true,
 		"context": true,
 	}
-	
+
 	keywords := strings.Fields(patternLower)
 	significantKeywords := 0
 	matches := 0
-	
+
 	for _, kw := range keywords {
 		if len(kw) < 3 || fillers[kw] {
 			continue
@@ -232,7 +232,7 @@ func (o *GuidelineOptimizer) matchesGuideline(content, pattern string) bool {
 			}
 		}
 	}
-	
+
 	// If no significant keywords, fall back to any match
 	if significantKeywords == 0 {
 		for _, kw := range keywords {
@@ -242,7 +242,7 @@ func (o *GuidelineOptimizer) matchesGuideline(content, pattern string) bool {
 		}
 		return false
 	}
-	
+
 	// Require majority of significant keywords to match
 	// This ensures we detect when content is truly missing key parts
 	minMatches := (significantKeywords + 1) / 2 // Round up
@@ -253,7 +253,7 @@ func (o *GuidelineOptimizer) matchesGuideline(content, pattern string) bool {
 func (o *GuidelineOptimizer) restorePattern(original, filtered, pattern string) string {
 	lines := strings.Split(original, "\n")
 	filteredLines := strings.Split(filtered, "\n")
-	
+
 	// Find lines in original that match the pattern
 	var matchingLines []string
 	for _, line := range lines {
@@ -261,30 +261,30 @@ func (o *GuidelineOptimizer) restorePattern(original, filtered, pattern string) 
 			matchingLines = append(matchingLines, line)
 		}
 	}
-	
+
 	// If no matching lines, return as-is
 	if len(matchingLines) == 0 {
 		return filtered
 	}
-	
+
 	// Check if any matching lines are already in filtered
 	filteredSet := make(map[string]bool)
 	for _, line := range filteredLines {
 		filteredSet[strings.TrimSpace(line)] = true
 	}
-	
+
 	var toAdd []string
 	for _, line := range matchingLines {
 		if !filteredSet[strings.TrimSpace(line)] {
 			toAdd = append(toAdd, line)
 		}
 	}
-	
+
 	// Add missing lines at the end
 	if len(toAdd) > 0 {
 		return filtered + "\n\n[Restored from guidelines:]\n" + strings.Join(toAdd, "\n")
 	}
-	
+
 	return filtered
 }
 
@@ -292,7 +292,7 @@ func (o *GuidelineOptimizer) restorePattern(original, filtered, pattern string) 
 func (o *GuidelineOptimizer) GetGuidelines() []CompressionGuideline {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	result := make([]CompressionGuideline, len(o.guidelines))
 	copy(result, o.guidelines)
 	return result
@@ -302,7 +302,7 @@ func (o *GuidelineOptimizer) GetGuidelines() []CompressionGuideline {
 func (o *GuidelineOptimizer) RecordSuccess(pattern string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	for i, g := range o.guidelines {
 		if g.Pattern == pattern {
 			o.guidelines[i].ApplyCount++
@@ -310,7 +310,7 @@ func (o *GuidelineOptimizer) RecordSuccess(pattern string) {
 			break
 		}
 	}
-	
+
 	o.save()
 }
 
@@ -320,12 +320,12 @@ func (o *GuidelineOptimizer) load() {
 	if err != nil {
 		return // No existing file
 	}
-	
+
 	var guidelines []CompressionGuideline
 	if err := json.Unmarshal(data, &guidelines); err != nil {
 		return
 	}
-	
+
 	o.guidelines = guidelines
 }
 
@@ -335,11 +335,11 @@ func (o *GuidelineOptimizer) save() {
 	if err != nil {
 		return
 	}
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(o.filePath)
 	os.MkdirAll(dir, 0755)
-	
+
 	os.WriteFile(o.filePath, data, 0644)
 }
 
@@ -356,7 +356,7 @@ func (o *GuidelineOptimizer) trimGuidelines() {
 		}
 		o.guidelines[i], o.guidelines[maxIdx] = o.guidelines[maxIdx], o.guidelines[i]
 	}
-	
+
 	o.guidelines = o.guidelines[:minInt(target, len(o.guidelines))]
 }
 
