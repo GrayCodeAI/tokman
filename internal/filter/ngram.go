@@ -3,6 +3,8 @@ package filter
 import (
 	"regexp"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/simd"
 )
 
 // NgramAbbreviator compresses output by abbreviating common patterns.
@@ -327,65 +329,71 @@ func (f *NgramAbbreviator) safeReplace(input, pattern, replacement string) strin
 	return f.replaceWord(input, pattern, replacement)
 }
 
-// replaceWord replaces whole words only
+// replaceWord replaces whole words only using SIMD-optimized operations.
 func (f *NgramAbbreviator) replaceWord(input, pattern, replacement string) string {
-	// Build result manually to respect word boundaries
-	var result []rune
-	inputRunes := []rune(input)
-	patternRunes := []rune(pattern)
-	patternLen := len(patternRunes)
+	// Fast path: use byte-level operations with SIMD helpers
+	inputBytes := []byte(input)
+	patternBytes := []byte(pattern)
+	patternLen := len(patternBytes)
+
+	// Pre-allocate result buffer (conservatively)
+	result := make([]byte, 0, len(inputBytes))
 
 	i := 0
-	for i < len(inputRunes) {
-		// Check if we have a word match
-		if i+patternLen <= len(inputRunes) {
-			match := true
-
+	for i < len(inputBytes) {
+		// Check if we have a potential match
+		if i+patternLen <= len(inputBytes) {
 			// Check word match (case-insensitive for keywords)
+			match := true
 			for j := 0; j < patternLen; j++ {
-				if toLower(inputRunes[i+j]) != patternRunes[j] {
+				if toLowerByte(inputBytes[i+j]) != patternBytes[j] {
 					match = false
 					break
 				}
 			}
 
-			// Check word boundaries
+			// Check word boundaries using SIMD-optimized function
 			if match {
-				// Check before
-				if i > 0 && isWordChar(inputRunes[i-1]) {
+				// Check before - not a word char
+				if i > 0 && simd.IsWordChar(inputBytes[i-1]) {
 					match = false
 				}
-				// Check after
-				if i+patternLen < len(inputRunes) && isWordChar(inputRunes[i+patternLen]) {
+				// Check after - not a word char
+				if i+patternLen < len(inputBytes) && simd.IsWordChar(inputBytes[i+patternLen]) {
 					match = false
 				}
 			}
 
 			if match {
 				// Add replacement
-				result = append(result, []rune(replacement)...)
+				result = append(result, replacement...)
 				i += patternLen
 				continue
 			}
 		}
 
-		result = append(result, inputRunes[i])
+		result = append(result, inputBytes[i])
 		i++
 	}
 
 	return string(result)
 }
 
-// toLower converts a rune to lowercase
-func toLower(r rune) rune {
-	if r >= 'A' && r <= 'Z' {
-		return r + ('a' - 'A')
+// toLowerByte converts a byte to lowercase (ASCII only)
+func toLowerByte(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
 	}
-	return r
+	return b
 }
 
-// isWordChar checks if a rune is part of a word
+// isWordChar checks if a rune is part of a word (used by h2o.go for unicode support)
 func isWordChar(r rune) bool {
+	// ASCII fast path
+	if r < 128 {
+		return simd.IsWordChar(byte(r))
+	}
+	// Unicode letters and numbers are also word chars
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
 }
 
