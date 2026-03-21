@@ -488,6 +488,15 @@ func (f *SemanticChunkFilter) filterChunks(chunks []SemanticChunk, mode Mode) (s
 		threshold += 0.2
 	}
 
+	// Safety: for very small inputs, preserve all content
+	if len(chunks) <= 2 {
+		for _, chunk := range chunks {
+			result.WriteString(chunk.Content)
+			result.WriteString("\n")
+		}
+		return strings.TrimSpace(result.String()), 0
+	}
+
 	for _, chunk := range chunks {
 		if chunk.Score >= threshold || (f.config.PreserveStructure && isStructural(chunk.Type)) {
 			result.WriteString(chunk.Content)
@@ -497,7 +506,21 @@ func (f *SemanticChunkFilter) filterChunks(chunks []SemanticChunk, mode Mode) (s
 		}
 	}
 
-	return strings.TrimSpace(result.String()), saved
+	// Safety: if result is empty, preserve the highest-scoring chunk
+	output := strings.TrimSpace(result.String())
+	if output == "" && len(chunks) > 0 {
+		// Find highest scoring chunk
+		bestChunk := chunks[0]
+		for _, c := range chunks {
+			if c.Score > bestChunk.Score {
+				bestChunk = c
+			}
+		}
+		output = bestChunk.Content
+		saved = 0 // Don't claim savings if we're preserving
+	}
+
+	return output, saved
 }
 
 // isStructural returns true if chunk type should be preserved

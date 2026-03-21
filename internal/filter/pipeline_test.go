@@ -110,6 +110,10 @@ func TestQuickProcess(t *testing.T) {
 
 	output, saved := QuickProcess(input, ModeAggressive)
 
+	t.Logf("Input: %q", input)
+	t.Logf("Output: %q", output)
+	t.Logf("Saved: %d", saved)
+
 	if output == "" {
 		t.Error("output should not be empty")
 	}
