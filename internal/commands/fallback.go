@@ -263,6 +263,19 @@ func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.FilterCo
 			stats.OriginalTokens, stats.FinalTokens, stats.ReductionPercent)
 	}
 
+	// R1: Store reversible entry if enabled
+	if IsReversibleEnabled() && len(output) > 100 {
+		store := filter.NewReversibleStore()
+		layerStats := make(map[string]int)
+		for k, v := range stats.LayerStats {
+			layerStats[k] = v.TokensSaved
+		}
+		hash := store.Store("", output, filtered, string(mode), GetTokenBudget(), layerStats)
+		if !IsQuietMode() {
+			fmt.Fprintf(os.Stderr, "[reversible: %s] ", hash)
+		}
+	}
+
 	// If TOML has specific rules, apply them as a final pass
 	if tomlConfig != nil && (len(tomlConfig.Replace) > 0 || len(tomlConfig.MatchOutput) > 0 || len(tomlConfig.StripLinesMatching) > 0) {
 		engine := toml.NewTOMLFilterEngine(tomlConfig)

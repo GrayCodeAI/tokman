@@ -35,6 +35,9 @@ var (
 	compactionMaxTokens  int
 	compactionSnapshot   bool
 	compactionAutoDetect bool
+
+	// Reversible compression (R1: claw-compactor style)
+	reversibleEnabled bool
 )
 
 // Version is set via ldflags during build
@@ -167,6 +170,10 @@ func init() {
 		"use state snapshot format (4-section XML)")
 	rootCmd.PersistentFlags().BoolVar(&compactionAutoDetect, "compaction-auto-detect", true,
 		"auto-detect conversation content for compaction")
+
+	// Reversible compression flag (R1)
+	rootCmd.PersistentFlags().BoolVar(&reversibleEnabled, "reversible", false,
+		"store original output for later restoration (use 'tokman restore' to retrieve)")
 
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("query", rootCmd.PersistentFlags().Lookup("query"))
@@ -369,4 +376,9 @@ func IsQuietMode() bool {
 // IsJSONOutput returns whether JSON output is enabled.
 func IsJSONOutput() bool {
 	return jsonOutput
+}
+
+// IsReversibleEnabled returns whether reversible compression is enabled.
+func IsReversibleEnabled() bool {
+	return reversibleEnabled || os.Getenv("TOKMAN_REVERSIBLE") == "true"
 }
