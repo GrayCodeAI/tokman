@@ -1,4 +1,4 @@
-.PHONY: build build-small build-all build-simd test test-cover lint typecheck vet fmt clean benchmark check
+.PHONY: build build-small build-all build-simd build-tiny test test-cover lint typecheck vet fmt clean benchmark check
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
@@ -6,6 +6,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 GO ?= ~/sdk/go1.26.0/bin/go
 GOEXPERIMENT ?= simd
 
+# T30: Aggressive optimization flags for smaller binary
 LDFLAGS := -s -w -X github.com/GrayCodeAI/tokman/internal/commands.Version=$(VERSION)
 
 # Standard build (stripped symbols)
@@ -16,6 +17,15 @@ build:
 build-small:
 	$(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman ./cmd/tokman
 	@echo "Binary size: $$(du -h bin/tokman | cut -f1)"
+
+# T30: Tiny binary with maximum optimization
+build-tiny:
+	CGO_ENABLED=0 $(GO) build -ldflags="$(LDFLAGS) -extldflags '-static'" -trimpath -tags netgo,osusergo -o bin/tokman-tiny ./cmd/tokman
+	@echo "Tiny binary size: $$(du -h bin/tokman-tiny | cut -f1)"
+	@if command -v upx >/dev/null 2>&1; then \
+		upx --best bin/tokman-tiny -o bin/tokman-upx 2>/dev/null || true; \
+		echo "UPX compressed size: $$(du -h bin/tokman-upx 2>/dev/null | cut -f1 || echo 'N/A')"; \
+	fi
 
 # SIMD-optimized build (requires Go 1.26+)
 build-simd:

@@ -94,6 +94,12 @@ type PipelineCoordinator struct {
 
 	// Layer 20: Agent Memory Mode (Focus-inspired)
 	agentMemoryFilter *AgentMemoryFilter
+
+	// T12: Question-Aware Filter (LongLLMLingua-style)
+	questionAwareFilter *QuestionAwareFilter
+
+	// T17: Density-Adaptive Filter (DAST-style)
+	densityAdaptiveFilter *DensityAdaptiveFilter
 }
 
 // PipelineConfig holds configuration for the compression pipeline
@@ -188,6 +194,15 @@ type PipelineConfig struct {
 	AgentKnowledgeRetention float64
 	AgentHistoryPrune       float64
 	AgentConsolidationMax   int
+
+	// T12: Question-Aware Filter (LongLLMLingua-style)
+	EnableQuestionAware    bool
+	QuestionAwareThreshold float64
+
+	// T17: Density-Adaptive Filter (DAST-style)
+	EnableDensityAdaptive bool
+	DensityTargetRatio    float64
+	DensityThreshold      float64
 }
 
 // NewPipelineCoordinator creates a new 10-layer pipeline coordinator.
@@ -406,6 +421,25 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 		p.agentMemoryFilter = NewAgentMemoryFilterWithConfig(agentCfg)
 	}
 
+	// T12: Question-Aware Filter (LongLLMLingua-style)
+	if cfg.EnableQuestionAware && cfg.QueryIntent != "" {
+		p.questionAwareFilter = NewQuestionAwareFilter(cfg.QueryIntent)
+		if cfg.QuestionAwareThreshold > 0 {
+			p.questionAwareFilter.config.RelevanceThreshold = cfg.QuestionAwareThreshold
+		}
+	}
+
+	// T17: Density-Adaptive Filter (DAST-style)
+	if cfg.EnableDensityAdaptive {
+		p.densityAdaptiveFilter = NewDensityAdaptiveFilter()
+		if cfg.DensityTargetRatio > 0 {
+			p.densityAdaptiveFilter.config.TargetRatio = cfg.DensityTargetRatio
+		}
+		if cfg.DensityThreshold > 0 {
+			p.densityAdaptiveFilter.config.DensityThreshold = cfg.DensityThreshold
+		}
+	}
+
 	return p
 }
 
@@ -572,6 +606,16 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	// Layer 20: Agent Memory Mode (Focus-inspired)
 	if p.agentMemoryFilter != nil {
 		output = p.processLayer20(output, stats)
+	}
+
+	// T12: Question-Aware Recovery (LongLLMLingua-style)
+	if p.questionAwareFilter != nil && !p.shouldSkipGoalDriven() {
+		output = p.processLayerQuestionAware(output, stats)
+	}
+
+	// T17: Density-Adaptive Allocation (DAST-style)
+	if p.densityAdaptiveFilter != nil && !p.shouldSkipSemanticChunk(output) {
+		output = p.processLayerDensityAdaptive(output, stats)
 	}
 
 	// Layer 10: Budget Enforcement (Strict token limits)
@@ -880,6 +924,22 @@ func (p *PipelineCoordinator) processLayer20(input string, stats *PipelineStats)
 	start := time.Now()
 	output, saved := p.agentMemoryFilter.Apply(input, p.config.Mode)
 	stats.LayerStats["20_agent_memory"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// T12: Question-Aware Recovery (LongLLMLingua-style)
+func (p *PipelineCoordinator) processLayerQuestionAware(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.questionAwareFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["21_question_aware"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	return output
+}
+
+// T17: Density-Adaptive Allocation (DAST-style)
+func (p *PipelineCoordinator) processLayerDensityAdaptive(input string, stats *PipelineStats) string {
+	start := time.Now()
+	output, saved := p.densityAdaptiveFilter.Apply(input, p.config.Mode)
+	stats.LayerStats["22_density_adaptive"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
 	return output
 }
 
