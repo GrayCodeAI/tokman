@@ -2,6 +2,47 @@
 
 All notable changes to TokMan will be documented in this file.
 
+## [1.3.0](https://github.com/GrayCodeAI/tokman/compare/v1.2.0...v1.3.0) (2026-03-21)
+
+
+### Features
+
+* add 14 more test files, 4 TOML filters ([9c4e332](https://github.com/GrayCodeAI/tokman/commit/9c4e332d15a30a2a9da051a158033fe94d32ee6e))
+* add adaptive layer selection based on content type ([3527f8e](https://github.com/GrayCodeAI/tokman/commit/3527f8e33304bd04311a8bc63cd0dd5e4a48a8dd))
+* add community TOML filter marketplace (T40) ([deaa28a](https://github.com/GrayCodeAI/tokman/commit/deaa28a01cac0aa78c15c613df41c96f818096f4))
+* add comprehensive benchmark suite for Tokman performance comparison ([357a872](https://github.com/GrayCodeAI/tokman/commit/357a87232f8fcf3788ad38af9f939a2aba9d1842))
+* add dynamic frequency estimation (T11) for +15-20% entropy accuracy ([0beeb6a](https://github.com/GrayCodeAI/tokman/commit/0beeb6a906759c55a77c569e9cc34b36cbec2652))
+* add Go SDK for native token compression ([72d216d](https://github.com/GrayCodeAI/tokman/commit/72d216d0f726dc6e19d7e0e1fd066c91dc796ad8))
+* add LangChain and LlamaIndex integration examples ([2328d0f](https://github.com/GrayCodeAI/tokman/commit/2328d0f7f6d5aeec2cbc0f8ae80ced732c1d0812))
+* add performance optimizations and new features ([e997bfa](https://github.com/GrayCodeAI/tokman/commit/e997bfa22f0c7565337fab0224b014b085efcf3a))
+* add Prometheus metrics and structured logging ([c30c026](https://github.com/GrayCodeAI/tokman/commit/c30c026149e4a5f8ed11001fcd8ca5d851e775bd))
+* add Python SDK for token compression ([cef5caf](https://github.com/GrayCodeAI/tokman/commit/cef5caf3e716f5dc55bd851dbcad298b441f39e6))
+* add reversible compression and restore command ([714a837](https://github.com/GrayCodeAI/tokman/commit/714a8370cac43f0101dd82d0eaa468787b0e3df3))
+* add SIMD-optimized operations for compression hot paths ([5018549](https://github.com/GrayCodeAI/tokman/commit/50185499b8f45ba8227dc477f0a0d17743cb38e0))
+* add stage gates and adaptive attention sinks (T7, T14) ([2a44e69](https://github.com/GrayCodeAI/tokman/commit/2a44e69d2244b79f49334114c235b27802eaf93c))
+* add streaming API for real-time compression ([e24302e](https://github.com/GrayCodeAI/tokman/commit/e24302e181ffd7f2d184c1dee0ada34ba0b17a7b))
+* add T12, T17, T30 - question-aware, density-adaptive, and binary optimization ([f87dfb8](https://github.com/GrayCodeAI/tokman/commit/f87dfb85e9dd4c12634c499be258c84acfa9bfda))
+* add tests, multi-language READMEs, expand TOML filters ([6f76a1a](https://github.com/GrayCodeAI/tokman/commit/6f76a1a4ac44c1e272db4b0d9ff1c2ae81a9609b))
+* add TypeScript/Node.js SDK ([224d690](https://github.com/GrayCodeAI/tokman/commit/224d69098ca91298ce584e5183ea4c0f76bb734c))
+* add WASM build for browser-based compression ([2bff3fc](https://github.com/GrayCodeAI/tokman/commit/2bff3fc1456da0942e7d390120bbeaba9cece43a))
+* implement 7 research-backed compression layers (Layers 15-20) ([cfe87ba](https://github.com/GrayCodeAI/tokman/commit/cfe87bab387fba456a02ff601571c4b77c9f1a93))
+* improve attention score simulation (T13) for heavy-hitter identification ([5d0b1f9](https://github.com/GrayCodeAI/tokman/commit/5d0b1f9b39b8bcf9f23b2080cb2d09a07edb554c))
+* port all tokf features to tokman ([7e7ce4a](https://github.com/GrayCodeAI/tokman/commit/7e7ce4a4a7f43b0bfb2f95d1119a9b153ee239bb))
+
+
+### Bug Fixes
+
+* correct unit tests for new compression layers (L15-L19) ([497de4c](https://github.com/GrayCodeAI/tokman/commit/497de4cf284fa4ef6b2f21d3c02e91b8008f8bd3))
+* handle short strings in analyze test preview ([6801134](https://github.com/GrayCodeAI/tokman/commit/68011349622e3f15a4e121ee3ee6258383573cf1))
+* prevent over-pruning on small inputs in compression layers ([ea25908](https://github.com/GrayCodeAI/tokman/commit/ea259085b8122489e1c5d89ac1146555cb906526))
+* remove conflicting -q shorthand from audit command ([e819535](https://github.com/GrayCodeAI/tokman/commit/e8195357ffdd1c882ac36709b23a8ea13f6812ac))
+* resolve 17 code quality issues ([f2bc16a](https://github.com/GrayCodeAI/tokman/commit/f2bc16a121938248f6a9b62112d2a2bf428b6146))
+
+
+### Performance Improvements
+
+* streaming memory optimization for large contexts ([0e216ae](https://github.com/GrayCodeAI/tokman/commit/0e216ae3c793e5f2caa6ecd43efe80fcb81aabb0))
+
 ## [2.1.0] - 2026-03-21
 
 ### Added - Ecosystem Integration
