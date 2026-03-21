@@ -1,44 +1,53 @@
-.PHONY: build build-small build-all test test-cover lint typecheck vet fmt clean benchmark check
+.PHONY: build build-small build-all build-simd test test-cover lint typecheck vet fmt clean benchmark check
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
+# Go 1.26+ with SIMD support
+GO ?= ~/sdk/go1.26.0/bin/go
+GOEXPERIMENT ?= simd
 
 LDFLAGS := -s -w -X github.com/GrayCodeAI/tokman/internal/commands.Version=$(VERSION)
 
 # Standard build (stripped symbols)
 build:
-	go build -ldflags="$(LDFLAGS)" -o bin/tokman ./cmd/tokman
+	$(GO) build -ldflags="$(LDFLAGS)" -o bin/tokman ./cmd/tokman
 
 # T106: Optimized small binary (strip + compress)
 build-small:
-	go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman ./cmd/tokman
+	$(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman ./cmd/tokman
 	@echo "Binary size: $$(du -h bin/tokman | cut -f1)"
 
-# Multi-platform build
+# SIMD-optimized build (requires Go 1.26+)
+build-simd:
+	GOEXPERIMENT=$(GOEXPERIMENT) $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-simd ./cmd/tokman
+	@echo "SIMD binary size: $$(du -h bin/tokman-simd | cut -f1)"
+
+# Multi-platform build with SIMD
 build-all:
-	GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-linux-amd64 ./cmd/tokman
-	GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-linux-arm64 ./cmd/tokman
-	GOOS=darwin GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-darwin-amd64 ./cmd/tokman
-	GOOS=darwin GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-darwin-arm64 ./cmd/tokman
-	GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-windows-amd64.exe ./cmd/tokman
+	GOEXPERIMENT=$(GOEXPERIMENT) GOOS=linux GOARCH=amd64 $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-linux-amd64 ./cmd/tokman
+	GOEXPERIMENT=$(GOEXPERIMENT) GOOS=linux GOARCH=arm64 $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-linux-arm64 ./cmd/tokman
+	GOEXPERIMENT=$(GOEXPERIMENT) GOOS=darwin GOARCH=amd64 $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-darwin-amd64 ./cmd/tokman
+	GOEXPERIMENT=$(GOEXPERIMENT) GOOS=darwin GOARCH=arm64 $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-darwin-arm64 ./cmd/tokman
+	GOEXPERIMENT=$(GOEXPERIMENT) GOOS=windows GOARCH=amd64 $(GO) build -ldflags="$(LDFLAGS)" -trimpath -o bin/tokman-windows-amd64.exe ./cmd/tokman
 
 test:
-	go test -race -count=1 ./...
+	GOEXPERIMENT=$(GOEXPERIMENT) $(GO) test -race -count=1 ./...
 
 test-short:
-	go test -short -count=1 ./...
+	GOEXPERIMENT=$(GOEXPERIMENT) $(GO) test -short -count=1 ./...
 
 test-cover:
-	go test -race -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
+	GOEXPERIMENT=$(GOEXPERIMENT) $(GO) test -race -coverprofile=coverage.out ./...
+	$(GO) tool cover -html=coverage.out -o coverage.html
 
 lint:
 	golangci-lint run ./...
 
 typecheck:
-	go vet ./...
+	$(GO) vet ./...
 
 vet:
-	go vet ./...
+	$(GO) vet ./...
 
 fmt:
 	gofmt -s -w .
@@ -48,7 +57,7 @@ clean:
 	rm -rf bin/ coverage.out coverage.html
 
 benchmark:
-	go test -bench=. -benchmem ./...
+	GOEXPERIMENT=$(GOEXPERIMENT) $(GO) test -bench=. -benchmem ./...
 
 # Run all checks
 check: fmt vet typecheck lint test
