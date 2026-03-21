@@ -1,0 +1,30 @@
+# Playwright E2E test filter
+schema_version = 1
+
+[playwright_run]
+match_command = "playwright|npx.*playwright"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*✓",
+    "^\\s*Running",
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "expect\\(.*\\)\\..*",
+    "Failed tests:.*",
+    "Passed:.*",
+    "Failed:.*",
+    "Skipped:.*",
+    "Time:.*",
+]
+max_lines = 100
+
+[playwright_report]
+match_command = "playwright.*show-report"
+strip_ansi = true
+keep_lines_matching = [
+    "http://localhost.*",
+    "Report generated.*",
+]
+max_lines = 10

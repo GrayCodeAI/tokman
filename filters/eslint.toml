@@ -1,0 +1,28 @@
+# ESLint linter filter
+schema_version = 1
+
+[eslint_run]
+match_command = "eslint|npx.*eslint"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "Warning:.*",
+    "✖.*problems.*",
+    ".*errors?\\s*,.*warnings?.*",
+    "line\\s+\\d+.*",
+]
+max_lines = 100
+
+[eslint_fix]
+match_command = "eslint.*--fix"
+strip_ansi = true
+keep_lines_matching = [
+    "Fixed.*problems.*",
+    "Error:.*",
+    "Warning:.*",
+]
+max_lines = 50
+on_empty = "All issues fixed"

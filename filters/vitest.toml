@@ -1,0 +1,30 @@
+# Vitest test runner filter
+schema_version = 1
+
+[vitest_run]
+match_command = "vitest|npx.*vitest"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*✓",
+    "^\\s*✗",
+    "^\\s*$",
+    "Waiting for file changes",
+]
+keep_lines_matching = [
+    "FAIL\\s+.*",
+    "Error:.*",
+    "AssertionError.*",
+    "Test Files:.*",
+    "Tests:.*failed.*",
+    "Duration:.*",
+]
+max_lines = 80
+
+[vitest_coverage]
+match_command = "vitest.*--coverage"
+strip_ansi = true
+keep_lines_matching = [
+    "% Stmts.*",
+    "All files.*",
+]
+max_lines = 40

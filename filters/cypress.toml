@@ -1,0 +1,29 @@
+# Cypress E2E test filter
+schema_version = 1
+
+[cypress_run]
+match_command = "cypress|npx.*cypress"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*✓",
+    "^\\s*$",
+    "Cypress.*version",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "AssertionError.*",
+    "Tests Running.*",
+    "Tests Finished.*",
+    "passed.*failed.*",
+]
+max_lines = 80
+
+[cypress_headed]
+match_command = "cypress.*open"
+strip_ansi = true
+keep_lines_matching = [
+    "DevTools.*",
+    "http://localhost.*",
+]
+max_lines = 10
+on_empty = "Cypress opened"

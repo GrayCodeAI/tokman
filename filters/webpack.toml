@@ -1,0 +1,34 @@
+# Webpack bundler filter
+schema_version = 1
+
+[webpack_build]
+match_command = "webpack|npx.*webpack"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+asset.*",
+    "^\\s+orphan modules.*",
+    "^\\s+modules.*",
+    "^\\s+modules by path.*",
+]
+keep_lines_matching = [
+    "ERROR.*",
+    "WARNING.*",
+    "error\\s+in.*",
+    "Compiled successfully.*",
+    "Compiled with warnings.*",
+    "Built at:.*",
+    "webpack.*compiled.*",
+]
+max_lines = 60
+
+[webpack_watch]
+match_command = "webpack.*--watch|webpack.*serve"
+strip_ansi = true
+keep_lines_matching = [
+    "ERROR.*",
+    "Compiled successfully.*",
+    "webpack.*compiled.*",
+    "Project is running at.*",
+]
+max_lines = 15

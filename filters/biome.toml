@@ -1,0 +1,27 @@
+# Biome linter/formatter filter
+schema_version = 1
+
+[biome_check]
+match_command = "biome.*check|npx.*biome"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "error:.*",
+    "warn:.*",
+    "Found.*errors.*",
+    "Checked.*files.*",
+]
+max_lines = 80
+
+[biome_format]
+match_command = "biome.*format|biome.*lint"
+strip_ansi = true
+keep_lines_matching = [
+    "Formatted.*files.*",
+    "Would format.*",
+    "Found.*issues.*",
+]
+max_lines = 30
+on_empty = "All files formatted"

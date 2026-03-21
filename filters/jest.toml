@@ -1,0 +1,34 @@
+# Jest test runner filter
+schema_version = 1
+
+[jest_run]
+match_command = "jest|npm.*test|yarn.*test"
+strip_ansi = true
+strip_lines_matching = [
+    "^PASS\\s+",
+    "^\\s*$",
+    "^\\s*✓",
+    "^\\s*✕",
+    "^Test Suites:\\s+1 passed,\\s+1 total",
+]
+keep_lines_matching = [
+    "FAIL\\s+.*",
+    "Error:.*",
+    "expect\\(.*\\)\\..*",
+    "Test Suites:.*failed.*",
+    "Tests:.*failed.*",
+    "Snapshots:.*",
+    "Time:.*",
+]
+max_lines = 100
+
+[jest_coverage]
+match_command = "jest.*--coverage|npm.*coverage"
+strip_ansi = true
+keep_lines_matching = [
+    "All files.*",
+    "Uncovered Line.*",
+    "File.*|.*%.*|.*",
+]
+max_lines = 50
+on_empty = "Coverage report generated"

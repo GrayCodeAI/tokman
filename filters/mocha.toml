@@ -1,0 +1,27 @@
+# Mocha test runner filter
+schema_version = 1
+
+[mocha_run]
+match_command = "mocha|npm.*mocha"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*✓",
+    "^\\s*$",
+]
+keep_lines_matching = [
+    "Error:.*",
+    "AssertionError.*",
+    "passing.*",
+    "failing.*",
+    "pending.*",
+]
+max_lines = 60
+
+[mocha_reporter]
+match_command = "mocha.*--reporter"
+strip_ansi = true
+keep_lines_matching = [
+    "passing.*",
+    "failing.*",
+]
+max_lines = 20
