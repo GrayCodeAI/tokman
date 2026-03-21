@@ -2,6 +2,52 @@
 
 All notable changes to TokMan will be documented in this file.
 
+## [2.1.0] - 2026-03-21
+
+### Added - Ecosystem Integration
+
+#### MCP Server Mode (T8)
+- **HTTP API Server** - `tokman mcp --port 8080` for Claude/ChatGPT integration
+- **Endpoints**: `/compress`, `/explain`, `/restore`, `/health`
+- **JSON API** - Full token stats, quality scores, and layer breakdowns
+- **Query-aware compression** - Pass `query` parameter for intent-based filtering
+
+#### Proxy Mode (T9)
+- **API Proxy** - `tokman api-proxy --port 7878 --upstream https://api.anthropic.com`
+- **Automatic compression** - Intercepts LLM API responses, compresses large strings
+- **Transparent** - Zero code changes required in client applications
+
+#### Question-Aware Recovery (T12)
+- **Layer 21: QuestionAwareFilter** - Preserves query-relevant context during compression
+- **Keyword extraction** - Identifies important terms from user queries
+- **Context protection** - Prevents removal of answer-relevant passages
+
+#### Density-Adaptive Allocation (T17)
+- **Layer 22: DensityAdaptiveFilter** - Non-uniform compression ratios per section
+- **Density analysis** - Measures information density across content
+- **Selective compression** - Preserves dense regions, aggressively compresses sparse areas
+
+#### Result Fingerprinting (T35)
+- **Content hashing** - SHA-256 fingerprints for compression results
+- **Cache optimization** - Enables content-based deduplication
+- **Layer 11 integration** - Compaction layer reuses fingerprinted content
+
+### Fixed
+- **Audit command** - Removed conflicting `-q` shorthand that caused panic
+
+### Performance
+- **Go 1.26.1** - Upgraded to latest Go with native SIMD support
+- **Benchmark results**:
+  - Small input: 6.6µs/op (167K ops/sec)
+  - Log compression: 47K tokens saved in 5.4ms
+  - 82% compression on test output (balanced mode)
+
+### Pipeline Summary
+- **22 active layers** (L1-L14 original + L15-L22 research-backed)
+- **Stage gates** for zero-cost layer skipping
+- **BM25 scoring** for superior relevance ranking
+- **Adaptive attention sinks** for streaming contexts
+
 ## [2.0.0] - 2026-03-21
 
 ### Added - Go 1.26 SIMD Optimizations
