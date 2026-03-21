@@ -322,15 +322,26 @@ func (f *AgentMemoryFilter) summarizeAction(action string) string {
 // pruneHistory removes redundant or low-value history entries
 func (f *AgentMemoryFilter) pruneHistory(history string) string {
 	lines := strings.Split(history, "\n")
-	var prunedLines []string
+	
+	// Safety: if empty or single line, return as-is
+	if len(lines) <= 1 {
+		return history
+	}
 
 	pruneRatio := f.config.HistoryPruneRatio
 	linesToKeep := int(float64(len(lines)) * (1 - pruneRatio))
+
+	// Ensure we keep at least 1 line
+	if linesToKeep < 1 {
+		linesToKeep = 1
+	}
 
 	// Use sliding window - keep most recent and most relevant
 	if len(lines) <= linesToKeep {
 		return history
 	}
+
+	var prunedLines []string
 
 	// Score each line by relevance
 	type scoredLine struct {
@@ -470,7 +481,14 @@ func (f *AgentMemoryFilter) reconstruct(knowledge, history string) string {
 		parts = append(parts, history)
 	}
 
-	return strings.Join(parts, "\n")
+	// Safety: ensure we always return something
+	result := strings.Join(parts, "\n")
+	if strings.TrimSpace(result) == "" {
+		// Fallback: return original input preserved
+		return knowledge + history
+	}
+
+	return result
 }
 
 // GetStats returns current memory management statistics

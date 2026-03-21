@@ -308,6 +308,11 @@ func (f *SemanticAnchorFilter) findNearestAnchor(pos int) int {
 
 // reconstructWithAnchors reconstructs output using only anchors
 func (f *SemanticAnchorFilter) reconstructWithAnchors(tokens []string, aggregated map[int][]string, mode Mode) (string, int) {
+	// Safety: if no anchors detected, return original input
+	if len(f.anchorTokens) == 0 {
+		return strings.Join(tokens, " "), 0
+	}
+
 	// Sort anchor positions
 	positions := make([]int, len(f.anchorTokens))
 	for i, a := range f.anchorTokens {
