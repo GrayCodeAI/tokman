@@ -194,7 +194,7 @@ func ExamplePluginConfigs() []PluginConfig {
 
 // SaveExamplePlugins saves example plugin configs to the specified directory.
 func SaveExamplePlugins(dir string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -207,7 +207,7 @@ func SaveExamplePlugins(dir string) error {
 
 		filename := fmt.Sprintf("%s.json", cfg.Name)
 		path := filepath.Join(dir, filename)
-		if err := os.WriteFile(path, data, 0644); err != nil {
+		if err := os.WriteFile(path, data, 0600); err != nil {
 			return err
 		}
 	}

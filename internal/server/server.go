@@ -1,20 +1,30 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/GrayCodeAI/tokman/internal/filter"
+	"github.com/GrayCodeAI/tokman/internal/httpmw"
 )
 
-const maxRequestBodySize = 10 * 1024 * 1024 // 10MB
+const (
+	maxRequestBodySize = 10 * 1024 * 1024 // 10MB
+	defaultLayerCount  = 20
+)
 
 // Server provides REST API for token compression
 type Server struct {
 	port        int
 	apiKey      string
+	version     string
 	coordinator *filter.PipelineCoordinator
 	selector    *filter.AdaptiveLayerSelector
 	metrics     *Metrics
@@ -26,6 +36,7 @@ type Config struct {
 	Port     int
 	APIKey   string // Optional API key for authentication (empty = no auth)
 	LogLevel string // "debug", "info", "error"
+	Version  string
 }
 
 // New creates a new server
@@ -39,6 +50,7 @@ func New(config Config) *Server {
 	return &Server{
 		port:     config.Port,
 		apiKey:   config.APIKey,
+		version:  config.Version,
 		selector: filter.NewAdaptiveLayerSelector(),
 		metrics:  NewMetrics(),
 		logger:   NewLogger(config.LogLevel),
@@ -52,10 +64,11 @@ func (s *Server) Start() error {
 	// Health check (no auth required)
 	mux.HandleFunc("/health", s.handleHealth)
 
-	// Compression endpoints
-	mux.HandleFunc("/compress", s.handleCompress)
-	mux.HandleFunc("/compress/adaptive", s.handleCompressAdaptive)
-	mux.HandleFunc("/analyze", s.handleAnalyze)
+	// Compression endpoints (require JSON content type)
+	contentTypeJSON := httpmw.RequireContentType("application/json")
+	mux.Handle("/compress", contentTypeJSON(http.HandlerFunc(s.handleCompress)))
+	mux.Handle("/compress/adaptive", contentTypeJSON(http.HandlerFunc(s.handleCompressAdaptive)))
+	mux.Handle("/analyze", contentTypeJSON(http.HandlerFunc(s.handleAnalyze)))
 
 	// Stats and metrics endpoints
 	mux.HandleFunc("/stats", s.handleStats)
@@ -69,7 +82,7 @@ func (s *Server) Start() error {
 	handler = s.loggingMiddleware(handler)
 
 	addr := fmt.Sprintf(":%d", s.port)
-	s.logger.Info("TokMan server starting", map[string]interface{}{"port": s.port})
+	s.logger.Info("TokMan server starting", map[string]any{"port": s.port})
 
 	srv := &http.Server{
 		Addr:              addr,
@@ -80,7 +93,22 @@ func (s *Server) Start() error {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1MB
 	}
-	return srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+	return nil
 }
 
 // loggingMiddleware logs all requests
@@ -94,7 +122,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrapped, r)
 
 		duration := time.Since(start)
-		s.logger.Debug("request", map[string]interface{}{
+		s.logger.Debug("request", map[string]any{
 			"method":      r.Method,
 			"path":        r.URL.Path,
 			"status":      wrapped.statusCode,
@@ -179,7 +207,7 @@ type StatsResponse struct {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, HealthResponse{
 		Status:  "ok",
-		Version: "1.2.0",
+		Version: s.version,
 	})
 }
 
@@ -194,7 +222,7 @@ func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
 	var req CompressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.metrics.RecordError()
-		s.logger.Error("invalid JSON", map[string]interface{}{"error": err.Error()})
+		s.logger.Error("invalid JSON", map[string]any{"error": err.Error()})
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -233,7 +261,7 @@ func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
 	// Record metrics
 	s.metrics.RecordCompression(stats.OriginalTokens, stats.FinalTokens, elapsed, "unknown")
 
-	s.logger.Info("compression", map[string]interface{}{
+	s.logger.Info("compression", map[string]any{
 		"original_tokens": stats.OriginalTokens,
 		"final_tokens":    stats.FinalTokens,
 		"reduction_pct":   stats.ReductionPercent,
@@ -261,7 +289,7 @@ func (s *Server) handleCompressAdaptive(w http.ResponseWriter, r *http.Request) 
 	var req CompressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.metrics.RecordError()
-		s.logger.Error("invalid JSON", map[string]interface{}{"error": err.Error()})
+		s.logger.Error("invalid JSON", map[string]any{"error": err.Error()})
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -286,7 +314,7 @@ func (s *Server) handleCompressAdaptive(w http.ResponseWriter, r *http.Request) 
 	contentType := s.selector.AnalyzeContent(req.Input).String()
 	s.metrics.RecordCompression(stats.OriginalTokens, stats.FinalTokens, elapsed, contentType)
 
-	s.logger.Info("adaptive compression", map[string]interface{}{
+	s.logger.Info("adaptive compression", map[string]any{
 		"content_type":    contentType,
 		"original_tokens": stats.OriginalTokens,
 		"final_tokens":    stats.FinalTokens,
@@ -330,9 +358,9 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	snapshot := s.metrics.Snapshot()
-	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"version":            "1.2.0",
-		"layer_count":        14,
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"version":            s.version,
+		"layer_count":        defaultLayerCount,
 		"total_requests":     snapshot.TotalRequests,
 		"total_compressions": snapshot.TotalCompressions,
 		"total_tokens_saved": snapshot.TotalTokensSaved,
@@ -347,8 +375,10 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 // Helper
 
-func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
+func jsonResponse(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }

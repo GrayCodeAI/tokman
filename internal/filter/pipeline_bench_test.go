@@ -285,3 +285,74 @@ func generateLargeContext(lines int) string {
 
 	return sb.String()
 }
+
+// BenchmarkStageGates tests the efficiency of early-exit stage gates
+// Stage gates skip layers when not applicable, reducing processing overhead
+func BenchmarkStageGates(b *testing.B) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"short_content", "short text with no structure"},
+		{"medium_structured", generateTestContent(100)},
+		{"large_structured", generateTestContent(1000)},
+	}
+
+	for _, tc := range testCases {
+		b.Run(tc.name, func(b *testing.B) {
+			p := NewPipelineCoordinator(PipelineConfig{
+				Mode:                ModeMinimal,
+				EnableEntropy:       true,
+				EnablePerplexity:    true,
+				EnableGoalDriven:    true,
+				EnableAST:           true,
+				EnableContrastive:   true,
+				EnableEvaluator:     true,
+				EnableGist:          true,
+				EnableHierarchical:  true,
+				EnableCompaction:    true,
+				EnableAttribution:   true,
+				EnableH2O:           true,
+				EnableAttentionSink: true,
+				EnableMetaToken:     true,
+				EnableSemanticChunk: true,
+				EnableSketchStore:   true,
+				EnableLazyPruner:    true,
+				EnableSemanticAnchor: true,
+				EnableAgentMemory:   true,
+				QueryIntent:         "test query",
+				Budget:              500, // Enable budget-dependent layers
+			})
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				p.Process(tc.input)
+			}
+		})
+	}
+}
+
+// BenchmarkPipelineWithBudget tests budget-aware early exit performance
+func BenchmarkPipelineWithBudget(b *testing.B) {
+	input := generateTestContent(5000)
+
+	budgets := []int{0, 1000, 5000, 10000}
+
+	for _, budget := range budgets {
+		b.Run(fmt.Sprintf("budget_%d", budget), func(b *testing.B) {
+			p := NewPipelineCoordinator(PipelineConfig{
+				Mode:              ModeMinimal,
+				Budget:            budget,
+				EnableEntropy:     true,
+				EnablePerplexity:  true,
+				EnableH2O:         true,
+				EnableAttribution: true,
+			})
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				p.Process(input)
+			}
+		})
+	}
+}

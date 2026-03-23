@@ -59,7 +59,7 @@ func BenchmarkPipelineAggressive(b *testing.B) {
 	}
 }
 
-func BenchmarkPipelineWithBudget(b *testing.B) {
+func BenchmarkPipelineWithBudgetSimple(b *testing.B) {
 	input := benchmarkInput(100)
 	p := NewPipelineCoordinator(PipelineConfig{
 		Mode:   ModeMinimal,

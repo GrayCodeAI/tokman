@@ -66,7 +66,7 @@ type SessionContext struct {
 	Commands []CommandRecord `json:"commands"`
 
 	// Key-value store for custom data
-	Extras map[string]interface{} `json:"extras"`
+	Extras map[string]any `json:"extras"`
 }
 
 // CommandRecord tracks a command execution
@@ -92,7 +92,10 @@ type Manager struct {
 // NewManager creates a new session manager
 func NewManager(sessionDir string) *Manager {
 	if sessionDir == "" {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = os.TempDir()
+		}
 		sessionDir = filepath.Join(home, ".local", "share", "tokman", "sessions")
 	}
 
@@ -102,7 +105,9 @@ func NewManager(sessionDir string) *Manager {
 	}
 
 	// Ensure directory exists
-	os.MkdirAll(sessionDir, 0755)
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
 
 	// Load existing sessions
 	m.loadSessions()
@@ -150,7 +155,7 @@ func (m *Manager) NewSession(agent string) *SessionContext {
 		ErrorsSeen:   make([]Error, 0),
 		Patterns:     make(map[string]int),
 		Commands:     make([]CommandRecord, 0),
-		Extras:       make(map[string]interface{}),
+		Extras:       make(map[string]any),
 	}
 
 	m.sessions[ctx.ID] = ctx
@@ -220,7 +225,9 @@ func (m *Manager) DeleteSession(id string) error {
 
 	// Remove persisted file
 	path := filepath.Join(m.sessionDir, id+".json")
-	os.Remove(path)
+	if err := os.Remove(path); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", path, err)
+	}
 
 	return nil
 }
@@ -233,7 +240,7 @@ func (m *Manager) persist(ctx *SessionContext) error {
 	}
 
 	path := filepath.Join(m.sessionDir, ctx.ID+".json")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 // Sync persists the session to disk

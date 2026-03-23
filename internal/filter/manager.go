@@ -384,7 +384,9 @@ func (m *PipelineManager) saveTee(input string, ctx CommandContext, reason strin
 	}
 
 	content, _ := json.MarshalIndent(data, "", "  ")
-	os.WriteFile(path, content, 0644)
+	if err := os.WriteFile(path, content, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", path, err)
+	}
 
 	return path
 }
@@ -401,11 +403,11 @@ func (m *PipelineManager) cacheKey(input string, mode Mode, ctx CommandContext) 
 }
 
 // GetStats returns pipeline statistics
-func (m *PipelineManager) GetStats() map[string]interface{} {
+func (m *PipelineManager) GetStats() map[string]any {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	stats := map[string]interface{}{
+	stats := map[string]any{
 		"max_context_tokens": m.config.MaxContextTokens,
 		"chunk_size":         m.config.ChunkSize,
 		"stream_threshold":   m.config.StreamThreshold,

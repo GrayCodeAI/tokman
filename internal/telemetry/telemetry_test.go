@@ -20,26 +20,6 @@ func TestGenerateDeviceHash(t *testing.T) {
 	}
 }
 
-func TestFormatStringSlice(t *testing.T) {
-	tests := []struct {
-		input    []string
-		expected string
-	}{
-		{[]string{}, "[]"},
-		{[]string{"one"}, `["one"]`},
-		{[]string{"one", "two"}, `["one","two"]`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			got := formatStringSlice(tt.input)
-			if got != tt.expected {
-				t.Errorf("formatStringSlice() = %s, want %s", got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestGetVersion(t *testing.T) {
 	// Default version when env not set
 	orig := os.Getenv("TOKMAN_VERSION")

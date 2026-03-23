@@ -8,8 +8,14 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
-// PipelineCoordinator orchestrates the 14-layer compression pipeline.
-// Research-based: Combines the best techniques from 50+ research papers worldwide
+// filterLayer pairs a compression filter with its stats key.
+type filterLayer struct {
+	filter Filter
+	name   string
+}
+
+// PipelineCoordinator orchestrates the 20-layer compression pipeline.
+// Research-based: Combines the best techniques from 120+ research papers worldwide
 // to achieve maximum token reduction for CLI/Agent output.
 //
 // Layer order is critical - each layer builds on the previous:
@@ -24,12 +30,20 @@ import (
 // Layer 8: Gist Compression (Stanford/Berkeley 2023) - 20x+
 // Layer 9: Hierarchical Summary (AutoCompressor, Princeton/MIT 2023) - Extreme
 // Layer 10: Budget Enforcement (Industry standard) - Guaranteed
-// Layer 11: Compaction Layer (Semantic compression) - Auto
+// Layer 11: Compaction Layer (MemGPT, UC Berkeley 2023) - 98%+
 // Layer 12: Attribution Filter (ProCut, LinkedIn 2025) - 78%
 // Layer 13: H2O Filter (Heavy-Hitter Oracle, NeurIPS 2023) - 30x+
 // Layer 14: Attention Sink Filter (StreamingLLM, 2023) - Infinite context stability
+// Layer 15: Meta-Token Compression (arXiv:2506.00307, 2025) - 27% lossless
+// Layer 16: Semantic Chunking (ChunkKV-style) - Context-aware boundaries
+// Layer 17: Sketch Store (KVReviver, Dec 2025) - 90% memory reduction
+// Layer 18: Lazy Pruner (LazyLLM, July 2024) - 2.34x speedup
+// Layer 19: Semantic Anchor (Attention Gradient Detection) - Context preservation
+// Layer 20: Agent Memory (Knowledge Graph Extraction) - Agent-optimized
 type PipelineCoordinator struct {
 	config PipelineConfig
+
+	layers []filterLayer
 
 	// Layer 1: Entropy Filtering
 	entropyFilter *EntropyFilter
@@ -440,6 +454,32 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 		}
 	}
 
+	// Build layers in Process() execution order
+	p.layers = []filterLayer{
+		{p.entropyFilter, "1_entropy"},               // Layer 1
+		{p.perplexityFilter, "2_perplexity"},          // Layer 2
+		{p.goalDrivenFilter, "3_goal_driven"},         // Layer 3
+		{p.astPreserveFilter, "4_ast_preserve"},       // Layer 4
+		{p.contrastiveFilter, "5_contrastive"},        // Layer 5
+		{p.ngramAbbreviator, "6_ngram"},               // Layer 6
+		{p.evaluatorHeadsFilter, "7_evaluator"},       // Layer 7
+		{p.gistFilter, "8_gist"},                      // Layer 8
+		{p.hierarchicalSummaryFilter, "9_hierarchical"}, // Layer 9
+		{p.llmFilter, "neural"},                       // Neural (optional)
+		{p.compactionLayer, "11_compaction"},          // Layer 11
+		{p.attributionFilter, "12_attribution"},       // Layer 12
+		{p.h2oFilter, "13_h2o"},                       // Layer 13
+		{p.attentionSinkFilter, "14_attention_sink"},  // Layer 14
+		{p.metaTokenFilter, "15_meta_token"},          // Layer 15
+		{p.semanticChunkFilter, "16_semantic_chunk"},  // Layer 16
+		{p.sketchStoreFilter, "17_sketch_store"},      // Layer 17
+		{p.lazyPrunerFilter, "18_lazy_pruner"},        // Layer 18
+		{p.semanticAnchorFilter, "19_semantic_anchor"}, // Layer 19
+		{p.agentMemoryFilter, "20_agent_memory"},      // Layer 20
+		{p.questionAwareFilter, "21_question_aware"},  // T12
+		{p.densityAdaptiveFilter, "22_density_adaptive"}, // T17
+	}
+
 	return p
 }
 
@@ -454,172 +494,144 @@ func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 
 	output := input
 
-	// Layer 1: Entropy Filtering (Remove low-information tokens)
-	// T7: Stage gate - skip if content is too short or already dense
+	// Layers 1-9
 	if p.entropyFilter != nil && p.config.EnableEntropy && !p.shouldSkipEntropy(output) {
-		output = p.processLayer1(output, stats)
+		output = p.processLayer(p.layers[0], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 2: Perplexity Pruning (Iterative token removal)
-	// T7: Stage gate - skip if too few lines
 	if p.perplexityFilter != nil && p.config.EnablePerplexity && !p.shouldSkipPerplexity(output) {
-		output = p.processLayer2(output, stats)
+		output = p.processLayer(p.layers[1], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 3: Goal-Driven Selection (CRF-style line scoring)
-	// T7: Stage gate - skip if no query intent
-	if p.goalDrivenFilter != nil && p.config.EnableGoalDriven && !p.shouldSkipGoalDriven() {
-		output = p.processLayer3(output, stats)
+	if p.goalDrivenFilter != nil && p.config.EnableGoalDriven && !p.shouldSkipQueryDependent() {
+		output = p.processLayer(p.layers[2], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 4: AST Preservation (Syntax-aware compression)
 	if p.astPreserveFilter != nil && p.config.EnableAST {
-		output = p.processLayer4(output, stats)
+		output = p.processLayer(p.layers[3], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 5: Contrastive Ranking (Question-relevance scoring)
-	// T7: Stage gate - skip if no query intent
-	if p.contrastiveFilter != nil && p.config.EnableContrastive && !p.shouldSkipContrastive() {
-		output = p.processLayer5(output, stats)
+	if p.contrastiveFilter != nil && p.config.EnableContrastive && !p.shouldSkipQueryDependent() {
+		output = p.processLayer(p.layers[4], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 6: N-gram Abbreviation (Lossless compression)
-	// T7: Stage gate - skip if content is too short or has no patterns
 	if p.ngramAbbreviator != nil && !p.shouldSkipNgram(output) {
-		output = p.processLayer6(output, stats)
+		output = p.processLayer(p.layers[5], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 7: Evaluator Heads (Early-layer attention simulation)
 	if p.evaluatorHeadsFilter != nil && p.config.EnableEvaluator {
-		output = p.processLayer7(output, stats)
+		output = p.processLayer(p.layers[6], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 8: Gist Compression (Virtual token embedding)
 	if p.gistFilter != nil && p.config.EnableGist {
-		output = p.processLayer8(output, stats)
+		output = p.processLayer(p.layers[7], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 9: Hierarchical Summary (Recursive summarization)
 	if p.hierarchicalSummaryFilter != nil && p.config.EnableHierarchical {
-		output = p.processLayer9(output, stats)
+		output = p.processLayer(p.layers[8], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Optional: Neural Layer (LLM-based compression)
+	// Neural (optional, LLM-based)
 	if p.llmFilter != nil {
-		output = p.processLayerNeural(output, stats)
+		output = p.processLayer(p.layers[9], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 11: Compaction Layer (Semantic compression)
-	// T7: Stage gate - skip if not conversation-like content
+	// Layers 11-14
 	if p.compactionLayer != nil && !p.shouldSkipCompaction(output) {
-		output = p.processLayer11(output, stats)
+		output = p.processLayer(p.layers[10], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 12: Attribution Filter (ProCut-style pruning)
 	if p.attributionFilter != nil {
-		output = p.processLayer12(output, stats)
+		output = p.processLayer(p.layers[11], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 13: H2O Filter (Heavy-Hitter Oracle)
-	// T7: Stage gate - skip if content is too short
 	if p.h2oFilter != nil && !p.shouldSkipH2O(output) {
-		output = p.processLayer13(output, stats)
+		output = p.processLayer(p.layers[12], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 14: Attention Sink Filter (StreamingLLM-style)
-	// T7: Stage gate - skip if content is too short
 	if p.attentionSinkFilter != nil && !p.shouldSkipAttentionSink(output) {
-		output = p.processLayer14(output, stats)
+		output = p.processLayer(p.layers[13], output, stats)
 		if p.shouldEarlyExit(stats) {
 			return output, p.finalizeStats(stats, output)
 		}
 	}
 
-	// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
-	// T7: Stage gate - skip if content is too short
+	// Layers 15-20
 	if p.metaTokenFilter != nil && !p.shouldSkipMetaToken(output) {
-		output = p.processLayer15(output, stats)
+		output = p.processLayer(p.layers[14], output, stats)
 	}
 
-	// Layer 16: Semantic Chunk Filter (ChunkKV style)
-	// T7: Stage gate - skip if content is too short
 	if p.semanticChunkFilter != nil && !p.shouldSkipSemanticChunk(output) {
-		output = p.processLayer16(output, stats)
+		output = p.processLayer(p.layers[15], output, stats)
 	}
 
-	// Layer 17: Sketch-based Reversible Store (KVReviver style)
-	// T7: Stage gate - skip if no budget tracking
-	if p.sketchStoreFilter != nil && !p.shouldSkipSketchStore() {
-		output = p.processLayer17(output, stats)
+	if p.sketchStoreFilter != nil && !p.shouldSkipBudgetDependent() {
+		output = p.processLayer(p.layers[16], output, stats)
 	}
 
-	// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
-	// T7: Stage gate - skip if no budget tracking
-	if p.lazyPrunerFilter != nil && !p.shouldSkipLazyPruner() {
-		output = p.processLayer18(output, stats)
+	if p.lazyPrunerFilter != nil && !p.shouldSkipBudgetDependent() {
+		output = p.processLayer(p.layers[17], output, stats)
 	}
 
-	// Layer 19: Semantic-Anchor Compression (SAC style)
 	if p.semanticAnchorFilter != nil {
-		output = p.processLayer19(output, stats)
+		output = p.processLayer(p.layers[18], output, stats)
 	}
 
-	// Layer 20: Agent Memory Mode (Focus-inspired)
 	if p.agentMemoryFilter != nil {
-		output = p.processLayer20(output, stats)
+		output = p.processLayer(p.layers[19], output, stats)
 	}
 
-	// T12: Question-Aware Recovery (LongLLMLingua-style)
-	if p.questionAwareFilter != nil && !p.shouldSkipGoalDriven() {
-		output = p.processLayerQuestionAware(output, stats)
+	// T12: Question-Aware Recovery
+	if p.questionAwareFilter != nil && !p.shouldSkipQueryDependent() {
+		output = p.processLayer(p.layers[20], output, stats)
 	}
 
-	// T17: Density-Adaptive Allocation (DAST-style)
+	// T17: Density-Adaptive Allocation
 	if p.densityAdaptiveFilter != nil && !p.shouldSkipSemanticChunk(output) {
-		output = p.processLayerDensityAdaptive(output, stats)
+		output = p.processLayer(p.layers[21], output, stats)
 	}
 
-	// Layer 10: Budget Enforcement (Strict token limits)
-	output = p.processLayer10(output, stats)
+	// Layer 10: Budget Enforcement (special - sub-filters)
+	output = p.processBudgetLayer(output, stats)
 
 	return output, p.finalizeStats(stats, output)
 }
@@ -666,15 +678,10 @@ func (p *PipelineCoordinator) shouldSkipPerplexity(content string) bool {
 	return false
 }
 
-// shouldSkipGoalDriven checks if goal-driven selection applies.
+// shouldSkipQueryDependent checks if query-dependent layers apply.
+// Used by goal-driven selection (L3) and contrastive ranking (L5).
 // Skip if no query intent is specified.
-func (p *PipelineCoordinator) shouldSkipGoalDriven() bool {
-	return p.config.QueryIntent == ""
-}
-
-// shouldSkipContrastive checks if contrastive ranking applies.
-// Skip if no query intent is specified.
-func (p *PipelineCoordinator) shouldSkipContrastive() bool {
+func (p *PipelineCoordinator) shouldSkipQueryDependent() bool {
 	return p.config.QueryIntent == ""
 }
 
@@ -736,15 +743,10 @@ func (p *PipelineCoordinator) shouldSkipSemanticChunk(content string) bool {
 	return len(content) < 300
 }
 
-// shouldSkipSketchStore checks if sketch storage would help.
+// shouldSkipBudgetDependent checks if budget-dependent layers apply.
+// Used by sketch store (L17) and lazy pruner (L18).
 // Skip if budget tracking isn't enabled.
-func (p *PipelineCoordinator) shouldSkipSketchStore() bool {
-	return p.config.Budget <= 0
-}
-
-// shouldSkipLazyPruner checks if lazy pruning would help.
-// Skip if budget tracking isn't enabled.
-func (p *PipelineCoordinator) shouldSkipLazyPruner() bool {
+func (p *PipelineCoordinator) shouldSkipBudgetDependent() bool {
 	return p.config.Budget <= 0
 }
 
@@ -767,188 +769,19 @@ func (p *PipelineCoordinator) finalizeStats(stats *PipelineStats, output string)
 	return stats
 }
 
-// Layer 1: Entropy Filtering
-func (p *PipelineCoordinator) processLayer1(input string, stats *PipelineStats) string {
+// processLayer runs a single filter layer and records its stats.
+func (p *PipelineCoordinator) processLayer(layer filterLayer, input string, stats *PipelineStats) string {
 	start := time.Now()
-	output, saved := p.entropyFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["1_entropy"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
+	output, saved := layer.filter.Apply(input, p.config.Mode)
+	stats.LayerStats[layer.name] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
 	return output
 }
 
-// Layer 2: Perplexity Pruning
-func (p *PipelineCoordinator) processLayer2(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.perplexityFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["2_perplexity"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 3: Goal-Driven Selection
-func (p *PipelineCoordinator) processLayer3(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.goalDrivenFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["3_goal_driven"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 4: AST Preservation
-func (p *PipelineCoordinator) processLayer4(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.astPreserveFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["4_ast_preserve"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 5: Contrastive Ranking
-func (p *PipelineCoordinator) processLayer5(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.contrastiveFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["5_contrastive"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 6: N-gram Abbreviation
-func (p *PipelineCoordinator) processLayer6(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.ngramAbbreviator.Apply(input, p.config.Mode)
-	stats.LayerStats["6_ngram"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 7: Evaluator Heads
-func (p *PipelineCoordinator) processLayer7(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.evaluatorHeadsFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["7_evaluator"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 8: Gist Compression
-func (p *PipelineCoordinator) processLayer8(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.gistFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["8_gist"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 9: Hierarchical Summary
-func (p *PipelineCoordinator) processLayer9(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.hierarchicalSummaryFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["9_hierarchical"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer Neural: LLM-based compression (optional)
-func (p *PipelineCoordinator) processLayerNeural(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.llmFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["neural"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 11: Compaction (Semantic compression)
-func (p *PipelineCoordinator) processLayer11(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.compactionLayer.Apply(input, p.config.Mode)
-	stats.LayerStats["11_compaction"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 12: Attribution (ProCut-style pruning)
-func (p *PipelineCoordinator) processLayer12(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.attributionFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["12_attribution"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 13: H2O (Heavy-Hitter Oracle)
-func (p *PipelineCoordinator) processLayer13(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.h2oFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["13_h2o"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 14: Attention Sink (StreamingLLM-style)
-func (p *PipelineCoordinator) processLayer14(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.attentionSinkFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["14_attention_sink"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 15: Meta-Token Lossless Compression (arXiv:2506.00307)
-func (p *PipelineCoordinator) processLayer15(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.metaTokenFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["15_meta_token"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 16: Semantic Chunk Filter (ChunkKV style)
-func (p *PipelineCoordinator) processLayer16(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.semanticChunkFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["16_semantic_chunk"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 17: Sketch-based Reversible Store (KVReviver style)
-func (p *PipelineCoordinator) processLayer17(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.sketchStoreFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["17_sketch_store"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 18: Budget-aware Dynamic Pruning (LazyLLM style)
-func (p *PipelineCoordinator) processLayer18(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.lazyPrunerFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["18_lazy_pruner"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 19: Semantic-Anchor Compression (SAC style)
-func (p *PipelineCoordinator) processLayer19(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.semanticAnchorFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["19_semantic_anchor"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 20: Agent Memory Mode (Focus-inspired)
-func (p *PipelineCoordinator) processLayer20(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.agentMemoryFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["20_agent_memory"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// T12: Question-Aware Recovery (LongLLMLingua-style)
-func (p *PipelineCoordinator) processLayerQuestionAware(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.questionAwareFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["21_question_aware"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// T17: Density-Adaptive Allocation (DAST-style)
-func (p *PipelineCoordinator) processLayerDensityAdaptive(input string, stats *PipelineStats) string {
-	start := time.Now()
-	output, saved := p.densityAdaptiveFilter.Apply(input, p.config.Mode)
-	stats.LayerStats["22_density_adaptive"] = LayerStat{TokensSaved: saved, Duration: time.Since(start).Microseconds()}
-	return output
-}
-
-// Layer 10: Budget Enforcement
-func (p *PipelineCoordinator) processLayer10(input string, stats *PipelineStats) string {
+// processBudgetLayer handles Layer 10: Budget Enforcement (special - sub-filters).
+func (p *PipelineCoordinator) processBudgetLayer(input string, stats *PipelineStats) string {
 	output := input
 	totalSaved := 0
 
-	// Session tracking (deduplication)
 	if p.sessionTracker != nil {
 		filtered, saved := p.sessionTracker.Apply(output, p.config.Mode)
 		output = filtered
@@ -956,7 +789,6 @@ func (p *PipelineCoordinator) processLayer10(input string, stats *PipelineStats)
 		stats.LayerStats["10_session"] = LayerStat{TokensSaved: saved}
 	}
 
-	// Budget enforcement (final safety net)
 	if p.budgetEnforcer != nil {
 		filtered, saved := p.budgetEnforcer.Apply(output, p.config.Mode)
 		output = filtered
@@ -1016,95 +848,45 @@ func (s *PipelineStats) String() string {
 	return sb.String()
 }
 
-// QuickProcess is a convenience function for simple compression
-func QuickProcess(input string, mode Mode) (string, int) {
-	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:                mode,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableAttribution:   true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-		EnableMetaToken:     true,
-		EnableSemanticChunk: true,
-		EnableSketchStore:   true,
-		EnableLazyPruner:    true,
-		EnableSemanticAnchor: true,
-		EnableAgentMemory:   true,
-	})
+// QuickProcessOpt is a functional option for QuickProcess
+type QuickProcessOpt func(*PipelineConfig)
 
-	output, stats := p.Process(input)
-	return output, stats.TotalSaved
+// WithBudget sets the token budget
+func WithBudget(budget int) QuickProcessOpt {
+	return func(cfg *PipelineConfig) { cfg.Budget = budget }
 }
 
-// QuickProcessWithBudget is a convenience function for budgeted compression
-func QuickProcessWithBudget(input string, mode Mode, budget int) (string, int) {
-	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:                mode,
-		Budget:              budget,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableAttribution:   true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-		EnableMetaToken:     true,
-		EnableSemanticChunk: true,
-		EnableSketchStore:   true,
-		EnableLazyPruner:    true,
-		EnableSemanticAnchor: true,
-		EnableAgentMemory:   true,
-	})
-
-	output, stats := p.Process(input)
-	return output, stats.TotalSaved
+// WithQuery sets the query intent
+func WithQuery(query string) QuickProcessOpt {
+	return func(cfg *PipelineConfig) { cfg.QueryIntent = query }
 }
 
-// QuickProcessWithQuery is a convenience function for query-aware compression
-func QuickProcessWithQuery(input string, mode Mode, query string) (string, int) {
-	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:                mode,
-		QueryIntent:         query,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableAttribution:   true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-		EnableMetaToken:     true,
-		EnableSemanticChunk: true,
-		EnableSketchStore:   true,
-		EnableLazyPruner:    true,
-		EnableSemanticAnchor: true,
-		EnableAgentMemory:   true,
-	})
-
-	output, stats := p.Process(input)
-	return output, stats.TotalSaved
+// WithLLM enables LLM compression
+func WithLLM() QuickProcessOpt {
+	return func(cfg *PipelineConfig) { cfg.LLMEnabled = true }
 }
 
-// QuickProcessFull is a convenience function with all options
-func QuickProcessFull(input string, mode Mode, query string, budget int, llmEnabled bool) (string, int) {
-	p := NewPipelineCoordinator(PipelineConfig{
-		Mode:                mode,
-		QueryIntent:         query,
-		Budget:              budget,
-		LLMEnabled:          llmEnabled,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableAttribution:   true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-		EnableMetaToken:     true,
-		EnableSemanticChunk: true,
-		EnableSketchStore:   true,
-		EnableLazyPruner:    true,
+// QuickProcess compresses input with optional configuration
+func QuickProcess(input string, mode Mode, opts ...QuickProcessOpt) (string, int) {
+	cfg := PipelineConfig{
+		Mode:                 mode,
+		SessionTracking:      true,
+		NgramEnabled:         true,
+		EnableCompaction:     true,
+		EnableAttribution:    true,
+		EnableH2O:            true,
+		EnableAttentionSink:  true,
+		EnableMetaToken:      true,
+		EnableSemanticChunk:  true,
+		EnableSketchStore:    true,
+		EnableLazyPruner:     true,
 		EnableSemanticAnchor: true,
-		EnableAgentMemory:   true,
-	})
-
+		EnableAgentMemory:    true,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	p := NewPipelineCoordinator(cfg)
 	output, stats := p.Process(input)
 	return output, stats.TotalSaved
 }

@@ -23,7 +23,10 @@ func ConfigPath() string {
 	}
 
 	// Unix: default to ~/.config
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".config", "tokman", "config.toml")
+	}
 	return filepath.Join(home, ".config", "tokman", "config.toml")
 }
 
@@ -48,7 +51,10 @@ func DataPath() string {
 	}
 
 	// Unix: default to ~/.local/share
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".local", "share", "tokman")
+	}
 	return filepath.Join(home, ".local", "share", "tokman")
 }
 
@@ -82,4 +88,26 @@ func ProjectPath() string {
 		return cwd
 	}
 	return canonical
+}
+
+// ConfigDir returns the path to the tokman config directory.
+func ConfigDir() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "tokman")
+	}
+	if runtime.GOOS == "windows" {
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "tokman")
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".config", "tokman")
+	}
+	return filepath.Join(home, ".config", "tokman")
+}
+
+// FiltersDir returns the path to the user filters directory.
+func FiltersDir() string {
+	return filepath.Join(ConfigDir(), "filters")
 }

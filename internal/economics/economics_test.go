@@ -2,6 +2,8 @@ package economics
 
 import (
 	"testing"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 func TestWeightConstants(t *testing.T) {
@@ -151,7 +153,7 @@ func TestFormatTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatTokens(tt.count)
+			result := utils.FormatTokens64(tt.count)
 			if result != tt.expected {
 				t.Errorf("formatTokens(%d) = %q, want %q", tt.count, result, tt.expected)
 			}

@@ -118,7 +118,7 @@ func (t *Tee) Write(raw string, commandSlug string, exitCode int) string {
 	}
 
 	// Create directory if needed
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return ""
 	}
 
@@ -138,7 +138,7 @@ func (t *Tee) Write(raw string, commandSlug string, exitCode int) string {
 	}
 
 	// Write file
-	if err := os.WriteFile(filepath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath, []byte(content), 0600); err != nil {
 		return ""
 	}
 
@@ -195,7 +195,9 @@ func (t *Tee) cleanupOldFiles(dir string) {
 	// Remove oldest files
 	toRemove := len(sorted) - t.config.MaxFiles
 	for i := 0; i < toRemove; i++ {
-		os.Remove(filepath.Join(dir, sorted[i]))
+		if err := os.Remove(filepath.Join(dir, sorted[i])); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", sorted[i], err)
+		}
 	}
 }
 
@@ -217,7 +219,11 @@ func sanitizeSlug(slug string) string {
 
 // FormatHint formats a file path as a hint string with ~ shorthand.
 func FormatHint(path string) string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+
 	display := path
 
 	if home != "" {

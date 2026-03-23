@@ -34,9 +34,14 @@ type StoredEntry struct {
 
 // NewReversibleStore creates a store in the tokman data directory.
 func NewReversibleStore() *ReversibleStore {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 	baseDir := filepath.Join(home, ".local", "share", "tokman", "reversible")
-	os.MkdirAll(baseDir, 0755)
+	if err := os.MkdirAll(baseDir, 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
 	return &ReversibleStore{baseDir: baseDir}
 }
 
@@ -61,7 +66,9 @@ func (s *ReversibleStore) Store(command, original, compressed string, mode strin
 	data, _ := json.Marshal(entry)
 	filename := fmt.Sprintf("%s_%s.json", time.Now().Format("20060102_150405"), hash[:8])
 	path := filepath.Join(s.baseDir, filename)
-	os.WriteFile(path, data, 0644)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", path, err)
+	}
 
 	return hash[:12]
 }
@@ -143,8 +150,11 @@ func (s *ReversibleStore) Cleanup(maxAge time.Duration) int {
 			continue
 		}
 		if info.ModTime().Before(cutoff) {
-			os.Remove(filepath.Join(s.baseDir, e.Name()))
-			removed++
+			if err := os.Remove(filepath.Join(s.baseDir, e.Name())); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
+			} else {
+				removed++
+			}
 		}
 	}
 	return removed

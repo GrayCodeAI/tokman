@@ -8,9 +8,32 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/integrity"
 	"github.com/GrayCodeAI/tokman/internal/utils"
+
+	// Sub-package imports (blank imports for side effects - init() registration)
+	_ "github.com/GrayCodeAI/tokman/internal/commands/agents"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/analysis"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/build"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/cloud"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/configcmd"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/container"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/core"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/filtercmd"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/hooks"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/init"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/lang"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/linter"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/output"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/pkgmgr"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/sessioncmd"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/system"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/test"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/vcs"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/web"
 )
 
 var (
@@ -44,45 +67,90 @@ var (
 var Version = "dev"
 
 // rootCmd represents the base command when called without any subcommands.
-var rootCmd = &cobra.Command{
-	Use:   "tokman",
-	Short: "Token-aware CLI proxy",
-	Long: `TokMan intercepts CLI commands and filters verbose output
+var rootCmd = newRootCmd()
+
+func newRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tokman",
+		Short: "Token-aware CLI proxy",
+		Long: `TokMan intercepts CLI commands and filters verbose output
 to reduce token usage in LLM interactions.
 
 It acts as a transparent proxy that executes commands, captures their
 output, applies intelligent filtering, and tracks token savings.`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Set SKIP_ENV_VALIDATION for child processes if requested
-		if skipEnv {
-			os.Setenv("SKIP_ENV_VALIDATION", "1")
-		}
-		// Skip integrity check for meta commands
-		if isOperationalCommand(cmd) {
-			if err := integrity.RuntimeCheck(); err != nil {
-				return err
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			shared.SetRootCmd(cmd)
+			shared.Version = Version
+			shared.SetConfig(struct {
+				Verbose              int
+				DryRun               bool
+				UltraCompact         bool
+				SkipEnv              bool
+				QueryIntent          string
+				LLMEnabled           bool
+				TokenBudget          int
+				FallbackArgs         []string
+				LayerPreset          string
+				OutputFile           string
+				QuietMode            bool
+				JSONOutput           bool
+				CompactionEnabled    bool
+				CompactionThreshold  int
+				CompactionPreserve   int
+				CompactionMaxTokens  int
+				CompactionSnapshot   bool
+				CompactionAutoDetect bool
+				ReversibleEnabled    bool
+			}{
+				Verbose:              verbose,
+				DryRun:               dryRun,
+				UltraCompact:         ultraCompact,
+				SkipEnv:              skipEnv,
+				QueryIntent:          queryIntent,
+				LLMEnabled:           llmEnabled,
+				TokenBudget:          tokenBudget,
+				FallbackArgs:         fallbackArgs,
+				LayerPreset:          layerPreset,
+				OutputFile:           outputFile,
+				QuietMode:            quietMode,
+				JSONOutput:           jsonOutput,
+				CompactionEnabled:    compactionEnabled,
+				CompactionThreshold:  compactionThreshold,
+				CompactionPreserve:   compactionPreserve,
+				CompactionMaxTokens:  compactionMaxTokens,
+				CompactionSnapshot:   compactionSnapshot,
+				CompactionAutoDetect: compactionAutoDetect,
+				ReversibleEnabled:    reversibleEnabled,
+			})
+			shared.SetConfigFile(cfgFile)
+
+			if skipEnv {
+				os.Setenv("SKIP_ENV_VALIDATION", "1")
 			}
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Fallback: handle unknown commands via TOML filter system
-		if len(args) == 0 {
-			return cmd.Help()
-		}
+			if isOperationalCommand(cmd) {
+				if err := integrity.RuntimeCheck(); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
 
-		fallback := GetFallback()
-		output, handled, err := fallback.Handle(args)
+			fallback := shared.GetFallback()
+			output, handled, err := fallback.Handle(args)
 
-		if !handled {
-			return fmt.Errorf("unknown command: %s", args[0])
-		}
+			if !handled {
+				return fmt.Errorf("unknown command: %s", args[0])
+			}
 
-		// Print filtered output
-		fmt.Print(output)
-
-		return err
-	},
+			fmt.Print(output)
+			return err
+		},
+	}
+	return cmd
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -99,7 +167,7 @@ func Execute() {
 			// Extract the unknown command from args
 			args := extractUnknownCommandArgs()
 			if len(args) > 0 {
-				fallback := GetFallback()
+				fallback := shared.GetFallback()
 				output, handled, ferr := fallback.Handle(args)
 				if handled {
 					fmt.Print(output)
@@ -127,6 +195,8 @@ func extractUnknownCommandArgs() []string {
 }
 
 func init() {
+	registry.Init(rootCmd)
+
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.Version = Version
@@ -185,6 +255,8 @@ func init() {
 	viper.BindPFlag("pipeline.compaction_max_tokens", rootCmd.PersistentFlags().Lookup("compaction-max-tokens"))
 	viper.BindPFlag("pipeline.compaction_state_snapshot", rootCmd.PersistentFlags().Lookup("compaction-snapshot"))
 	viper.BindPFlag("pipeline.compaction_auto_detect", rootCmd.PersistentFlags().Lookup("compaction-auto-detect"))
+
+	registry.RegisterAll()
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -217,32 +289,32 @@ func initConfig() {
 
 // GetConfig returns the current configuration.
 func GetConfig() (*config.Config, error) {
-	return config.Load(cfgFile)
+	return shared.GetConfig()
 }
 
 // IsVerbose returns whether verbose mode is enabled.
 func IsVerbose() bool {
-	return verbose > 0
+	return shared.IsVerbose()
 }
 
 // VerbosityLevel returns the verbosity level (0-3).
 func VerbosityLevel() int {
-	return verbose
+	return shared.VerbosityLevel()
 }
 
 // IsUltraCompact returns whether ultra-compact mode is enabled.
 func IsUltraCompact() bool {
-	return ultraCompact
+	return shared.IsUltraCompact()
 }
 
 // IsSkipEnv returns whether SKIP_ENV_VALIDATION should be set.
 func IsSkipEnv() bool {
-	return skipEnv
+	return shared.IsSkipEnv()
 }
 
 // IsDryRun returns whether dry-run mode is enabled.
 func IsDryRun() bool {
-	return dryRun
+	return shared.IsDryRun()
 }
 
 // isOperationalCommand returns true for commands that process CLI output
@@ -289,96 +361,72 @@ func isOperationalCommand(cmd *cobra.Command) bool {
 // GetQueryIntent returns the query intent for query-aware compression
 // Can be set via --query flag or TOKMAN_QUERY environment variable
 func GetQueryIntent() string {
-	if queryIntent != "" {
-		return queryIntent
-	}
-	return os.Getenv("TOKMAN_QUERY")
+	return shared.GetQueryIntent()
 }
 
 // IsLLMEnabled returns whether LLM-based compression is enabled
 func IsLLMEnabled() bool {
-	return llmEnabled || os.Getenv("TOKMAN_LLM") == "true"
+	return shared.IsLLMEnabled()
 }
 
 // GetTokenBudget returns the token budget for compression
 // Can be set via --budget flag or TOKMAN_BUDGET environment variable
 func GetTokenBudget() int {
-	if tokenBudget > 0 {
-		return tokenBudget
-	}
-	envBudget := os.Getenv("TOKMAN_BUDGET")
-	if envBudget != "" {
-		var budget int
-		fmt.Sscanf(envBudget, "%d", &budget)
-		return budget
-	}
-	return 0
+	return shared.GetTokenBudget()
 }
 
 // IsCompactionEnabled returns whether compaction is enabled
 func IsCompactionEnabled() bool {
-	return compactionEnabled || os.Getenv("TOKMAN_COMPACTION") == "true"
+	return shared.IsCompactionEnabled()
 }
 
 // GetCompactionThreshold returns the compaction threshold
 func GetCompactionThreshold() int {
-	if compactionThreshold > 0 {
-		return compactionThreshold
-	}
-	return 500 // Default for 1M-2M context support
+	return shared.GetCompactionThreshold()
 }
 
 // GetCompactionPreserveTurns returns the number of turns to preserve
 func GetCompactionPreserveTurns() int {
-	if compactionPreserve > 0 {
-		return compactionPreserve
-	}
-	return 10 // Keep more turns for large contexts
+	return shared.GetCompactionPreserveTurns()
 }
 
 // GetCompactionMaxTokens returns the max summary tokens
 func GetCompactionMaxTokens() int {
-	if compactionMaxTokens > 0 {
-		return compactionMaxTokens
-	}
-	return 5000 // Larger summaries for 1M-2M context
+	return shared.GetCompactionMaxTokens()
 }
 
 // IsCompactionSnapshotEnabled returns whether state snapshot format is enabled
 func IsCompactionSnapshotEnabled() bool {
-	return compactionSnapshot
+	return shared.IsCompactionSnapshotEnabled()
 }
 
 // IsCompactionAutoDetect returns whether auto-detect is enabled
 func IsCompactionAutoDetect() bool {
-	return compactionAutoDetect
+	return shared.IsCompactionAutoDetect()
 }
 
 // GetLayerPreset returns the pipeline preset (fast/balanced/full).
 // T90: Pipeline mode presets.
 func GetLayerPreset() string {
-	if layerPreset != "" {
-		return layerPreset
-	}
-	return os.Getenv("TOKMAN_PRESET")
+	return shared.GetLayerPreset()
 }
 
 // GetOutputFile returns the output file path.
 func GetOutputFile() string {
-	return outputFile
+	return shared.GetOutputFile()
 }
 
 // IsQuietMode returns whether quiet mode is enabled.
 func IsQuietMode() bool {
-	return quietMode
+	return shared.IsQuietMode()
 }
 
 // IsJSONOutput returns whether JSON output is enabled.
 func IsJSONOutput() bool {
-	return jsonOutput
+	return shared.IsJSONOutput()
 }
 
 // IsReversibleEnabled returns whether reversible compression is enabled.
 func IsReversibleEnabled() bool {
-	return reversibleEnabled || os.Getenv("TOKMAN_REVERSIBLE") == "true"
+	return shared.IsReversibleEnabled()
 }

@@ -32,7 +32,10 @@ func LoadHierarchical() (*HierarchicalConfig, error) {
 	}
 
 	// 2. User config
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
 	if home != "" {
 		userPaths := []string{
 			filepath.Join(home, ".config", "tokman", "config.toml"),

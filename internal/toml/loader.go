@@ -30,11 +30,14 @@ type LoaderConfig struct {
 // NewLoader creates a new filter loader
 func NewLoader(configDir string) *Loader {
 	if configDir == "" {
-		homeDir, _ := os.UserHomeDir()
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
 		configDir = filepath.Join(homeDir, ".config", "tokman")
 	}
 
-	trustedFile := filepath.Join(configDir, "trusted.json")
+	trustedFile := filepath.Join(configDir, "trusted.txt")
 
 	return &Loader{
 		parser:       NewParser(),
@@ -56,12 +59,14 @@ func (l *Loader) LoadAll(projectDir string) (*FilterRegistry, error) {
 	}
 
 	// Load user-global filters
-	homeDir, _ := os.UserHomeDir()
-	userFiltersPath := filepath.Join(homeDir, ".config", "tokman", "filters.toml")
-	if _, err := os.Stat(userFiltersPath); err == nil {
-		if err := registry.LoadFile(userFiltersPath); err != nil {
-			// Log warning but don't fail
-			fmt.Fprintf(os.Stderr, "Warning: failed to load user filters: %v\n", err)
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		userFiltersPath := filepath.Join(homeDir, ".config", "tokman", "filters.toml")
+		if _, err := os.Stat(userFiltersPath); err == nil {
+			if err := registry.LoadFile(userFiltersPath); err != nil {
+				// Log warning but don't fail
+				fmt.Fprintf(os.Stderr, "Warning: failed to load user filters: %v\n", err)
+			}
 		}
 	}
 
@@ -193,7 +198,7 @@ func (l *Loader) LoadTrusted() error {
 func (l *Loader) saveTrusted() error {
 	// Ensure directory exists
 	dir := filepath.Dir(l.trustedFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

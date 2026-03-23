@@ -40,13 +40,13 @@ type Alert struct {
 	Severity     AlertSeverity          `json:"severity"`
 	Title        string                 `json:"title"`
 	Message      string                 `json:"message"`
-	Value        interface{}            `json:"value,omitempty"`
-	Threshold    interface{}            `json:"threshold,omitempty"`
+	Value        any            `json:"value,omitempty"`
+	Threshold    any            `json:"threshold,omitempty"`
 	Timestamp    time.Time              `json:"timestamp"`
 	Acknowledged bool                   `json:"acknowledged"`
 	Resolved     bool                   `json:"resolved"`
 	ResolvedAt   *time.Time             `json:"resolved_at,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
 }
 
 // Config represents alert configuration
@@ -92,7 +92,10 @@ type Manager struct {
 
 // NewManager creates a new alert manager
 func NewManager(config Config) *Manager {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 	alertFile := filepath.Join(home, ".tokman", "alerts.json")
 
 	m := &Manager{
@@ -256,7 +259,7 @@ func (m *Manager) CheckParseFailureRate(failureRate float64) []Alert {
 }
 
 // createAlert creates a new alert if not in cooldown
-func (m *Manager) createAlert(alertType AlertType, severity AlertSeverity, title, message string, value, threshold interface{}) *Alert {
+func (m *Manager) createAlert(alertType AlertType, severity AlertSeverity, title, message string, value, threshold any) *Alert {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -391,7 +394,7 @@ func (m *Manager) save() {
 	}
 
 	dir := filepath.Dir(m.alertFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return
 	}
 
@@ -400,7 +403,10 @@ func (m *Manager) save() {
 		return
 	}
 
-	os.WriteFile(m.alertFile, data, 0644)
+	if err := os.WriteFile(m.alertFile, data, 0600); err != nil {
+		// Log but don't fail - alert persistence is non-critical
+		_ = err
+	}
 }
 
 // load restores alerts from disk
@@ -414,15 +420,18 @@ func (m *Manager) load() {
 		return
 	}
 
-	json.Unmarshal(data, &m.alerts)
+	if err := json.Unmarshal(data, &m.alerts); err != nil {
+		// Start fresh with empty alerts on corrupt file
+		m.alerts = []Alert{}
+	}
 }
 
 // Stats returns alert statistics
-func (m *Manager) Stats() map[string]interface{} {
+func (m *Manager) Stats() map[string]any {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	stats := map[string]interface{}{
+	stats := map[string]any{
 		"total_alerts":       len(m.alerts),
 		"active_alerts":      len(m.GetActive()),
 		"alerts_by_type":     make(map[AlertType]int),

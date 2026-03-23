@@ -294,7 +294,7 @@ func (f *SessionTracker) Save() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(f.sessionFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -303,7 +303,7 @@ func (f *SessionTracker) Save() error {
 		return err
 	}
 
-	return os.WriteFile(f.sessionFile, data, 0644)
+	return os.WriteFile(f.sessionFile, data, 0600)
 }
 
 // Clear clears the session history

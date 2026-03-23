@@ -284,8 +284,8 @@ func (d *DensityAdaptiveFilter) SetTargetRatio(ratio float64) {
 }
 
 // GetStats returns filter statistics
-func (d *DensityAdaptiveFilter) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (d *DensityAdaptiveFilter) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":           d.config.Enabled,
 		"target_ratio":      d.config.TargetRatio,
 		"density_threshold": d.config.DensityThreshold,

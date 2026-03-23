@@ -236,8 +236,8 @@ func (q *QuestionAwareFilter) SetEnabled(enabled bool) {
 }
 
 // GetStats returns filter statistics
-func (q *QuestionAwareFilter) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (q *QuestionAwareFilter) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":             q.config.Enabled,
 		"query":               q.config.Query,
 		"relevance_threshold": q.config.RelevanceThreshold,

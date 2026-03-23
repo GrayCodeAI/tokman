@@ -5,6 +5,8 @@ import (
 	"container/heap"
 	"math"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // H2OFilter implements Heavy-Hitter Oracle compression.
@@ -123,6 +125,7 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		lineCount++
 	}
 	if scanner.Err() != nil {
+		utils.Warn("h2o: scanner error during line count", "error", scanner.Err())
 		return input, 0
 	}
 
@@ -162,6 +165,7 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		lineIdx++
 	}
 	if scanner.Err() != nil {
+		utils.Warn("h2o: scanner error during line scoring", "error", scanner.Err())
 		return input, 0
 	}
 
@@ -214,6 +218,7 @@ func (h *H2OFilter) applyLineBased(input string, mode Mode, originalTokens int) 
 		lineIdx++
 	}
 	if scanner.Err() != nil {
+		utils.Warn("h2o: scanner error during output building", "error", scanner.Err())
 		return input, 0
 	}
 
@@ -534,11 +539,11 @@ func (h tokenHeap) Len() int           { return len(h) }
 func (h tokenHeap) Less(i, j int) bool { return h[i].score > h[j].score } // Max heap
 func (h tokenHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
-func (h *tokenHeap) Push(x interface{}) {
+func (h *tokenHeap) Push(x any) {
 	*h = append(*h, x.(*scoredToken))
 }
 
-func (h *tokenHeap) Pop() interface{} {
+func (h *tokenHeap) Pop() any {
 	old := *h
 	n := len(old)
 	x := old[n-1]
@@ -595,8 +600,8 @@ func (h *H2OFilter) SetEnabled(enabled bool) {
 }
 
 // GetStats returns filter statistics
-func (h *H2OFilter) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (h *H2OFilter) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":           h.config.Enabled,
 		"sink_size":         h.config.SinkSize,
 		"recent_size":       h.config.RecentSize,

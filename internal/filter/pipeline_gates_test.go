@@ -74,11 +74,8 @@ func TestStageGates_WithQueryIntent(t *testing.T) {
 
 	// Goal-driven and contrastive should have stats (may have 0 savings but still run)
 	// Note: They may not save tokens if content doesn't match, but they shouldn't be skipped
-	if p.shouldSkipGoalDriven() {
-		t.Error("Goal-driven should not be skipped with query intent")
-	}
-	if p.shouldSkipContrastive() {
-		t.Error("Contrastive should not be skipped with query intent")
+	if p.shouldSkipQueryDependent() {
+		t.Error("Query-dependent should not be skipped with query intent")
 	}
 }
 
@@ -137,11 +134,8 @@ func TestStageGates_BudgetAware(t *testing.T) {
 		EnableLazyPruner:  true,
 	})
 
-	if p.shouldSkipSketchStore() {
-		t.Error("Sketch store should NOT be skipped when budget is set")
-	}
-	if p.shouldSkipLazyPruner() {
-		t.Error("Lazy pruner should NOT be skipped when budget is set")
+	if p.shouldSkipBudgetDependent() {
+		t.Error("Budget-dependent should NOT be skipped when budget is set")
 	}
 
 	// Without budget, they should be skipped
@@ -152,11 +146,8 @@ func TestStageGates_BudgetAware(t *testing.T) {
 		EnableLazyPruner:  true,
 	})
 
-	if !p2.shouldSkipSketchStore() {
-		t.Error("Sketch store SHOULD be skipped when no budget")
-	}
-	if !p2.shouldSkipLazyPruner() {
-		t.Error("Lazy pruner SHOULD be skipped when no budget")
+	if !p2.shouldSkipBudgetDependent() {
+		t.Error("Budget-dependent SHOULD be skipped when no budget")
 	}
 }
 

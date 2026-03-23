@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -211,7 +213,7 @@ func (l *LLMCompressor) callOpenAI(ctx context.Context, prompt string) (string, 
 		model = "gpt-4o-mini"
 	}
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": model,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
@@ -227,19 +229,26 @@ func (l *LLMCompressor) callOpenAI(ctx context.Context, prompt string) (string, 
 		baseURL = "https://api.openai.com/v1"
 	}
 
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-X", "POST",
-		baseURL+"/chat/completions",
-		"-H", "Content-Type: application/json",
-		"-H", "Authorization: Bearer "+apiKey,
-		"-d", string(reqJSON))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", strings.NewReader(string(reqJSON)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	output, err := cmd.Output()
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
 
 	// Parse response
-	var resp struct {
+	var parsed struct {
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
@@ -247,15 +256,15 @@ func (l *LLMCompressor) callOpenAI(ctx context.Context, prompt string) (string, 
 		} `json:"choices"`
 	}
 
-	if err := json.Unmarshal(output, &resp); err != nil {
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", err
 	}
 
-	if len(resp.Choices) == 0 {
+	if len(parsed.Choices) == 0 {
 		return "", fmt.Errorf("no response from OpenAI")
 	}
 
-	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+	return strings.TrimSpace(parsed.Choices[0].Message.Content), nil
 }
 
 // callAnthropic calls Anthropic API
@@ -273,7 +282,7 @@ func (l *LLMCompressor) callAnthropic(ctx context.Context, prompt string) (strin
 		model = "claude-3-haiku-20240307"
 	}
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model":      model,
 		"max_tokens": l.MaxTokens,
 		"messages": []map[string]string{
@@ -283,33 +292,40 @@ func (l *LLMCompressor) callAnthropic(ctx context.Context, prompt string) (strin
 
 	reqJSON, _ := json.Marshal(reqBody)
 
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-X", "POST",
-		"https://api.anthropic.com/v1/messages",
-		"-H", "Content-Type: application/json",
-		"-H", "x-api-key: "+apiKey,
-		"-H", "anthropic-version: 2023-06-01",
-		"-d", string(reqJSON))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", strings.NewReader(string(reqJSON)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	output, err := cmd.Output()
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
-	var resp struct {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var parsed struct {
 		Content []struct {
 			Text string `json:"text"`
 		} `json:"content"`
 	}
 
-	if err := json.Unmarshal(output, &resp); err != nil {
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", err
 	}
 
-	if len(resp.Content) == 0 {
+	if len(parsed.Content) == 0 {
 		return "", fmt.Errorf("no response from Anthropic")
 	}
 
-	return strings.TrimSpace(resp.Content[0].Text), nil
+	return strings.TrimSpace(parsed.Content[0].Text), nil
 }
 
 // callOllama calls local Ollama API
@@ -319,11 +335,11 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 		model = "llama3"
 	}
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model":  model,
 		"prompt": prompt,
 		"stream": false,
-		"options": map[string]interface{}{
+		"options": map[string]any{
 			"num_predict": l.MaxTokens,
 			"temperature": l.Temperature,
 		},
@@ -336,25 +352,32 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 		baseURL = "http://localhost:11434"
 	}
 
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-X", "POST",
-		baseURL+"/api/generate",
-		"-H", "Content-Type: application/json",
-		"-d", string(reqJSON))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/generate", strings.NewReader(string(reqJSON)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
 
-	output, err := cmd.Output()
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
-	var resp struct {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var parsed struct {
 		Response string `json:"response"`
 	}
 
-	if err := json.Unmarshal(output, &resp); err != nil {
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(resp.Response), nil
+	return strings.TrimSpace(parsed.Response), nil
 }
 
 // callLocal calls a local command-line LLM

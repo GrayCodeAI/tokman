@@ -22,7 +22,10 @@ type VersionChecker struct {
 
 // NewVersionChecker creates a new version checker.
 func NewVersionChecker() *VersionChecker {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 	dataDir := filepath.Join(home, ".local", "share", "tokman")
 	return &VersionChecker{dataDir: dataDir}
 }
@@ -59,8 +62,12 @@ func (v *VersionChecker) checkAndWarn() error {
 	}
 
 	// Touch marker
-	os.MkdirAll(filepath.Dir(marker), 0755)
-	os.WriteFile(marker, []byte{}, 0644)
+	if err := os.MkdirAll(filepath.Dir(marker), 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
+	if err := os.WriteFile(marker, []byte{}, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", marker, err)
+	}
 
 	// Print warning
 	fmt.Fprintf(os.Stderr, "[tokman] Hook outdated — run `tokman init` to update\n")

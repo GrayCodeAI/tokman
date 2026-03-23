@@ -22,7 +22,8 @@ const HistoryRetentionDays = 90
 // Tracker manages token tracking persistence.
 type Tracker struct {
 	db            *sql.DB
-	lastCleanupMs int64 // atomic: unix timestamp of last cleanup
+	lastCleanupMs int64         // atomic: unix timestamp of last cleanup
+	cleanupCh     chan struct{} // non-blocking cleanup trigger
 }
 
 // TimedExecution tracks execution time and token savings.
@@ -158,17 +159,30 @@ func NewTracker(dbPath string) (*Tracker, error) {
 		}
 	}
 
-	return &Tracker{db: db}, nil
+	t := &Tracker{
+		db:        db,
+		cleanupCh: make(chan struct{}, 1),
+	}
+	go t.cleanupWorker()
+	return t, nil
 }
 
 // Close closes the database connection.
 func (t *Tracker) Close() error {
+	close(t.cleanupCh)
 	return t.db.Close()
+}
+
+// cleanupWorker processes cleanup triggers from the channel.
+func (t *Tracker) cleanupWorker() {
+	for range t.cleanupCh {
+		t.cleanupOld()
+	}
 }
 
 // Query executes a raw SQL query and returns the rows.
 // This is exposed for custom aggregations in the economics package.
-func (t *Tracker) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (t *Tracker) Query(query string, args ...any) (*sql.Rows, error) {
 	return t.db.Query(query, args...)
 }
 
@@ -210,7 +224,10 @@ func (t *Tracker) Record(record *CommandRecord) error {
 	}
 
 	// Run cleanup after recording (throttled - at most once per minute)
-	go t.cleanupOld()
+	select {
+	case t.cleanupCh <- struct{}{}:
+	default:
+	}
 
 	return nil
 }
@@ -695,7 +712,10 @@ func (t *Tracker) RecordParseFailure(rawCommand string, errorMessage string, fal
 	}
 
 	// Cleanup old records (throttled)
-	go t.cleanupOld()
+	select {
+	case t.cleanupCh <- struct{}{}:
+	default:
+	}
 
 	return nil
 }
@@ -724,41 +744,47 @@ func (t *Tracker) GetParseFailureSummary() (*ParseFailureSummary, error) {
 	}
 
 	// Get top 10 failing commands
-	rows, err := t.db.Query(
+	topRows, err := t.db.Query(
 		`SELECT raw_command, COUNT(*) as cnt
 		 FROM parse_failures
 		 GROUP BY raw_command
 		 ORDER BY cnt DESC
 		 LIMIT 10`,
 	)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var cfc CommandFailureCount
-			if err := rows.Scan(&cfc.Command, &cfc.Count); err == nil {
-				summary.TopCommands = append(summary.TopCommands, cfc)
-			}
+	if err != nil {
+		return summary, nil // return partial results on query failure
+	}
+	defer topRows.Close()
+	for topRows.Next() {
+		var cfc CommandFailureCount
+		if err := topRows.Scan(&cfc.Command, &cfc.Count); err == nil {
+			summary.TopCommands = append(summary.TopCommands, cfc)
 		}
 	}
 
 	// Get recent 10 failures
-	rows, err = t.db.Query(
+	recentRows, err := t.db.Query(
 		`SELECT id, timestamp, raw_command, error_message, fallback_succeeded
 		 FROM parse_failures
 		 ORDER BY timestamp DESC
 		 LIMIT 10`,
 	)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var pfr ParseFailureRecord
-			var ts string
-			var fb int
-			if err := rows.Scan(&pfr.ID, &ts, &pfr.RawCommand, &pfr.ErrorMessage, &fb); err == nil {
-				pfr.Timestamp, _ = time.Parse(time.RFC3339, ts)
-				pfr.FallbackSucceeded = fb == 1
-				summary.RecentFailures = append(summary.RecentFailures, pfr)
+	if err != nil {
+		return summary, nil // return partial results on query failure
+	}
+	defer recentRows.Close()
+	for recentRows.Next() {
+		var pfr ParseFailureRecord
+		var ts string
+		var fb int
+		if err := recentRows.Scan(&pfr.ID, &ts, &pfr.RawCommand, &pfr.ErrorMessage, &fb); err == nil {
+			parsed, parseErr := time.Parse(time.RFC3339, ts)
+			if parseErr != nil {
+				log.Printf("[tokman] failed to parse timestamp %q: %v", ts, parseErr)
 			}
+			pfr.Timestamp = parsed
+			pfr.FallbackSucceeded = fb == 1
+			summary.RecentFailures = append(summary.RecentFailures, pfr)
 		}
 	}
 

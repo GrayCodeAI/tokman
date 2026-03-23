@@ -24,7 +24,7 @@ type WasmPlugin struct {
 	ctx     context.Context
 	runtime wazero.Runtime
 	module  api.Module
-	config  map[string]interface{}
+	config  map[string]any
 }
 
 // wasmFilter wraps a WASM filter function
@@ -224,7 +224,7 @@ func (p *WasmPlugin) Commands() []Command {
 }
 
 // Init initializes the plugin
-func (p *WasmPlugin) Init(config map[string]interface{}) error {
+func (p *WasmPlugin) Init(config map[string]any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

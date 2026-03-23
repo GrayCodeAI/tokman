@@ -175,32 +175,10 @@ func (e *Engine) ProcessWithLang(input string, lang string) (string, int) {
 	return e.Process(input)
 }
 
-// DetectLanguageFromInput detects language from input content
+// DetectLanguageFromInput detects language from input content.
+// Delegates to DetectLanguage and wraps the result as a Language.
 func DetectLanguageFromInput(input string) Language {
-	if strings.Contains(input, "package ") || strings.Contains(input, "func ") {
-		return LangGo
-	}
-	if strings.Contains(input, "fn ") || strings.Contains(input, "pub fn") {
-		return LangRust
-	}
-	if strings.Contains(input, "def ") || strings.Contains(input, "class ") {
-		if strings.Contains(input, ":") && !strings.Contains(input, "{") {
-			return LangPython
-		}
-		if strings.Contains(input, "import ") {
-			return LangPython
-		}
-	}
-	if strings.Contains(input, "function ") || strings.Contains(input, "const ") {
-		if strings.Contains(input, ":") {
-			return LangTypeScript
-		}
-		return LangJavaScript
-	}
-	if strings.Contains(input, "SELECT") || strings.Contains(input, "FROM") || strings.Contains(input, "WHERE") || strings.Contains(input, "INSERT") || strings.Contains(input, "UPDATE") {
-		return LangSQL
-	}
-	return LangUnknown
+	return Language(DetectLanguage(input))
 }
 
 // SetMode changes the filter mode.
@@ -245,12 +223,21 @@ func DetectLanguage(output string) string {
 	if strings.Contains(output, "fn ") || strings.Contains(output, "pub fn") {
 		return "rust"
 	}
-	if strings.Contains(output, "def ") || strings.Contains(output, "import ") {
+	if strings.Contains(output, "def ") || strings.Contains(output, "class ") {
 		if strings.Contains(output, ":") && !strings.Contains(output, "{") {
 			return "python"
 		}
+		if strings.Contains(output, "import ") {
+			return "python"
+		}
+	}
+	if strings.Contains(output, "SELECT") || strings.Contains(output, "FROM") || strings.Contains(output, "WHERE") || strings.Contains(output, "INSERT") || strings.Contains(output, "UPDATE") {
+		return "sql"
 	}
 	if strings.Contains(output, "function ") || strings.Contains(output, "const ") {
+		if strings.Contains(output, ":") {
+			return "typescript"
+		}
 		return "javascript"
 	}
 	return "unknown"

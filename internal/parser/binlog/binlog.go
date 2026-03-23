@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // BinlogIssue represents a build error or warning
@@ -341,8 +343,16 @@ func parseBinlogEvents(reader *binReader) (*ParsedBinlog, error) {
 			}
 
 		case RecordProjectStarted:
-			_, _ = readEventFields(eventReader, int(version), parsed)
-			if hasContext, _ := eventReader.readBool(); hasContext {
+			if _, err := readEventFields(eventReader, int(version), parsed); err != nil {
+				utils.Warn("binlog: failed to read project started event fields", "error", err)
+				continue
+			}
+			hasContext, err := eventReader.readBool()
+			if err != nil {
+				utils.Warn("binlog: failed to read build context flag", "error", err)
+				continue
+			}
+			if hasContext {
 				skipBuildContext(eventReader, int(version))
 			}
 			if projectFile, err := readOptionalString(eventReader, parsed); err == nil && projectFile != "" {
@@ -350,7 +360,10 @@ func parseBinlogEvents(reader *binReader) (*ParsedBinlog, error) {
 			}
 
 		case RecordProjectFinished:
-			_, _ = readEventFields(eventReader, int(version), parsed)
+			if _, err := readEventFields(eventReader, int(version), parsed); err != nil {
+				utils.Warn("binlog: failed to read project finished event fields", "error", err)
+				continue
+			}
 			if projectFile, err := readOptionalString(eventReader, parsed); err == nil && projectFile != "" {
 				parsed.projectFiles[projectFile] = true
 			}
@@ -410,7 +423,9 @@ func readEventFields(reader *binReader, version int, parsed *ParsedBinlog) (Pars
 		if ticks, err := reader.readInt64(); err == nil {
 			result.timestampTicks = ticks
 		}
-		_, _ = reader.read7BitInt32() // timestamp kind
+		if _, err := reader.read7BitInt32(); err != nil { // timestamp kind
+			utils.Warn("binlog: failed to read timestamp kind", "error", err)
+		}
 	}
 
 	return result, nil
@@ -422,7 +437,10 @@ func skipBuildContext(reader *binReader, version int) {
 		count = 7
 	}
 	for i := 0; i < count; i++ {
-		_, _ = reader.read7BitInt32()
+		if _, err := reader.read7BitInt32(); err != nil {
+			utils.Warn("binlog: failed to skip build context field", "error", err, "field", i)
+			return
+		}
 	}
 }
 
@@ -464,14 +482,34 @@ func readDeduplicatedString(reader *binReader, parsed *ParsedBinlog) (string, er
 }
 
 func readIssue(reader *binReader, parsed *ParsedBinlog, message string) (BinlogIssue, error) {
-	_, _ = readOptionalString(reader, parsed) // subcategory
-	code, _ := readOptionalString(reader, parsed)
-	file, _ := readOptionalString(reader, parsed)
-	_, _ = readOptionalString(reader, parsed) // project file
-	line, _ := reader.read7BitInt32()
-	column, _ := reader.read7BitInt32()
-	_, _ = reader.read7BitInt32() // end line
-	_, _ = reader.read7BitInt32() // end column
+	if _, err := readOptionalString(reader, parsed); err != nil { // subcategory
+		utils.Warn("binlog: failed to read issue subcategory", "error", err)
+	}
+	code, err := readOptionalString(reader, parsed)
+	if err != nil {
+		utils.Warn("binlog: failed to read issue code", "error", err)
+	}
+	file, err := readOptionalString(reader, parsed)
+	if err != nil {
+		utils.Warn("binlog: failed to read issue file", "error", err)
+	}
+	if _, err := readOptionalString(reader, parsed); err != nil { // project file
+		utils.Warn("binlog: failed to read issue project file", "error", err)
+	}
+	line, err := reader.read7BitInt32()
+	if err != nil {
+		utils.Warn("binlog: failed to read issue line", "error", err)
+	}
+	column, err := reader.read7BitInt32()
+	if err != nil {
+		utils.Warn("binlog: failed to read issue column", "error", err)
+	}
+	if _, err := reader.read7BitInt32(); err != nil { // end line
+		utils.Warn("binlog: failed to read issue end line", "error", err)
+	}
+	if _, err := reader.read7BitInt32(); err != nil { // end column
+		utils.Warn("binlog: failed to read issue end column", "error", err)
+	}
 
 	if line < 0 {
 		line = 0
@@ -600,13 +638,17 @@ func formatDuration(d time.Duration) string {
 
 func parseInt(s string) int {
 	var n int
-	fmt.Sscanf(s, "%d", &n)
+	if _, err := fmt.Sscanf(s, "%d", &n); err != nil {
+		return 0
+	}
 	return n
 }
 
 func parseUint32(s string) uint32 {
 	var n uint32
-	fmt.Sscanf(s, "%d", &n)
+	if _, err := fmt.Sscanf(s, "%d", &n); err != nil {
+		return 0
+	}
 	return n
 }
 

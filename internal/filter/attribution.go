@@ -370,8 +370,8 @@ func (a *AttributionFilter) SetEnabled(enabled bool) {
 }
 
 // GetStats returns filter statistics
-func (a *AttributionFilter) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (a *AttributionFilter) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":    a.config.Enabled,
 		"threshold":  a.config.ImportanceThreshold,
 		"cache_size": len(a.cache),

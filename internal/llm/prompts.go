@@ -2,6 +2,7 @@ package llm
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -337,7 +338,9 @@ func (m *PromptTemplateManager) RemoveTemplate(name string) error {
 	// Remove from disk
 	if m.templatesDir != "" {
 		file := filepath.Join(m.templatesDir, name+".json")
-		os.Remove(file)
+		if err := os.Remove(file); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", file, err)
+		}
 	}
 
 	return nil
@@ -350,7 +353,7 @@ func (m *PromptTemplateManager) saveTemplate(template PromptTemplate) error {
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(m.templatesDir, 0755); err != nil {
+	if err := os.MkdirAll(m.templatesDir, 0700); err != nil {
 		return err
 	}
 
@@ -360,7 +363,7 @@ func (m *PromptTemplateManager) saveTemplate(template PromptTemplate) error {
 	}
 
 	file := filepath.Join(m.templatesDir, template.Name+".json")
-	return os.WriteFile(file, data, 0644)
+	return os.WriteFile(file, data, 0600)
 }
 
 // BuildPrompt creates a complete prompt from a template

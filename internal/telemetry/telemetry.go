@@ -1,15 +1,18 @@
 package telemetry
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -44,7 +47,10 @@ type Client struct {
 
 // NewClient creates a new telemetry client.
 func NewClient(stats StatsProvider) *Client {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 	dataDir := filepath.Join(home, ".local", "share", "tokman")
 
 	return &Client{
@@ -138,15 +144,20 @@ func (c *Client) sendPing() {
 	payload := string(payloadBytes)
 
 	// Send HTTP POST (with 2-second timeout)
-	// Using curl for simplicity (no external HTTP dependencies)
-	cmd := exec.Command("curl", "-s", "-X", "POST",
-		"-H", "Content-Type: application/json",
-		"-H", fmt.Sprintf("X-TokMan-Token: %s", c.token),
-		"-m", "2", // 2-second timeout
-		"-d", payload,
-		c.url,
-	)
-	cmd.Run() // Ignore errors (fire-and-forget)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, strings.NewReader(payload))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-TokMan-Token", c.token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
 }
 
 func (c *Client) markerPath() string {
@@ -154,13 +165,20 @@ func (c *Client) markerPath() string {
 }
 
 func (c *Client) touchMarker(path string) {
-	os.MkdirAll(filepath.Dir(path), 0755)
-	os.WriteFile(path, []byte{}, 0644)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
+	if err := os.WriteFile(path, []byte{}, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", path, err)
+	}
 }
 
 // generateDeviceHash creates an anonymous SHA-256 hash of hostname:username.
 func generateDeviceHash() string {
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
 	username := os.Getenv("USER")
 	if username == "" {
 		username = os.Getenv("USERNAME")
@@ -179,24 +197,16 @@ func getVersion() string {
 	return "dev"
 }
 
-func formatStringSlice(s []string) string {
-	if len(s) == 0 {
-		return "[]"
-	}
-	quoted := make([]string, len(s))
-	for i, v := range s {
-		quoted[i] = fmt.Sprintf(`"%s"`, v)
-	}
-	return fmt.Sprintf("[%s]", strings.Join(quoted, ","))
-}
-
 // detectInstallMethod determines how tokman was installed.
 func detectInstallMethod() string {
 	// Check if running from GOPATH/bin (go install)
 	execPath, err := os.Executable()
 	if err == nil {
 		// Check common install locations
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "unknown"
+		}
 		goBinPath := filepath.Join(home, "go", "bin")
 		if strings.HasPrefix(execPath, goBinPath) {
 			return "go-install"
@@ -214,11 +224,16 @@ func detectInstallMethod() string {
 }
 
 // Global client
-var defaultClient *Client
+var (
+	defaultClient *Client
+	clientOnce    sync.Once
+)
 
 // Init initializes the global telemetry client.
 func Init(stats StatsProvider) {
-	defaultClient = NewClient(stats)
+	clientOnce.Do(func() {
+		defaultClient = NewClient(stats)
+	})
 }
 
 // MaybePing sends a telemetry ping using the global client.

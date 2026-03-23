@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 )
@@ -48,7 +49,7 @@ type MatchOutputRule struct {
 type TOMLFilter struct {
 	SchemaVersion int                     `toml:"schema_version"`
 	Filters       map[string]FilterConfig `toml:"-"`
-	RawContent    map[string]interface{}  `toml:"-"`
+	RawContent    map[string]any  `toml:"-"`
 }
 
 // Parser handles parsing TOML filter files
@@ -73,7 +74,7 @@ func (p *Parser) ParseFile(path string) (*TOMLFilter, error) {
 
 // ParseContent parses TOML filter content
 func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error) {
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := toml.Unmarshal(content, &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse TOML from %s: %w", source, err)
 	}
@@ -98,7 +99,7 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 			continue
 		}
 
-		if filterMap, ok := val.(map[string]interface{}); ok {
+		if filterMap, ok := val.(map[string]any); ok {
 			cfg, err := parseFilterConfig(filterMap)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse filter %q: %w", name, err)
@@ -111,7 +112,7 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 }
 
 // parseFilterConfig parses a single filter configuration from raw map
-func parseFilterConfig(m map[string]interface{}) (FilterConfig, error) {
+func parseFilterConfig(m map[string]any) (FilterConfig, error) {
 	cfg := FilterConfig{
 		TruncateLinesAt: 0,
 		Head:            0,
@@ -159,14 +160,14 @@ func parseFilterConfig(m map[string]interface{}) (FilterConfig, error) {
 	}
 
 	// Parse string arrays
-	if v, ok := m["strip_lines_matching"].([]interface{}); ok {
+	if v, ok := m["strip_lines_matching"].([]any); ok {
 		for _, item := range v {
 			if s, ok := item.(string); ok {
 				cfg.StripLinesMatching = append(cfg.StripLinesMatching, s)
 			}
 		}
 	}
-	if v, ok := m["keep_lines_matching"].([]interface{}); ok {
+	if v, ok := m["keep_lines_matching"].([]any); ok {
 		for _, item := range v {
 			if s, ok := item.(string); ok {
 				cfg.KeepLinesMatching = append(cfg.KeepLinesMatching, s)
@@ -175,9 +176,9 @@ func parseFilterConfig(m map[string]interface{}) (FilterConfig, error) {
 	}
 
 	// Parse replace rules
-	if v, ok := m["replace"].([]interface{}); ok {
+	if v, ok := m["replace"].([]any); ok {
 		for _, item := range v {
-			if ruleMap, ok := item.(map[string]interface{}); ok {
+			if ruleMap, ok := item.(map[string]any); ok {
 				rule := ReplaceRule{}
 				if p, ok := ruleMap["pattern"].(string); ok {
 					rule.Pattern = p
@@ -191,9 +192,9 @@ func parseFilterConfig(m map[string]interface{}) (FilterConfig, error) {
 	}
 
 	// Parse match_output rules
-	if v, ok := m["match_output"].([]interface{}); ok {
+	if v, ok := m["match_output"].([]any); ok {
 		for _, item := range v {
-			if ruleMap, ok := item.(map[string]interface{}); ok {
+			if ruleMap, ok := item.(map[string]any); ok {
 				rule := MatchOutputRule{}
 				if p, ok := ruleMap["pattern"].(string); ok {
 					rule.Pattern = p
@@ -284,6 +285,7 @@ func (f *TOMLFilter) MatchesCommand(command string) (string, *FilterConfig, erro
 
 // FilterRegistry holds all loaded TOML filters
 type FilterRegistry struct {
+	mu      sync.RWMutex
 	filters map[string]*TOMLFilter
 	parser  *Parser
 }
@@ -305,6 +307,9 @@ func (r *FilterRegistry) LoadDirectory(dir string) error {
 		}
 		return fmt.Errorf("failed to read filters directory %s: %w", dir, err)
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -343,12 +348,18 @@ func (r *FilterRegistry) LoadFile(path string) error {
 		return err
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.filters[filepath.Base(path)] = filter
 	return nil
 }
 
 // FindMatchingFilter finds a filter that matches the given command
 func (r *FilterRegistry) FindMatchingFilter(command string) (string, string, *FilterConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	for filename, filter := range r.filters {
 		if name, cfg, err := filter.MatchesCommand(command); err == nil && cfg != nil {
 			return filename, name, cfg
@@ -359,6 +370,9 @@ func (r *FilterRegistry) FindMatchingFilter(command string) (string, string, *Fi
 
 // ListFilters returns all loaded filter names
 func (r *FilterRegistry) ListFilters() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	names := make([]string, 0, len(r.filters))
 	for name := range r.filters {
 		names = append(names, name)
@@ -368,5 +382,8 @@ func (r *FilterRegistry) ListFilters() []string {
 
 // Count returns the number of loaded filters
 func (r *FilterRegistry) Count() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return len(r.filters)
 }

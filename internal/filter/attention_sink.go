@@ -213,8 +213,8 @@ func (a *AttentionSinkFilter) SetEnabled(enabled bool) {
 }
 
 // GetStats returns filter statistics
-func (a *AttentionSinkFilter) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (a *AttentionSinkFilter) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":             a.config.Enabled,
 		"sink_token_count":    a.config.SinkTokenCount,
 		"recent_token_count":  a.config.RecentTokenCount,

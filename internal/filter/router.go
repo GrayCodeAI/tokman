@@ -75,7 +75,7 @@ func CompressJSON(input string) string {
 	}
 
 	// Parse and re-serialize compactly
-	var data interface{}
+	var data any
 	if err := json.Unmarshal([]byte(trimmed), &data); err != nil {
 		return input
 	}
@@ -92,21 +92,21 @@ func CompressJSON(input string) string {
 }
 
 // truncateJSONValues recursively truncates long string values in JSON.
-func truncateJSONValues(v interface{}, maxLen int) interface{} {
+func truncateJSONValues(v any, maxLen int) any {
 	switch val := v.(type) {
 	case string:
 		if len(val) > maxLen {
 			return val[:maxLen] + "... (truncated)"
 		}
 		return val
-	case map[string]interface{}:
-		result := make(map[string]interface{})
+	case map[string]any:
+		result := make(map[string]any)
 		for k, v := range val {
 			result[k] = truncateJSONValues(v, maxLen)
 		}
 		return result
-	case []interface{}:
-		result := make([]interface{}, len(val))
+	case []any:
+		result := make([]any, len(val))
 		for i, v := range val {
 			result[i] = truncateJSONValues(v, maxLen)
 		}

@@ -6,13 +6,17 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/GrayCodeAI/tokman/internal/filter"
+	"github.com/GrayCodeAI/tokman/internal/simd"
 )
 
 // TOMLFilterEngine applies TOML-defined filter rules to output
 type TOMLFilterEngine struct {
-	config *FilterConfig
+	config     *FilterConfig
+	compiledRe []*regexp.Regexp // pre-compiled replace patterns
+	compileOnce sync.Once
 }
 
 // NewTOMLFilterEngine creates a new filter engine from a TOML config
@@ -45,13 +49,21 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 	}
 
 	// Stage 2: Replace patterns
-	for _, rule := range e.config.Replace {
-		re, err := regexp.Compile(rule.Pattern)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: invalid regex pattern %q: %v\n", rule.Pattern, err)
-			continue
+	e.compileOnce.Do(func() {
+		e.compiledRe = make([]*regexp.Regexp, len(e.config.Replace))
+		for i, rule := range e.config.Replace {
+			re, err := regexp.Compile(rule.Pattern)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: invalid regex pattern %q: %v\n", rule.Pattern, err)
+				continue
+			}
+			e.compiledRe[i] = re
 		}
-		output = re.ReplaceAllString(output, rule.Replacement)
+	})
+	for i, rule := range e.config.Replace {
+		if e.compiledRe[i] != nil {
+			output = e.compiledRe[i].ReplaceAllString(output, rule.Replacement)
+		}
 	}
 
 	// Stage 3: Match output (short-circuit)
@@ -167,9 +179,7 @@ func (e *TOMLFilterEngine) filterLines(input string) string {
 
 // stripANSI removes ANSI escape sequences from the output
 func stripANSI(input string) string {
-	// Common ANSI escape sequence pattern
-	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]`)
-	return ansiPattern.ReplaceAllString(input, "")
+	return simd.StripANSI(input)
 }
 
 // truncateLines truncates each line to maxLen characters
@@ -246,13 +256,6 @@ func capLines(input string, maxLines int) string {
 func ApplyTOMLFilter(input string, config *FilterConfig) (string, int) {
 	engine := NewTOMLFilterEngine(config)
 	return engine.Apply(input, filter.ModeMinimal)
-}
-
-// ProcessWithTOMLFilter processes output using a TOML filter configuration
-// Returns the filtered output and the number of bytes saved
-func ProcessWithTOMLFilter(output string, config *FilterConfig) (string, int) {
-	engine := NewTOMLFilterEngine(config)
-	return engine.Apply(output, filter.ModeMinimal)
 }
 
 // MatchAndFilter finds a matching filter and applies it

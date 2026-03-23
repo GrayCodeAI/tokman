@@ -17,6 +17,7 @@ import (
 
 	"github.com/GrayCodeAI/tokman/internal/ccusage"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // API pricing ratios (verified Feb 2026, consistent across Claude models <=200K context)
@@ -384,14 +385,14 @@ func displaySummary(tracker *tracking.Tracker, verbose bool) error {
 
 	fmt.Printf("  Spent (ccusage):              %s\n", formatUSD(totals.CCCost))
 	fmt.Println("  Token breakdown:")
-	fmt.Printf("    Input:                      %s\n", formatTokens(totals.CCInputTokens))
-	fmt.Printf("    Output:                     %s\n", formatTokens(totals.CCOutputTokens))
-	fmt.Printf("    Cache writes:               %s\n", formatTokens(totals.CCCacheCreate))
-	fmt.Printf("    Cache reads:                %s\n", formatTokens(totals.CCCacheRead))
+	fmt.Printf("    Input:                      %s\n", utils.FormatTokens64(totals.CCInputTokens))
+	fmt.Printf("    Output:                     %s\n", utils.FormatTokens64(totals.CCOutputTokens))
+	fmt.Printf("    Cache writes:               %s\n", utils.FormatTokens64(totals.CCCacheCreate))
+	fmt.Printf("    Cache reads:                %s\n", utils.FormatTokens64(totals.CCCacheRead))
 	fmt.Println()
 
 	fmt.Printf("  TokMan commands:              %d\n", totals.TMCommands)
-	fmt.Printf("  Tokens saved:                 %s\n", formatTokens(uint64(totals.TMSavedTokens)))
+	fmt.Printf("  Tokens saved:                 %s\n", utils.FormatTokens64(uint64(totals.TMSavedTokens)))
 	fmt.Println()
 
 	fmt.Println("  Estimated Savings:")
@@ -565,7 +566,7 @@ func printPeriodTable(periods []PeriodEconomics, verbose bool) {
 			}
 			saved := "—"
 			if p.TMSavedTokens != nil {
-				saved = formatTokens(uint64(*p.TMSavedTokens))
+				saved = utils.FormatTokens64(uint64(*p.TMSavedTokens))
 			}
 			weighted := "—"
 			if p.SavingsWeighted != nil {
@@ -595,7 +596,7 @@ func printPeriodTable(periods []PeriodEconomics, verbose bool) {
 			}
 			saved := "—"
 			if p.TMSavedTokens != nil {
-				saved = formatTokens(uint64(*p.TMSavedTokens))
+				saved = utils.FormatTokens64(uint64(*p.TMSavedTokens))
 			}
 			weighted := "—"
 			if p.SavingsWeighted != nil {
@@ -724,24 +725,6 @@ func getWeeklyStats(tracker *tracking.Tracker) []WeekStats {
 // formatUSD formats a USD amount
 func formatUSD(amount float64) string {
 	return fmt.Sprintf("$%.2f", amount)
-}
-
-// formatTokens formats a token count with K/M/B suffixes
-func formatTokens(count uint64) string {
-	const billion = 1e9
-	const million = 1e6
-	const thousand = 1e3
-
-	if count >= billion {
-		return fmt.Sprintf("%.1fB", float64(count)/billion)
-	}
-	if count >= million {
-		return fmt.Sprintf("%.1fM", float64(count)/million)
-	}
-	if count >= thousand {
-		return fmt.Sprintf("%.1fK", float64(count)/thousand)
-	}
-	return fmt.Sprintf("%d", count)
 }
 
 // formatCPT formats cost-per-token

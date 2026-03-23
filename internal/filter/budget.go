@@ -264,8 +264,3 @@ func (f *BudgetEnforcer) selectLines(scored []scoredLine, targetTokens int, tota
 	return result
 }
 
-// EstimateTokens provides a heuristic token count.
-// Uses the formula: ceil(text.length / 4.0)
-func EstimateTokensForBudget(text string) int {
-	return (len(text) + 3) / 4
-}

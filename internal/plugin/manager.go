@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,7 +31,7 @@ type Plugin interface {
 	Commands() []Command
 
 	// Init initializes the plugin (called once on load)
-	Init(config map[string]interface{}) error
+	Init(config map[string]any) error
 
 	// Cleanup releases resources (called on unload)
 	Cleanup() error
@@ -58,7 +60,10 @@ type Manager struct {
 func NewManager(pluginDirs ...string) *Manager {
 	if len(pluginDirs) == 0 {
 		// Default plugin directories
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
 		pluginDirs = []string{
 			filepath.Join(home, ".config", "tokman", "plugins", "native"),
 			"/usr/local/lib/tokman/plugins",
@@ -112,6 +117,11 @@ func (m *Manager) LoadAll() error {
 
 // loadGoPlugin loads a Go .so plugin
 func (m *Manager) loadGoPlugin(path string) error {
+	// Verify plugin checksum before loading
+	if err := m.verifyPlugin(path); err != nil {
+		return err
+	}
+
 	// Open the .so file
 	handle, err := plugin.Open(path)
 	if err != nil {
@@ -151,6 +161,42 @@ func (m *Manager) loadWasmPlugin(path string) error {
 
 	m.plugins[wasmPlugin.Name()] = wasmPlugin
 	return nil
+}
+
+// verifyPlugin checks the plugin file's SHA-256 hash against a .sha256 sidecar file
+func (m *Manager) verifyPlugin(path string) error {
+	hashFile := path + ".sha256"
+	if _, err := os.Stat(hashFile); os.IsNotExist(err) {
+		// No hash file - log warning but allow (backward compatible)
+		fmt.Fprintf(os.Stderr, "Warning: no checksum file for plugin %s (run 'tokman plugin verify')\n", path)
+		return nil
+	}
+	// Read expected hash
+	expectedBytes, err := os.ReadFile(hashFile)
+	if err != nil {
+		return fmt.Errorf("failed to read plugin checksum: %w", err)
+	}
+	expected := strings.TrimSpace(string(expectedBytes))
+
+	// Compute actual hash
+	actual, err := computeFileHash(path)
+	if err != nil {
+		return fmt.Errorf("failed to compute plugin hash: %w", err)
+	}
+
+	if expected != actual {
+		return fmt.Errorf("plugin checksum mismatch: expected %s, got %s", expected[:16], actual[:16])
+	}
+	return nil
+}
+
+func computeFileHash(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:]), nil
 }
 
 // GetPlugin retrieves a loaded plugin by name

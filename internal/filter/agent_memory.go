@@ -133,6 +133,14 @@ func (f *AgentMemoryFilter) Apply(input string, mode Mode) (string, int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	// Safety: limit accumulated state to prevent unbounded growth
+	if f.knowledgeBlock.Len() > f.config.KnowledgeMaxSize*4 {
+		f.enforceKnowledgeLimit()
+	}
+	if f.historyBlock.Len() > f.config.KnowledgeMaxSize*8 {
+		f.historyBlock.Reset()
+	}
+
 	tokens := strings.Fields(input)
 	if len(tokens) == 0 {
 		return input, 0
@@ -487,6 +495,9 @@ func (f *AgentMemoryFilter) reconstruct(knowledge, history string) string {
 		// Fallback: return original input preserved
 		return knowledge + history
 	}
+
+	// After building output, clear transient history
+	f.historyBlock.Reset()
 
 	return result
 }

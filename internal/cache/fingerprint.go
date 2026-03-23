@@ -79,8 +79,8 @@ func (fc *FingerprintCache) Get(content string) *FingerprintResult {
 
 // GetByFingerprint retrieves a cached result by fingerprint
 func (fc *FingerprintCache) GetByFingerprint(fp string) *FingerprintResult {
-	fc.mu.RLock()
-	defer fc.mu.RUnlock()
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
 
 	result := &FingerprintResult{
 		Hash: fp,

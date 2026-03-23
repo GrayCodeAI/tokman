@@ -216,27 +216,27 @@ type LogEntry struct {
 	Time    string                 `json:"time"`
 	Level   string                 `json:"level"`
 	Message string                 `json:"message"`
-	Fields  map[string]interface{} `json:"fields,omitempty"`
+	Fields  map[string]any `json:"fields,omitempty"`
 }
 
 // Info logs at INFO level
-func (l *Logger) Info(msg string, fields map[string]interface{}) {
+func (l *Logger) Info(msg string, fields map[string]any) {
 	l.log("INFO", msg, fields)
 }
 
 // Error logs at ERROR level
-func (l *Logger) Error(msg string, fields map[string]interface{}) {
+func (l *Logger) Error(msg string, fields map[string]any) {
 	l.log("ERROR", msg, fields)
 }
 
 // Debug logs at DEBUG level
-func (l *Logger) Debug(msg string, fields map[string]interface{}) {
+func (l *Logger) Debug(msg string, fields map[string]any) {
 	if l.level == "debug" {
 		l.log("DEBUG", msg, fields)
 	}
 }
 
-func (l *Logger) log(level, msg string, fields map[string]interface{}) {
+func (l *Logger) log(level, msg string, fields map[string]any) {
 	entry := LogEntry{
 		Time:    time.Now().Format(time.RFC3339),
 		Level:   level,

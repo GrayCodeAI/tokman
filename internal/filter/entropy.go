@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/GrayCodeAI/tokman/internal/simd"
 )
@@ -341,7 +342,7 @@ func (f *EntropyFilter) buildDynamicFrequencies(input string) {
 	for _, word := range words {
 		wordLower := strings.ToLower(word)
 		// Skip very short words and punctuation-only tokens
-		if len(wordLower) < 2 {
+		if utf8.RuneCountInString(wordLower) < 2 {
 			continue
 		}
 		// Use SIMD to check if it's a word character

@@ -325,12 +325,12 @@ func detectOpenCode() bool {
 func setupClaudeCode() error {
 	// Claude Code setup is handled by ccusage integration
 	configDir := expandPath("~/.claude")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
 	// Create settings.json with tokman integration
-	settings := map[string]interface{}{
+	settings := map[string]any{
 		"env": map[string]string{
 			"CLAUDE_CODE_USE_TOKMAN": "true",
 		},
@@ -340,11 +340,11 @@ func setupClaudeCode() error {
 
 func setupCursor() error {
 	configDir := expandPath("~/.cursor")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
-	settings := map[string]interface{}{
+	settings := map[string]any{
 		"cursor.ai.tokenOptimization": true,
 		"cursor.ai.cacheEnabled":      true,
 	}
@@ -353,11 +353,11 @@ func setupCursor() error {
 
 func setupCline() error {
 	configDir := expandPath("~/.vscode")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
-	settings := map[string]interface{}{
+	settings := map[string]any{
 		"cline.tokenOptimization": true,
 	}
 	return writeJSONConfig(filepath.Join(configDir, "settings.json"), settings)
@@ -365,12 +365,12 @@ func setupCline() error {
 
 func setupContinue() error {
 	configDir := expandPath("~/.continue")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
-	config := map[string]interface{}{
-		"models": []map[string]interface{}{
+	config := map[string]any{
+		"models": []map[string]any{
 			{
 				"title":    "TokMan Optimized",
 				"provider": "anthropic",
@@ -387,17 +387,17 @@ func setupAider() error {
 cache-prompts: true
 map-tokens: 2048
 `
-	return os.WriteFile(configPath, []byte(content), 0644)
+	return os.WriteFile(configPath, []byte(content), 0600)
 }
 
 func setupCodexCLI() error {
 	configDir := expandPath("~/.codex")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
-	config := map[string]interface{}{
-		"optimization": map[string]interface{}{
+	config := map[string]any{
+		"optimization": map[string]any{
 			"cacheEnabled": true,
 		},
 	}
@@ -406,7 +406,7 @@ func setupCodexCLI() error {
 
 func setupAdaL() error {
 	configDir := expandPath("~/.adal")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
@@ -428,7 +428,7 @@ optimization:
   token_reduction: true
   cache_enabled: true
 `
-	return os.WriteFile(filepath.Join(configDir, "config"), []byte(config), 0644)
+	return os.WriteFile(filepath.Join(configDir, "config"), []byte(config), 0600)
 }
 
 func setupKiro() error {
@@ -444,7 +444,7 @@ optimization:
   cacheEnabled: true
   tokenBudget: 4000
 `
-	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0644)
+	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0600)
 }
 
 func setupKiloCode() error {
@@ -460,7 +460,7 @@ optimization:
   cacheEnabled: true
   tokenBudget: 4000
 `
-	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0644)
+	return os.WriteFile(expandPath("~/.kilorc"), []byte(config), 0600)
 }
 
 func setupWindsurf() error {
@@ -471,11 +471,11 @@ func setupWindsurf() error {
 		configDir = expandPath("~/.config/windsurf/User")
 	}
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
-	settings := map[string]interface{}{
+	settings := map[string]any{
 		"windsurf.ai.tokenOptimization": true,
 		"windsurf.ai.cacheEnabled":      true,
 	}
@@ -492,23 +492,23 @@ token_optimization = true
 [env]
 TOKMAN_ENABLED = "true"
 `
-	return os.WriteFile(".replit", []byte(config), 0644)
+	return os.WriteFile(".replit", []byte(config), 0600)
 }
 
 func setupGeminiCLI() error {
 	configDir := expandPath("~/.gemini")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
 	// Gemini CLI uses hooks in settings.json
-	settings := map[string]interface{}{
-		"hooks": map[string]interface{}{
-			"BeforeTool": []interface{}{
-				map[string]interface{}{
+	settings := map[string]any{
+		"hooks": map[string]any{
+			"BeforeTool": []any{
+				map[string]any{
 					"matcher": "run_shell_command",
-					"hooks": []interface{}{
-						map[string]interface{}{
+					"hooks": []any{
+						map[string]any{
 							"type":    "command",
 							"command": "tokman hook gemini",
 						},
@@ -522,7 +522,7 @@ func setupGeminiCLI() error {
 
 func setupOpenCode() error {
 	configDir := expandPath("~/.config/opencode")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 
@@ -539,7 +539,7 @@ tokman = { enabled = true, path = "~/.config/opencode/plugins/tokman.ts" }
 cache_enabled = true
 token_budget = 4000
 `
-	return os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(config), 0644)
+	return os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(config), 0600)
 }
 
 // === Status Functions ===
@@ -800,18 +800,21 @@ func configExists(path string) bool {
 
 func expandPath(path string) string {
 	if strings.HasPrefix(path, "~") {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
 		return filepath.Join(home, path[1:])
 	}
 	return path
 }
 
-func writeJSONConfig(path string, data interface{}) error {
+func writeJSONConfig(path string, data any) error {
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, content, 0644)
+	return os.WriteFile(path, content, 0600)
 }
 
 func checkVSCodeExtension(name string) bool {
@@ -961,7 +964,10 @@ func GetAgentBinaryPath(name string) string {
 // GetDefaultShellRC returns the default shell RC file path
 func GetDefaultShellRC() string {
 	shell := os.Getenv("SHELL")
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
 
 	if strings.Contains(shell, "zsh") {
 		return filepath.Join(home, ".zshrc")

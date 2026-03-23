@@ -7,18 +7,17 @@ import (
 )
 
 // Enabled reports whether SIMD optimizations are available.
-// Checks for AVX2 on AMD64 or NEON on ARM64.
 var Enabled bool
 
 func init() {
-	// Runtime CPU feature detection will be handled by the build
-	// For now, we use portable implementations that compilers can auto-vectorize
-	Enabled = true
+	// These are portable implementations that the Go compiler may auto-vectorize.
+	// Actual SIMD intrinsics would require GOEXPERIMENT=simd and CPU feature detection.
+	Enabled = false
 }
 
 // --- SIMD Optimized ANSI Stripping ---
 
-// StripANSI strips ANSI escape sequences from input using SIMD-optimized scanning.
+// StripANSI strips ANSI escape sequences from input using optimized byte scanning.
 // This is significantly faster than regex-based approaches for large inputs.
 func StripANSI(input string) string {
 	if len(input) == 0 {
@@ -132,8 +131,8 @@ func HasANSI(input string) bool {
 
 // --- SIMD Optimized Byte Operations ---
 
-// IndexByte finds the first occurrence of c in s using optimized scanning.
-// For large inputs, this can be vectorized by the compiler.
+// IndexByte finds the first occurrence of c in s using sequential byte scanning.
+// The Go compiler may auto-vectorize this loop on supported architectures.
 func IndexByte(s string, c byte) int {
 	// Use the standard library's optimized implementation
 	// which already uses SIMD on supported platforms
@@ -146,7 +145,7 @@ func IndexByte(s string, c byte) int {
 }
 
 // IndexByteSet finds the first occurrence of any byte in set.
-// SIMD-optimized for finding multiple target bytes simultaneously.
+// Uses a lookup table for fast byte set membership testing.
 func IndexByteSet(s string, set []byte) int {
 	if len(set) == 0 || len(s) == 0 {
 		return -1
@@ -166,7 +165,7 @@ func IndexByteSet(s string, set []byte) int {
 	return -1
 }
 
-// CountByte counts occurrences of c in s using SIMD-optimized scanning.
+// CountByte counts occurrences of c in s using byte scanning.
 func CountByte(s string, c byte) int {
 	count := 0
 	for i := 0; i < len(s); i++ {
@@ -200,7 +199,7 @@ func CountByteSet(s string, set []byte) int {
 // --- SIMD Optimized String Matching ---
 
 // ContainsAny checks if s contains any of the substrings.
-// Uses SIMD-optimized first-character matching for speed.
+// Uses first-character matching for speed.
 func ContainsAny(s string, substrs []string) bool {
 	if len(s) == 0 || len(substrs) == 0 {
 		return false
@@ -300,18 +299,18 @@ func CountBrackets(s string, pairs []BracketPair) (opens, closes int) {
 
 // --- Low-level SIMD Operations ---
 
-// Note: These are placeholder implementations that the Go compiler can
-// auto-vectorize. When GOEXPERIMENT=simd is enabled and Go 1.26+ is used,
-// these will use actual SIMD instructions.
+// Note: These are standard Go loop implementations. The Go compiler may
+// auto-vectorize some of these loops on supported architectures, but they
+// do not explicitly use SIMD instructions.
 
-// Memset fills buf with byte c using SIMD-optimized memset.
+// Memset fills buf with byte c.
 func Memset(buf []byte, c byte) {
 	for i := range buf {
 		buf[i] = c
 	}
 }
 
-// Memcmp compares two byte slices using SIMD-optimized comparison.
+// Memcmp compares two byte slices.
 func Memcmp(a, b []byte) int {
 	n := len(a)
 	if len(b) < n {

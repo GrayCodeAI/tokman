@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/GrayCodeAI/tokman/internal/llm"
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
+
+const maxCompactionCacheSize = 100
 
 // Pre-compiled regexes for compaction hot paths (avoid per-call compilation)
 var (
@@ -283,6 +286,20 @@ func (c *CompactionLayer) Apply(input string, mode Mode) (string, int) {
 	if c.config.CacheEnabled && savedTokens > 0 {
 		cacheKey := c.hashContent(input)
 		c.cacheMu.Lock()
+		// Evict oldest if at capacity
+		if len(c.cache) >= maxCompactionCacheSize {
+			oldest := ""
+			oldestTime := time.Now()
+			for k, v := range c.cache {
+				if v.Timestamp.Before(oldestTime) {
+					oldestTime = v.Timestamp
+					oldest = k
+				}
+			}
+			if oldest != "" {
+				delete(c.cache, oldest)
+			}
+		}
 		c.cache[cacheKey] = &CompactionResult{
 			Snapshot:         snapshot,
 			OriginalTokens:   originalTokens,
@@ -489,6 +506,7 @@ func (c *CompactionLayer) enrichWithLLM(snapshot *StateSnapshot, turns []Turn, o
 
 	resp, err := c.summarizer.Summarize(req)
 	if err != nil {
+		utils.Warn("compaction: LLM summarization failed", "error", err)
 		return
 	}
 
@@ -825,7 +843,7 @@ func (c *CompactionLayer) inferNextAction(content string) string {
 // hashContent creates a hash of content for caching
 func (c *CompactionLayer) hashContent(content string) string {
 	hash := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(hash[:16])
+	return hex.EncodeToString(hash[:])
 }
 
 // SetEnabled enables or disables the compaction layer
@@ -839,8 +857,8 @@ func (c *CompactionLayer) IsAvailable() bool {
 }
 
 // GetStats returns compaction statistics
-func (c *CompactionLayer) GetStats() map[string]interface{} {
-	return map[string]interface{}{
+func (c *CompactionLayer) GetStats() map[string]any {
+	return map[string]any{
 		"enabled":          c.config.Enabled,
 		"threshold_lines":  c.config.ThresholdLines,
 		"threshold_tokens": c.config.ThresholdTokens,
@@ -921,5 +939,5 @@ func (t *ConversationTracker) GetRecentTurns(n int) []Turn {
 // sha256Hash creates a SHA256 hash
 func sha256Hash(content string) string {
 	hash := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(hash[:8])
+	return hex.EncodeToString(hash[:])
 }

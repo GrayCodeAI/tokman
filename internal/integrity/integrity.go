@@ -113,7 +113,9 @@ func StoreHash(hookPath string) error {
 	// If hash file exists and is read-only, make it writable first
 	if info, err := os.Stat(hashFile); err == nil {
 		if info.Mode().Perm()&0200 == 0 {
-			os.Chmod(hashFile, 0644)
+			if err := os.Chmod(hashFile, 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to make hash file writable: %v\n", err)
+			}
 		}
 	}
 
@@ -133,7 +135,9 @@ func RemoveHash(hookPath string) (bool, error) {
 	}
 
 	// Make writable before removing
-	os.Chmod(hashFile, 0644)
+	if err := os.Chmod(hashFile, 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to make hash file writable: %v\n", err)
+	}
 
 	if err := os.Remove(hashFile); err != nil {
 		return false, fmt.Errorf("failed to remove hash file %s: %w", hashFile, err)

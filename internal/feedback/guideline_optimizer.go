@@ -2,6 +2,7 @@ package feedback
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -338,9 +339,13 @@ func (o *GuidelineOptimizer) save() {
 
 	// Ensure directory exists
 	dir := filepath.Dir(o.filePath)
-	os.MkdirAll(dir, 0755)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
 
-	os.WriteFile(o.filePath, data, 0644)
+	if err := os.WriteFile(o.filePath, data, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", o.filePath, err)
+	}
 }
 
 // trimGuidelines keeps only the top guidelines by confidence
