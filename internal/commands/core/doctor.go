@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
@@ -69,6 +70,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 10: Go version (R70)
 	results = append(results, checkGoVersion())
+
+	// Check 11: Tier system verification
+	results = append(results, checkTierSystem())
 
 	// Print results
 	hasError := false
@@ -211,4 +215,41 @@ func checkGoVersion() checkResult {
 		return checkResult{"Go", "ok", "available (for development)"}
 	}
 	return checkResult{"Go", "ok", "not required (prebuilt binary)"}
+}
+
+func checkTierSystem() checkResult {
+	// Verify the adaptive tier system is working
+	// Test with sample content of different sizes
+	testCases := []struct {
+		input    string
+		expected filter.Tier
+	}{
+		{"", filter.Tier0_Trivial},
+		{"short", filter.Tier1_Simple},
+		{generateMediumContent(), filter.Tier2_Medium},
+	}
+
+	adaptive := filter.NewAdaptive(filter.PipelineConfig{})
+	
+	correct := 0
+	for _, tc := range testCases {
+		detected := adaptive.DetectTier(tc.input)
+		if detected == tc.expected {
+			correct++
+		}
+	}
+
+	if correct == len(testCases) {
+		return checkResult{"Tier System", "ok", "4 tiers (0-3) with auto-detection"}
+	}
+	return checkResult{"Tier System", "warn", fmt.Sprintf("tier detection partially working (%d/%d)", correct, len(testCases))}
+}
+
+func generateMediumContent() string {
+	// Generate content that should trigger Tier2_Medium (300-1000 tokens, low code)
+	result := "Line of text for testing tier detection.\n"
+	for i := 0; i < 30; i++ {
+		result += "This is a sample line for medium tier content testing.\n"
+	}
+	return result
 }

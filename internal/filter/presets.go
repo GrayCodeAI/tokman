@@ -2,19 +2,28 @@ package filter
 
 // PipelinePreset defines a compression pipeline mode with specific layers enabled.
 // T90: Provide fast/balanced/full presets for different use cases.
+// Maps to the adaptive tier system for automatic layer selection.
 type PipelinePreset string
 
 const (
-	// PresetFast runs only layers 1, 3, 10 (entropy, goal-driven, budget).
+	// PresetFast maps to Tier1_Simple (3 layers).
 	// ~3x faster than full, ~60% of the compression.
+	// Best for: Quick commands, small output, speed-critical operations.
 	PresetFast PipelinePreset = "fast"
 
-	// PresetBalanced runs layers 1-6, 10, 14 (entropy through ngram + budget + attention sink).
+	// PresetBalanced maps to Tier2_Medium (8 layers).
 	// ~1.5x faster than full, ~85% of the compression.
+	// Best for: Most CLI output, git status, build logs, test results.
 	PresetBalanced PipelinePreset = "balanced"
 
-	// PresetFull runs all 29 layers for maximum compression.
+	// PresetFull maps to Tier3_Full (20 layers).
+	// Best for: Large outputs, documentation, conversation history.
 	PresetFull PipelinePreset = "full"
+
+	// PresetAuto automatically selects tier based on content analysis.
+	// Analyzes content size, type, and complexity to pick optimal tier.
+	// Best for: When you don't know the content size/type in advance.
+	PresetAuto PipelinePreset = "auto"
 )
 
 // PresetConfig returns a PipelineConfig for the given preset.
@@ -26,12 +35,13 @@ func PresetConfig(preset PipelinePreset, baseMode Mode) PipelineConfig {
 
 	switch preset {
 	case PresetFast:
+		// Fast preset: Minimal layers for speed
 		cfg.EnableEntropy = true
 		cfg.EnablePerplexity = false
-		cfg.EnableGoalDriven = true
+		cfg.EnableGoalDriven = false
 		cfg.EnableAST = false
 		cfg.EnableContrastive = false
-		cfg.NgramEnabled = false
+		cfg.NgramEnabled = true
 		cfg.EnableEvaluator = false
 		cfg.EnableGist = false
 		cfg.EnableHierarchical = false
@@ -39,7 +49,6 @@ func PresetConfig(preset PipelinePreset, baseMode Mode) PipelineConfig {
 		cfg.EnableAttribution = false
 		cfg.EnableH2O = false
 		cfg.EnableAttentionSink = false
-		// NEW layers disabled in fast preset
 		cfg.EnableTFIDF = false
 		cfg.EnableReasoningTrace = false
 		cfg.EnableSymbolicCompress = false
@@ -48,28 +57,29 @@ func PresetConfig(preset PipelinePreset, baseMode Mode) PipelineConfig {
 		cfg.EnableDynamicRatio = false
 
 	case PresetBalanced:
+		// Balanced preset: Core layers for most use cases
 		cfg.EnableEntropy = true
 		cfg.EnablePerplexity = true
-		cfg.EnableGoalDriven = true
+		cfg.EnableGoalDriven = false
 		cfg.EnableAST = true
-		cfg.EnableContrastive = true
+		cfg.EnableContrastive = false
 		cfg.NgramEnabled = true
 		cfg.EnableEvaluator = false
 		cfg.EnableGist = false
 		cfg.EnableHierarchical = false
 		cfg.EnableCompaction = false
-		cfg.EnableAttribution = false
+		cfg.EnableAttribution = true
 		cfg.EnableH2O = false
 		cfg.EnableAttentionSink = true
-		// NEW layers: TF-IDF + numerical in balanced
 		cfg.EnableTFIDF = true
 		cfg.EnableReasoningTrace = false
 		cfg.EnableSymbolicCompress = false
 		cfg.EnablePhraseGrouping = false
 		cfg.EnableNumericalQuant = true
-		cfg.EnableDynamicRatio = false
+		cfg.EnableDynamicRatio = true
 
-	default: // PresetFull - all 29 layers
+	default: // PresetFull + PresetAuto
+		// Full preset: All layers for maximum compression
 		cfg.EnableEntropy = true
 		cfg.EnablePerplexity = true
 		cfg.EnableGoalDriven = true
@@ -83,7 +93,6 @@ func PresetConfig(preset PipelinePreset, baseMode Mode) PipelineConfig {
 		cfg.EnableAttribution = true
 		cfg.EnableH2O = true
 		cfg.EnableAttentionSink = true
-		// NEW layers enabled in full preset
 		cfg.EnableTFIDF = true
 		cfg.EnableReasoningTrace = true
 		cfg.EnableSymbolicCompress = true
@@ -102,9 +111,32 @@ func PresetConfig(preset PipelinePreset, baseMode Mode) PipelineConfig {
 }
 
 // QuickProcessPreset runs compression with a named preset.
+// For PresetAuto, uses the adaptive pipeline to select optimal tier.
 func QuickProcessPreset(input string, mode Mode, preset PipelinePreset) (string, int) {
 	cfg := PresetConfig(preset, mode)
+	
+	if preset == PresetAuto {
+		// Use adaptive pipeline for auto preset
+		adaptive := NewAdaptive(cfg)
+		output, stats := adaptive.Process(input)
+		return output, stats.TotalSaved
+	}
+	
 	p := NewPipelineCoordinator(cfg)
 	output, stats := p.Process(input)
 	return output, stats.TotalSaved
+}
+
+// PresetToTier maps a preset to the adaptive tier system.
+func PresetToTier(preset PipelinePreset) Tier {
+	switch preset {
+	case PresetFast:
+		return Tier1_Simple
+	case PresetBalanced:
+		return Tier2_Medium
+	case PresetFull:
+		return Tier3_Full
+	default:
+		return Tier3_Full
+	}
 }
