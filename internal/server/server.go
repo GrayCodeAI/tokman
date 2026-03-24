@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 const (
 	maxRequestBodySize = 10 * 1024 * 1024 // 10MB
 	defaultLayerCount  = 31
+	defaultRateLimit   = 100              // requests per minute
 )
 
 // Server provides REST API for token compression
@@ -29,14 +31,66 @@ type Server struct {
 	selector    *filter.AdaptiveLayerSelector
 	metrics     *Metrics
 	logger      *Logger
+	
+	// Rate limiting
+	rateLimiter *rateLimiter
+	
+	// Readiness state
+	ready   bool
+	readyMu sync.RWMutex
+}
+
+// rateLimiter implements a simple IP-based rate limiter
+type rateLimiter struct {
+	requests map[string]*clientInfo
+	mu       sync.RWMutex
+	limit    int           // requests per minute
+	window   time.Duration // time window
+}
+
+type clientInfo struct {
+	count     int
+	resetTime time.Time
+}
+
+func newRateLimiter(limit int) *rateLimiter {
+	return &rateLimiter{
+		requests: make(map[string]*clientInfo),
+		limit:    limit,
+		window:   time.Minute,
+	}
+}
+
+func (rl *rateLimiter) Allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	
+	now := time.Now()
+	info, exists := rl.requests[ip]
+	
+	if !exists || now.After(info.resetTime) {
+		rl.requests[ip] = &clientInfo{
+			count:     1,
+			resetTime: now.Add(rl.window),
+		}
+		return true
+	}
+	
+	if info.count >= rl.limit {
+		return false
+	}
+	
+	info.count++
+	return true
 }
 
 // Config holds server configuration
 type Config struct {
-	Port     int
-	APIKey   string // Optional API key for authentication (empty = no auth)
-	LogLevel string // "debug", "info", "error"
-	Version  string
+	Port       int
+	APIKey     string // Optional API key for authentication (empty = no auth)
+	LogLevel   string // "debug", "info", "error"
+	Version    string
+	RateLimit  int    // Requests per minute (0 = unlimited)
 }
 
 // New creates a new server
@@ -47,13 +101,18 @@ func New(config Config) *Server {
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
 	}
+	if config.RateLimit == 0 {
+		config.RateLimit = defaultRateLimit
+	}
 	return &Server{
-		port:     config.Port,
-		apiKey:   config.APIKey,
-		version:  config.Version,
-		selector: filter.NewAdaptiveLayerSelector(),
-		metrics:  NewMetrics(),
-		logger:   NewLogger(config.LogLevel),
+		port:        config.Port,
+		apiKey:      config.APIKey,
+		version:     config.Version,
+		selector:    filter.NewAdaptiveLayerSelector(),
+		metrics:     NewMetrics(),
+		logger:      NewLogger(config.LogLevel),
+		rateLimiter: newRateLimiter(config.RateLimit),
+		ready:       true, // Start as ready
 	}
 }
 
@@ -63,6 +122,7 @@ func (s *Server) Start() error {
 
 	// Health check (no auth required)
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/health/ready", s.handleHealthReady)
 
 	// Compression endpoints (require JSON content type)
 	contentTypeJSON := httpmw.RequireContentType("application/json")
@@ -75,6 +135,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/metrics", s.handleMetrics)
 
 	var handler http.Handler = mux
+	// Apply rate limiting
+	handler = s.rateLimitMiddleware(handler)
 	// Apply auth middleware if API key is configured
 	if s.apiKey != "" {
 		handler = s.authMiddleware(handler)
@@ -109,6 +171,31 @@ func (s *Server) Start() error {
 		log.Printf("server shutdown error: %v", err)
 	}
 	return nil
+}
+
+// rateLimitMiddleware enforces rate limiting per IP
+func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Health checks are exempt from rate limiting
+		if r.URL.Path == "/health" || r.URL.Path == "/health/ready" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		
+		// Get client IP (check X-Forwarded-For header first)
+		ip := r.Header.Get("X-Forwarded-For")
+		if ip == "" {
+			ip = r.RemoteAddr
+		}
+		
+		if !s.rateLimiter.Allow(ip) {
+			s.metrics.RecordError()
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		
+		next.ServeHTTP(w, r)
+	})
 }
 
 // loggingMiddleware logs all requests
@@ -209,6 +296,29 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Status:  "ok",
 		Version: s.version,
 	})
+}
+
+func (s *Server) handleHealthReady(w http.ResponseWriter, r *http.Request) {
+	s.readyMu.RLock()
+	ready := s.ready
+	s.readyMu.RUnlock()
+	
+	if !ready {
+		http.Error(w, `{"status":"not ready"}`, http.StatusServiceUnavailable)
+		return
+	}
+	
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"status":  "ready",
+		"version": s.version,
+	})
+}
+
+// SetReady sets the readiness state for health checks
+func (s *Server) SetReady(ready bool) {
+	s.readyMu.Lock()
+	s.ready = ready
+	s.readyMu.Unlock()
 }
 
 func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
