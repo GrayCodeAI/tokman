@@ -10,7 +10,7 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
-var ConfigCmd = &cobra.Command{
+var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Show or create configuration file",
 	Long: `Display the current TokMan configuration or create a default config file.
@@ -37,9 +37,9 @@ The configuration file is stored at ~/.config/tokman/config.toml and controls:
 }
 
 func init() {
-	registry.Add(func() { registry.Register(ConfigCmd) })
+	registry.Add(func() { registry.Register(configCmd) })
 
-	ConfigCmd.Flags().Bool("create", false, "Create default config file")
+	configCmd.Flags().Bool("create", false, "Create default config file")
 }
 
 func createDefaultConfig() (string, error) {

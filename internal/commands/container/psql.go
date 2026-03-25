@@ -15,7 +15,7 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
-var PsqlCmd = &cobra.Command{
+var psqlCmd = &cobra.Command{
 	Use:   "psql [args...]",
 	Short: "PostgreSQL client with filtered output",
 	Long: `PostgreSQL client with token-optimized output.
@@ -31,8 +31,8 @@ Examples:
 }
 
 func init() {
-	registry.Add(func() { registry.Register(PsqlCmd) })
-	PsqlCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
+	registry.Add(func() { registry.Register(psqlCmd) })
+	psqlCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 }
 
 var (

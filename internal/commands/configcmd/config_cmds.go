@@ -32,9 +32,9 @@ var configSetCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigCmd.AddCommand(configShowCmd)
-	ConfigCmd.AddCommand(configInitCmd)
-	ConfigCmd.AddCommand(configSetCmd)
+	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configInitCmd)
+	configCmd.AddCommand(configSetCmd)
 }
 
 func runConfigShow(cmd *cobra.Command, args []string) error {

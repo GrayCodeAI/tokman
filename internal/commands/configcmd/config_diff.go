@@ -19,7 +19,7 @@ var configDiffCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigCmd.AddCommand(configDiffCmd)
+	configCmd.AddCommand(configDiffCmd)
 }
 
 func runConfigDiff(cmd *cobra.Command, args []string) error {

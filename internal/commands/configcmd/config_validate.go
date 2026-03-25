@@ -20,7 +20,7 @@ invalid values, and deprecated options.`,
 }
 
 func init() {
-	ConfigCmd.AddCommand(configValidateCmd)
+	configCmd.AddCommand(configValidateCmd)
 }
 
 func runConfigValidate(cmd *cobra.Command, args []string) error {

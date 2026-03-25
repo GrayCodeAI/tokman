@@ -16,7 +16,7 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
-var KubectlCmd = &cobra.Command{
+var kubectlCmd = &cobra.Command{
 	Use:   "kubectl [command] [args...]",
 	Short: "Kubernetes CLI with filtered output",
 	Long: `Kubernetes CLI with token-optimized output.
@@ -35,7 +35,7 @@ Examples:
 }
 
 func init() {
-	registry.Add(func() { registry.Register(KubectlCmd) })
+	registry.Add(func() { registry.Register(kubectlCmd) })
 }
 
 func runKubectl(cmd *cobra.Command, args []string) error {

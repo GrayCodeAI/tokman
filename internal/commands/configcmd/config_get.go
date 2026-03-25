@@ -16,7 +16,7 @@ var configGetCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigCmd.AddCommand(configGetCmd)
+	configCmd.AddCommand(configGetCmd)
 }
 
 func runConfigGet(cmd *cobra.Command, args []string) error {

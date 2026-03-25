@@ -15,7 +15,7 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
-var DockerCmd = &cobra.Command{
+var dockerCmd = &cobra.Command{
 	Use:   "docker [command] [args...]",
 	Short: "Docker CLI with filtered output",
 	Long: `Docker CLI with token-optimized output.
@@ -35,7 +35,7 @@ Examples:
 }
 
 func init() {
-	registry.Add(func() { registry.Register(DockerCmd) })
+	registry.Add(func() { registry.Register(dockerCmd) })
 }
 
 func runDocker(cmd *cobra.Command, args []string) error {
