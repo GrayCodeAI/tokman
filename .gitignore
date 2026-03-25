@@ -18,6 +18,8 @@ go.work
 # IDE
 .idea/
 .vscode/
+.opencode/
+.trace/
 *.swp
 *.swo
 
@@ -28,3 +30,7 @@ Thumbs.db
 # TokMan data
 *.db
 *.log
+
+# Generated files
+source_files.txt
+test_files.txt
