@@ -74,8 +74,8 @@ type PluginLayer struct {
 	Weight      float64 `json:"weight"`
 }
 
-// DefaultWASMPluginConfig returns default configuration
-func DefaultWASMPluginConfig() WASMPluginConfig {
+// defaultWASMPluginConfig returns default configuration
+func defaultWASMPluginConfig() WASMPluginConfig {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		homeDir = os.TempDir()
@@ -88,13 +88,13 @@ func DefaultWASMPluginConfig() WASMPluginConfig {
 	}
 }
 
-// NewWASMPluginSystem creates a new WASM plugin system
-func NewWASMPluginSystem() *WASMPluginSystem {
-	return NewWASMPluginSystemWithConfig(DefaultWASMPluginConfig())
+// newWASMPluginSystem creates a new WASM plugin system
+func newWASMPluginSystem() *WASMPluginSystem {
+	return newWASMPluginSystemWithConfig(defaultWASMPluginConfig())
 }
 
-// NewWASMPluginSystemWithConfig creates a plugin system with custom config
-func NewWASMPluginSystemWithConfig(cfg WASMPluginConfig) *WASMPluginSystem {
+// newWASMPluginSystemWithConfig creates a plugin system with custom config
+func newWASMPluginSystemWithConfig(cfg WASMPluginConfig) *WASMPluginSystem {
 	ps := &WASMPluginSystem{
 		config:    cfg,
 		plugins:   make(map[string]*WASMPlugin),
@@ -274,8 +274,8 @@ type PluginBuilder struct {
 	manifest PluginManifest
 }
 
-// NewPluginBuilder creates a new plugin builder
-func NewPluginBuilder(name string) *PluginBuilder {
+// newPluginBuilder creates a new plugin builder
+func newPluginBuilder(name string) *PluginBuilder {
 	return &PluginBuilder{
 		manifest: PluginManifest{
 			Name:    name,
@@ -339,8 +339,8 @@ type PluginRuntime struct {
 	mu      sync.RWMutex
 }
 
-// NewPluginRuntime creates a new WASM runtime manager
-func NewPluginRuntime() *PluginRuntime {
+// newPluginRuntime creates a new WASM runtime manager
+func newPluginRuntime() *PluginRuntime {
 	return &PluginRuntime{
 		ctx:     context.Background(),
 		plugins: make(map[string]*WASMPlugin),

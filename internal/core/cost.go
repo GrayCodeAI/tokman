@@ -44,8 +44,8 @@ func CalculateSavings(tokensSaved int, model string) float64 {
 	return float64(tokensSaved) / 1_000_000 * pricing.InputPerMillion
 }
 
-// FormatSavings returns a human-readable savings string.
-func FormatSavings(tokensSaved int, model string) string {
+// formatSavings returns a human-readable savings string.
+func formatSavings(tokensSaved int, model string) string {
 	savings := CalculateSavings(tokensSaved, model)
 	if savings < 0.01 {
 		return ">$0.01"

@@ -21,8 +21,8 @@ type StreamingProcessor struct {
 	lineChan    chan string // For true line-by-line processing
 }
 
-// NewStreamingProcessor creates a streaming processor for incremental compression
-func NewStreamingProcessor(config PipelineConfig) *StreamingProcessor {
+// newStreamingProcessor creates a streaming processor for incremental compression
+func newStreamingProcessor(config PipelineConfig) *StreamingProcessor {
 	return &StreamingProcessor{
 		config:      config,
 		coordinator: NewPipelineCoordinator(config),
@@ -90,8 +90,8 @@ type LineProcessor struct {
 	totalSaved  int
 }
 
-// NewLineProcessor creates a line-by-line streaming processor
-func NewLineProcessor(config PipelineConfig) *LineProcessor {
+// newLineProcessor creates a line-by-line streaming processor
+func newLineProcessor(config PipelineConfig) *LineProcessor {
 	return &LineProcessor{
 		config:      config,
 		coordinator: NewPipelineCoordinator(config),
@@ -162,10 +162,10 @@ type StreamingWriter struct {
 	target    io.Writer
 }
 
-// NewStreamingWriter creates a writer that compresses before writing
-func NewStreamingWriter(target io.Writer, config PipelineConfig) *StreamingWriter {
+// newStreamingWriter creates a writer that compresses before writing
+func newStreamingWriter(target io.Writer, config PipelineConfig) *StreamingWriter {
 	return &StreamingWriter{
-		processor: NewStreamingProcessor(config),
+		processor: newStreamingProcessor(config),
 		target:    target,
 	}
 }
@@ -192,12 +192,12 @@ type StreamChunk struct {
 	TokensSaved  int
 }
 
-// StreamChannel creates a channel-based streaming processor
-func StreamChannel(config PipelineConfig) (chan<- string, <-chan StreamChunk) {
+// streamChannel creates a channel-based streaming processor
+func streamChannel(config PipelineConfig) (chan<- string, <-chan StreamChunk) {
 	input := make(chan string, 100)
 	output := make(chan StreamChunk, 100)
 
-	processor := NewStreamingProcessor(config)
+	processor := newStreamingProcessor(config)
 
 	go func() {
 		defer close(output)

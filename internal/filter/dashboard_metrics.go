@@ -91,8 +91,8 @@ type CompressionRecord struct {
 	LayerContribs  map[string]int `json:"layer_contribs"`
 }
 
-// DefaultDashboardConfig returns default configuration
-func DefaultDashboardConfig() DashboardConfig {
+// defaultDashboardConfig returns default configuration
+func defaultDashboardConfig() DashboardConfig {
 	return DashboardConfig{
 		Enabled:    true,
 		MaxRecords: 100,
@@ -100,13 +100,13 @@ func DefaultDashboardConfig() DashboardConfig {
 	}
 }
 
-// NewCompressionDashboard creates a new dashboard
-func NewCompressionDashboard() *CompressionDashboard {
-	return NewCompressionDashboardWithConfig(DefaultDashboardConfig())
+// newCompressionDashboard creates a new dashboard
+func newCompressionDashboard() *CompressionDashboard {
+	return newCompressionDashboardWithConfig(defaultDashboardConfig())
 }
 
-// NewCompressionDashboardWithConfig creates a dashboard with custom config
-func NewCompressionDashboardWithConfig(cfg DashboardConfig) *CompressionDashboard {
+// newCompressionDashboardWithConfig creates a dashboard with custom config
+func newCompressionDashboardWithConfig(cfg DashboardConfig) *CompressionDashboard {
 	return &CompressionDashboard{
 		config: cfg,
 		metrics: &DashboardMetrics{

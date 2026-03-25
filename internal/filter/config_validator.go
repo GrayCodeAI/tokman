@@ -22,8 +22,8 @@ type ValidationResult struct {
 	Warnings []string `json:"warnings"`
 }
 
-// NewConfigValidator creates a new config validator
-func NewConfigValidator() *ConfigValidator {
+// newConfigValidator creates a new config validator
+func newConfigValidator() *ConfigValidator {
 	return &ConfigValidator{}
 }
 

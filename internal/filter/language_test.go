@@ -48,7 +48,7 @@ func TestLanguageDetection(t *testing.T) {
 	}
 }
 
-func TestCommentPatternsForLang(t *testing.T) {
+func TestCommentPatternsForLang2(t *testing.T) {
 	tests := []struct {
 		name          string
 		lang          Language
@@ -101,7 +101,7 @@ func TestCommentPatternsForLang(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			patterns := CommentPatternsForLang(tt.lang)
+			patterns := commentPatternsForLang(tt.lang)
 			if patterns.Line != tt.expectedLine {
 				t.Errorf("Line pattern = %v, want %v", patterns.Line, tt.expectedLine)
 			}
@@ -122,7 +122,7 @@ fn other() {
     // Another comment
 }`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that single-line comments are removed
@@ -152,7 +152,7 @@ def other():
     # Another comment
     pass`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -176,7 +176,7 @@ function other() {
     // Another comment
 }`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -206,7 +206,7 @@ func other() {
     // Another comment
 }`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -237,7 +237,7 @@ def other
   # Another comment
 end`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -257,7 +257,7 @@ echo "Hello, world!"
 # Another comment
 ls -la`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -278,7 +278,7 @@ SELECT * FROM users;
 -- Another comment
 DELETE FROM users WHERE id = 1;`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, _ := filter.Apply(input, ModeMinimal)
 
 	// Check that comments are removed
@@ -300,7 +300,7 @@ fn main() {
 }
 // Comment 3`
 
-	filter := NewCommentFilter()
+	filter := newCommentFilter()
 	result, saved := filter.Apply(input, ModeMinimal)
 
 	// Should save tokens (comments removed)

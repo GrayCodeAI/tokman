@@ -35,18 +35,18 @@ type secretPattern struct {
 	replace string
 }
 
-// DefaultSecretConfig returns default configuration
-func DefaultSecretConfig() SecretConfig {
+// defaultSecretConfig returns default configuration
+func defaultSecretConfig() SecretConfig {
 	return SecretConfig{
 		Enabled:       true,
 		RedactionMode: "partial",
 	}
 }
 
-// NewSecretDetector creates a new secret detector
-func NewSecretDetector() *SecretDetector {
+// newSecretDetector creates a new secret detector
+func newSecretDetector() *SecretDetector {
 	return &SecretDetector{
-		config:   DefaultSecretConfig(),
+		config:   defaultSecretConfig(),
 		patterns: initSecretPatterns(),
 	}
 }

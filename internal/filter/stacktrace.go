@@ -11,8 +11,8 @@ type StackTraceFilter struct {
 	stackPatterns []*regexp.Regexp
 }
 
-// NewStackTraceFilter creates a stack trace preservation filter.
-func NewStackTraceFilter() *StackTraceFilter {
+// newStackTraceFilter creates a stack trace preservation filter.
+func newStackTraceFilter() *StackTraceFilter {
 	return &StackTraceFilter{
 		stackPatterns: []*regexp.Regexp{
 			regexp.MustCompile(`^\s+at .+\(.+:\d+:\d+\)`),             // JavaScript
@@ -81,14 +81,14 @@ func (f *StackTraceFilter) isStackLine(line string) bool {
 	return false
 }
 
-// IsStackTraceBlock checks if an entire text block is a stack trace.
-func IsStackTraceBlock(text string) bool {
+// isStackTraceBlock checks if an entire text block is a stack trace.
+func isStackTraceBlock(text string) bool {
 	lines := strings.Split(text, "\n")
 	if len(lines) < 3 {
 		return false
 	}
 
-	f := NewStackTraceFilter()
+	f := newStackTraceFilter()
 	stackLines := 0
 	for _, line := range lines {
 		if f.isStackLine(line) {

@@ -10,8 +10,8 @@ import (
 // Fast but ~20-30% inaccurate vs real tiktoken counts.
 type HeuristicEstimator struct{}
 
-// NewHeuristicEstimator creates a heuristic token estimator.
-func NewHeuristicEstimator() *HeuristicEstimator {
+// newHeuristicEstimator creates a heuristic token estimator.
+func newHeuristicEstimator() *HeuristicEstimator {
 	return &HeuristicEstimator{}
 }
 
@@ -126,8 +126,8 @@ func (b *BPETokenizer) Count(text string) int {
 // Set to true by default for accuracy; can be toggled for performance.
 var useBPE = true
 
-// SetBPEEnabled enables or disables BPE token counting.
-func SetBPEEnabled(enabled bool) {
+// setBPEEnabled enables or disables BPE token counting.
+func setBPEEnabled(enabled bool) {
 	useBPE = enabled
 }
 

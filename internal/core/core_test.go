@@ -49,7 +49,7 @@ func TestCalculateTokensSaved(t *testing.T) {
 }
 
 func TestHeuristicEstimator(t *testing.T) {
-	e := NewHeuristicEstimator()
+	e := newHeuristicEstimator()
 
 	if e.Encoding() != "heuristic" {
 		t.Errorf("Encoding() = %q, want %q", e.Encoding(), "heuristic")
@@ -70,7 +70,7 @@ func TestHeuristicEstimator(t *testing.T) {
 }
 
 func TestMockCommandRunner(t *testing.T) {
-	runner := NewMockCommandRunner()
+	runner := newMockCommandRunner()
 	runner.Outputs["echo"] = "hello"
 	runner.ExitCodes["echo"] = 0
 
@@ -90,7 +90,7 @@ func TestMockCommandRunner(t *testing.T) {
 }
 
 func TestBufferedOutputWriter(t *testing.T) {
-	w := NewBufferedOutputWriter()
+	w := newBufferedOutputWriter()
 
 	w.WriteOutput([]byte("hello "))
 	w.WriteOutput([]byte("world"))
@@ -110,8 +110,8 @@ func TestCalculateSavings(t *testing.T) {
 		t.Errorf("CalculateSavings returned %f, want > 0", savings)
 	}
 
-	formatted := FormatSavings(1000, "gpt-4o")
+	formatted := formatSavings(1000, "gpt-4o")
 	if formatted == "" {
-		t.Errorf("FormatSavings returned empty string")
+		t.Errorf("formatSavings returned empty string")
 	}
 }

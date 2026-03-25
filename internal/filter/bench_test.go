@@ -123,7 +123,7 @@ func BenchmarkEntropyFilterAggressive(b *testing.B) {
 
 func BenchmarkBM25Scoring(b *testing.B) {
 	lines := strings.Split(benchmarkInput(50), "\n")
-	scorer := NewBM25Scorer()
+	scorer := newBM25Scorer()
 	scorer.Fit(lines)
 	query := "error connection failed"
 	b.ResetTimer()

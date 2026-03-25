@@ -12,8 +12,8 @@ type StdOutputWriter struct {
 	stderr io.Writer
 }
 
-// NewStdOutputWriter creates a writer using os.Stdout and os.Stderr.
-func NewStdOutputWriter() *StdOutputWriter {
+// newStdOutputWriter creates a writer using os.Stdout and os.Stderr.
+func newStdOutputWriter() *StdOutputWriter {
 	return &StdOutputWriter{
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -52,8 +52,8 @@ type BufferedOutputWriter struct {
 	diagnostic []byte
 }
 
-// NewBufferedOutputWriter creates a writer that buffers output in memory.
-func NewBufferedOutputWriter() *BufferedOutputWriter {
+// newBufferedOutputWriter creates a writer that buffers output in memory.
+func newBufferedOutputWriter() *BufferedOutputWriter {
 	return &BufferedOutputWriter{}
 }
 

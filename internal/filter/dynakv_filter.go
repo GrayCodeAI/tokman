@@ -29,8 +29,8 @@ type DynaKVConfig struct {
 	MinContentLength   int
 }
 
-// DefaultDynaKVConfig returns default configuration
-func DefaultDynaKVConfig() DynaKVConfig {
+// defaultDynaKVConfig returns default configuration
+func defaultDynaKVConfig() DynaKVConfig {
 	return DynaKVConfig{
 		Enabled:            true,
 		MaxCompressionRate: 0.9, // 90% compression for filler
@@ -40,9 +40,9 @@ func DefaultDynaKVConfig() DynaKVConfig {
 	}
 }
 
-// NewDynaKVFilter creates a new DynaKV filter
-func NewDynaKVFilter() *DynaKVFilter {
-	return &DynaKVFilter{config: DefaultDynaKVConfig()}
+// newDynaKVFilter creates a new DynaKV filter
+func newDynaKVFilter() *DynaKVFilter {
+	return &DynaKVFilter{config: defaultDynaKVConfig()}
 }
 
 // Name returns the filter name

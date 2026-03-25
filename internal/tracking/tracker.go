@@ -19,6 +19,16 @@ import (
 // Records older than this are automatically cleaned up on each write.
 const HistoryRetentionDays = 90
 
+// TrackerInterface defines the contract for command tracking.
+// Implementations can use SQLite, in-memory stores, or mocks for testing.
+type TrackerInterface interface {
+	Record(record *CommandRecord) error
+	GetSavings(projectPath string) (*SavingsSummary, error)
+	GetRecentCommands(projectPath string, limit int) ([]CommandRecord, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	Close() error
+}
+
 // Tracker manages token tracking persistence.
 type Tracker struct {
 	db            *sql.DB

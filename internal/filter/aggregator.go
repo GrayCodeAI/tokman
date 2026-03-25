@@ -11,8 +11,8 @@ type LogAggregator struct {
 	timestampPatterns []*regexp.Regexp
 }
 
-// NewLogAggregator creates a new log aggregator.
-func NewLogAggregator() *LogAggregator {
+// newLogAggregator creates a new log aggregator.
+func newLogAggregator() *LogAggregator {
 	return &LogAggregator{
 		timestampPatterns: LogTimestampPatterns,
 	}
@@ -274,13 +274,13 @@ func (f *LogAggregator) extractNumber(text string, keyword string) int {
 
 // Aggregate is a utility function to aggregate log output.
 func Aggregate(input string) string {
-	filter := NewLogAggregator()
+	filter := newLogAggregator()
 	output, _ := filter.Apply(input, ModeMinimal)
 	return output
 }
 
-// GroupLines groups lines by common prefix or pattern.
-func GroupLines(input string) string {
+// groupLines groups lines by common prefix or pattern.
+func groupLines(input string) string {
 	lines := strings.Split(input, "\n")
 
 	// Group by first word/pattern

@@ -9,8 +9,8 @@ import (
 // R9: DAST (Chen et al., 2025) — more budget for dense content sections.
 type DensityAdaptiveAllocator struct{}
 
-// NewDensityAdaptiveAllocator creates a density-aware allocator.
-func NewDensityAdaptiveAllocator() *DensityAdaptiveAllocator {
+// newDensityAdaptiveAllocator creates a density-aware allocator.
+func newDensityAdaptiveAllocator() *DensityAdaptiveAllocator {
 	return &DensityAdaptiveAllocator{}
 }
 
@@ -116,8 +116,8 @@ type TieredCompaction struct {
 	ColdMaxTokens int // Heavily compressed, archived
 }
 
-// NewTieredCompaction creates default tiered compaction.
-func NewTieredCompaction() *TieredCompaction {
+// newTieredCompaction creates default tiered compaction.
+func newTieredCompaction() *TieredCompaction {
 	return &TieredCompaction{
 		HotMaxTokens:  2000,  // Recent 2K tokens kept verbatim
 		WarmMaxTokens: 5000,  // Next 5K tokens summarized

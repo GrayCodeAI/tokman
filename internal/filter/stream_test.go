@@ -12,7 +12,7 @@ func TestStreamingProcessor_Basic(t *testing.T) {
 		Budget: 1000,
 	}
 
-	sp := NewStreamingProcessor(config)
+	sp := newStreamingProcessor(config)
 
 	// Write content in chunks
 	content := strings.Repeat("This is a test line with some content.\n", 50)
@@ -41,7 +41,7 @@ func TestStreamingWriter(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	sw := NewStreamingWriter(&buf, config)
+	sw := newStreamingWriter(&buf, config)
 
 	content := strings.Repeat("Test content for streaming compression.\n", 30)
 
@@ -72,7 +72,7 @@ func TestStreamChannel(t *testing.T) {
 		Budget: 1000,
 	}
 
-	input, output := StreamChannel(config)
+	input, output := streamChannel(config)
 
 	// Send chunks
 	go func() {
@@ -107,7 +107,7 @@ func TestStreamingProcessor_MultipleWrites(t *testing.T) {
 		Budget: 100, // Small budget to trigger processing
 	}
 
-	sp := NewStreamingProcessor(config)
+	sp := newStreamingProcessor(config)
 
 	// Write in small chunks
 	for i := 0; i < 10; i++ {

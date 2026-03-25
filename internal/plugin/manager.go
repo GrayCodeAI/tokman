@@ -13,28 +13,38 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/filter"
 )
 
-// Plugin is the interface that all TokMan plugins must implement
-type Plugin interface {
-	// Name returns the plugin name
+// Metadata provides basic plugin identification.
+type Metadata interface {
 	Name() string
-
-	// Version returns the plugin version
 	Version() string
-
-	// Description returns a human-readable description
 	Description() string
+}
 
-	// Filters returns the filters provided by this plugin
+// FilterProvider provides compression filters.
+type FilterProvider interface {
 	Filters() []filter.Filter
+}
 
-	// Commands returns additional CLI commands (optional)
+// CommandProvider provides CLI commands.
+type CommandProvider interface {
 	Commands() []Command
+}
 
-	// Init initializes the plugin (called once on load)
+// Lifecycle manages plugin initialization and cleanup.
+type Lifecycle interface {
 	Init(config map[string]any) error
-
-	// Cleanup releases resources (called on unload)
 	Cleanup() error
+}
+
+// Plugin is the composition of all plugin interfaces.
+// Any type implementing Metadata + Lifecycle can be a minimal plugin.
+// Full plugins also implement FilterProvider and/or CommandProvider.
+type Plugin interface {
+	Metadata
+	Lifecycle
+	// Optional interfaces checked at runtime via type assertions:
+	// - FilterProvider (if Filters() is implemented)
+	// - CommandProvider (if Commands() is implemented)
 }
 
 // Command represents an additional CLI command from a plugin
@@ -227,7 +237,9 @@ func (m *Manager) AllFilters() []filter.Filter {
 
 	var filters []filter.Filter
 	for _, p := range m.plugins {
-		filters = append(filters, p.Filters()...)
+		if fp, ok := p.(FilterProvider); ok {
+			filters = append(filters, fp.Filters()...)
+		}
 	}
 	return filters
 }
@@ -296,11 +308,16 @@ func (m *Manager) ListPlugins() []PluginInfo {
 			pType = "wasm"
 		}
 
+		filterCount := 0
+		if fp, ok := p.(FilterProvider); ok {
+			filterCount = len(fp.Filters())
+		}
+
 		infos = append(infos, PluginInfo{
 			Name:        name,
 			Version:     p.Version(),
 			Description: p.Description(),
-			FilterCount: len(p.Filters()),
+			FilterCount: filterCount,
 			Type:        pType,
 		})
 	}

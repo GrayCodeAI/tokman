@@ -77,9 +77,9 @@ func NewEngineWithQuery(mode Mode, queryIntent string) *Engine {
 func NewEngineWithConfig(cfg EngineConfig) *Engine {
 	filters := []Filter{
 		NewANSIFilter(),
-		NewCommentFilter(),
+		newCommentFilter(),
 		NewImportFilter(),
-		NewLogAggregator(),
+		newLogAggregator(),
 	}
 
 	// Add multi-file filter early if enabled (for cross-file optimization)

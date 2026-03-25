@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestNewBM25Scorer(t *testing.T) {
-	s := NewBM25Scorer()
+func TestBM25ScorerNew(t *testing.T) {
+	s := newBM25Scorer()
 	if s == nil {
-		t.Fatal("NewBM25Scorer returned nil")
+		t.Fatal("newBM25Scorer returned nil")
 	}
 	if s.k1 != 1.2 {
 		t.Errorf("k1 = %f, want 1.2", s.k1)
@@ -18,7 +18,7 @@ func TestNewBM25Scorer(t *testing.T) {
 }
 
 func TestBM25Scorer_Fit(t *testing.T) {
-	s := NewBM25Scorer()
+	s := newBM25Scorer()
 	docs := []string{
 		"the quick brown fox",
 		"the lazy dog sleeps",
@@ -34,7 +34,7 @@ func TestBM25Scorer_Fit(t *testing.T) {
 }
 
 func TestBM25Scorer_Score(t *testing.T) {
-	s := NewBM25Scorer()
+	s := newBM25Scorer()
 	docs := []string{
 		"error: connection failed at 192.168.1.1",
 		"info: server started on port 8080",
@@ -52,7 +52,7 @@ func TestBM25Scorer_Score(t *testing.T) {
 }
 
 func TestBM25Scorer_ScoreLines(t *testing.T) {
-	s := NewBM25Scorer()
+	s := newBM25Scorer()
 	lines := []string{
 		"ERROR: database connection failed",
 		"INFO: starting application",
@@ -70,7 +70,7 @@ func TestBM25Scorer_ScoreLines(t *testing.T) {
 }
 
 func TestBM25Scorer_UnseenTerm(t *testing.T) {
-	s := NewBM25Scorer()
+	s := newBM25Scorer()
 	docs := []string{"hello world", "foo bar"}
 	s.Fit(docs)
 	score := s.Score("hello world", "nonexistent")
@@ -80,7 +80,7 @@ func TestBM25Scorer_UnseenTerm(t *testing.T) {
 }
 
 func TestQuestionAwareRecovery(t *testing.T) {
-	qr := NewQuestionAwareRecovery()
+	qr := newQuestionAwareRecovery()
 	original := "line1\nERROR: failed\nline3\nline4"
 	compressed := "line1\nline3\nline4"
 	recovered := qr.Recover(original, compressed, "ERROR failed")
@@ -91,7 +91,7 @@ func TestQuestionAwareRecovery(t *testing.T) {
 }
 
 func TestQuestionAwareRecovery_NoRecovery(t *testing.T) {
-	qr := NewQuestionAwareRecovery()
+	qr := newQuestionAwareRecovery()
 	original := "line1\nline2\nline3"
 	compressed := "line1\nline2\nline3"
 	recovered := qr.Recover(original, compressed, "query")

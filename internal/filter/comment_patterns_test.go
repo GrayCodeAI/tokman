@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestCommentPatternsForLang_Constants(t *testing.T) {
+func TestCommentPatternsForLangConstants(t *testing.T) {
 	tests := []struct {
 		lang      Language
 		wantLine  string
@@ -20,20 +20,20 @@ func TestCommentPatternsForLang_Constants(t *testing.T) {
 		{LangRuby, "#", "=begin"},
 	}
 	for _, tt := range tests {
-		p := CommentPatternsForLang(tt.lang)
+		p := commentPatternsForLang(tt.lang)
 		if p.Line != tt.wantLine {
-			t.Errorf("CommentPatternsForLang(%v).Line = %q, want %q", tt.lang, p.Line, tt.wantLine)
+			t.Errorf("commentPatternsForLang(%v).Line = %q, want %q", tt.lang, p.Line, tt.wantLine)
 		}
 		if p.BlockStart != tt.wantBlock {
-			t.Errorf("CommentPatternsForLang(%v).BlockStart = %q, want %q", tt.lang, p.BlockStart, tt.wantBlock)
+			t.Errorf("commentPatternsForLang(%v).BlockStart = %q, want %q", tt.lang, p.BlockStart, tt.wantBlock)
 		}
 	}
 }
 
-func TestNewCommentFilter(t *testing.T) {
-	f := NewCommentFilter()
+func TestCommentFilterNew(t *testing.T) {
+	f := newCommentFilter()
 	if f == nil {
-		t.Fatal("NewCommentFilter returned nil")
+		t.Fatal("newCommentFilter returned nil")
 	}
 	if f.Name() != "comment" {
 		t.Errorf("Name() = %q, want 'comment'", f.Name())
@@ -41,7 +41,7 @@ func TestNewCommentFilter(t *testing.T) {
 }
 
 func TestCommentFilter_Apply_None(t *testing.T) {
-	f := NewCommentFilter()
+	f := newCommentFilter()
 	input := "// comment\nfunc main() {}"
 	output, _ := f.Apply(input, ModeNone)
 	if output == "" {
@@ -50,7 +50,7 @@ func TestCommentFilter_Apply_None(t *testing.T) {
 }
 
 func TestCommentFilter_Apply_Minimal(t *testing.T) {
-	f := NewCommentFilter()
+	f := newCommentFilter()
 	input := "// comment\nfunc main() {}"
 	output, saved := f.Apply(input, ModeMinimal)
 	if output == "" {
@@ -60,7 +60,7 @@ func TestCommentFilter_Apply_Minimal(t *testing.T) {
 }
 
 func TestCommentFilter_Apply_Go(t *testing.T) {
-	f := NewCommentFilter()
+	f := newCommentFilter()
 	input := `// Package main provides the entry point
 package main
 
@@ -86,9 +86,9 @@ func main() {
 	}
 }
 
-func TestStripComments(t *testing.T) {
+func TestStripCommentsFunc(t *testing.T) {
 	input := "// line comment\nfunc test() {\n/* block comment */\n}"
-	result := StripComments(input, LangGo)
+	result := stripComments(input, LangGo)
 	if result == "" {
 		t.Error("result should not be empty")
 	}
@@ -101,7 +101,7 @@ func TestStripComments(t *testing.T) {
 }
 
 func TestCommentFilter_Empty(t *testing.T) {
-	f := NewCommentFilter()
+	f := newCommentFilter()
 	output, saved := f.Apply("", ModeMinimal)
 	if output != "" {
 		t.Errorf("empty input should return empty, got: %q", output)

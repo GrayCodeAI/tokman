@@ -13,8 +13,8 @@ type CommentPatterns struct {
 	DocBlock   string
 }
 
-// CommentPatternsForLang returns comment patterns for a language
-func CommentPatternsForLang(lang Language) CommentPatterns {
+// commentPatternsForLang returns comment patterns for a language
+func commentPatternsForLang(lang Language) CommentPatterns {
 	switch lang {
 	case LangRust:
 		return CommentPatterns{
@@ -149,8 +149,8 @@ type CommentFilter struct {
 	patterns map[Language]*regexp.Regexp
 }
 
-// NewCommentFilter creates a new comment filter.
-func NewCommentFilter() *CommentFilter {
+// newCommentFilter creates a new comment filter.
+func newCommentFilter() *CommentFilter {
 	return &CommentFilter{
 		patterns: CommentPatternsMap,
 	}
@@ -179,9 +179,9 @@ func (f *CommentFilter) Apply(input string, mode Mode) (string, int) {
 	return output, tokensSaved
 }
 
-// StripComments is a utility function to strip comments from code.
-func StripComments(code string, lang Language) string {
-	filter := NewCommentFilter()
+// stripComments is a utility function to strip comments from code.
+func stripComments(code string, lang Language) string {
+	filter := newCommentFilter()
 	output, _ := filter.Apply(code, ModeMinimal)
 	return output
 }

@@ -95,7 +95,7 @@ WARN: timeout exceeded`
 }
 
 func TestByteSlicePool(t *testing.T) {
-	pool := NewByteSlicePool(5, 1024)
+	pool := newByteSlicePool(5, 1024)
 
 	buf := pool.Get()
 	if cap(buf) != 1024 {
@@ -113,7 +113,7 @@ func TestByteSlicePool(t *testing.T) {
 
 func TestLineScanner(t *testing.T) {
 	data := []byte("line1\nline2\nline3\n")
-	scanner := NewLineScanner(data)
+	scanner := newLineScanner(data)
 
 	line1 := scanner.Next()
 	if string(line1) != "line1" {
@@ -138,7 +138,7 @@ func TestLineScanner(t *testing.T) {
 
 func TestLineScannerCRLF(t *testing.T) {
 	data := []byte("line1\r\nline2\r\n")
-	scanner := NewLineScanner(data)
+	scanner := newLineScanner(data)
 
 	line1 := scanner.Next()
 	if string(line1) != "line1" {

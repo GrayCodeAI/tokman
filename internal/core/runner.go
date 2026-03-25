@@ -72,8 +72,8 @@ type MockCall struct {
 	Duration time.Duration
 }
 
-// NewMockCommandRunner creates a mock runner for testing.
-func NewMockCommandRunner() *MockCommandRunner {
+// newMockCommandRunner creates a mock runner for testing.
+func newMockCommandRunner() *MockCommandRunner {
 	return &MockCommandRunner{
 		Outputs:   make(map[string]string),
 		ExitCodes: make(map[string]int),

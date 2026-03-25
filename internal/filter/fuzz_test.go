@@ -83,7 +83,7 @@ func FuzzBM25(f *testing.F) {
 	f.Add("", "")
 
 	f.Fuzz(func(t *testing.T, doc, query string) {
-		scorer := NewBM25Scorer()
+		scorer := newBM25Scorer()
 		// Should never panic
 		score := scorer.Score(doc, query)
 		if score < 0 {

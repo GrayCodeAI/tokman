@@ -7,8 +7,8 @@ type ByteSlicePool struct {
 	size int
 }
 
-// NewByteSlicePool creates a pool of byte slices of given size.
-func NewByteSlicePool(poolSize, sliceSize int) *ByteSlicePool {
+// newByteSlicePool creates a pool of byte slices of given size.
+func newByteSlicePool(poolSize, sliceSize int) *ByteSlicePool {
 	return &ByteSlicePool{
 		pool: make(chan []byte, poolSize),
 		size: sliceSize,
@@ -44,8 +44,8 @@ type LineScanner struct {
 	pos  int
 }
 
-// NewLineScanner creates a scanner over byte data.
-func NewLineScanner(data []byte) *LineScanner {
+// newLineScanner creates a scanner over byte data.
+func newLineScanner(data []byte) *LineScanner {
 	return &LineScanner{data: data, pos: 0}
 }
 

@@ -15,8 +15,8 @@ type BM25Scorer struct {
 	docCount     int
 }
 
-// NewBM25Scorer creates a scorer with default parameters.
-func NewBM25Scorer() *BM25Scorer {
+// newBM25Scorer creates a scorer with default parameters.
+func newBM25Scorer() *BM25Scorer {
 	return &BM25Scorer{
 		k1:       1.2,  // Term frequency saturation
 		b:        0.75, // Length normalization
@@ -118,10 +118,10 @@ type QuestionAwareRecovery struct {
 	scorer *BM25Scorer
 }
 
-// NewQuestionAwareRecovery creates a recovery strategy.
-func NewQuestionAwareRecovery() *QuestionAwareRecovery {
+// newQuestionAwareRecovery creates a recovery strategy.
+func newQuestionAwareRecovery() *QuestionAwareRecovery {
 	return &QuestionAwareRecovery{
-		scorer: NewBM25Scorer(),
+		scorer: newBM25Scorer(),
 	}
 }
 
