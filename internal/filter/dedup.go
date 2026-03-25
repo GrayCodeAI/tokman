@@ -26,6 +26,10 @@ func (f *DeduplicationFilter) Name() string {
 
 // Apply removes duplicate consecutive lines.
 func (f *DeduplicationFilter) Apply(input string, mode Mode) (string, int) {
+	if mode == ModeNone {
+		return input, 0
+	}
+
 	lines := strings.Split(input, "\n")
 	originalTokens := EstimateTokens(input)
 

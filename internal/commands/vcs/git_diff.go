@@ -31,7 +31,7 @@ func runGitDiff(args []string) (string, string, error) {
 	statCmd := buildGitCmd("diff", statArgs...)
 	var statOut bytes.Buffer
 	statCmd.Stdout = &statOut
-	statCmd.Run()
+	_ = statCmd.Run() // Stat is best-effort; may be empty for no changes
 
 	// Capture raw diff output
 	diffArgs := append([]string{}, args...)

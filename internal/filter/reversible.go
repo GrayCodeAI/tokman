@@ -99,7 +99,7 @@ func (s *ReversibleStore) Restore(hashPrefix string) (*StoredEntry, error) {
 		if err := json.Unmarshal(data, &entry); err != nil {
 			continue
 		}
-		if entry.Hash == hashPrefix || entry.OriginalHash[:12] == hashPrefix {
+		if entry.Hash == hashPrefix || (len(entry.OriginalHash) >= 12 && entry.OriginalHash[:12] == hashPrefix) {
 			return &entry, nil
 		}
 	}

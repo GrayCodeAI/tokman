@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -182,15 +183,7 @@ func (t *Tee) cleanupOldFiles(dir string) {
 	for i, e := range logFiles {
 		sorted[i] = e.Name()
 	}
-
-	// Simple sort (filenames start with epoch)
-	for i := 0; i < len(sorted)-1; i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[i] > sorted[j] {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.Strings(sorted)
 
 	// Remove oldest files
 	toRemove := len(sorted) - t.config.MaxFiles
@@ -201,13 +194,15 @@ func (t *Tee) cleanupOldFiles(dir string) {
 	}
 }
 
+// sanitizeSlugRe is compiled once for use in sanitizeSlug.
+var sanitizeSlugRe = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
+
 // sanitizeSlug sanitizes a command slug for use in filenames.
 // Replaces non-alphanumeric chars (except underscore/hyphen) with underscore,
 // truncates at 40 chars.
 func sanitizeSlug(slug string) string {
 	// Replace non-alphanumeric (except _ and -) with _
-	re := regexp.MustCompile(`[^a-zA-Z0-9_-]`)
-	sanitized := re.ReplaceAllString(slug, "_")
+	sanitized := sanitizeSlugRe.ReplaceAllString(slug, "_")
 
 	// Truncate at 40 chars
 	if len(sanitized) > 40 {

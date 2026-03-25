@@ -130,16 +130,13 @@ func (f *SessionTracker) processSegments(input string, mode Mode) string {
 func (f *SessionTracker) processSegment(segment string, mode Mode) string {
 	hash := f.hashContent(segment)
 
-	f.mu.RLock()
+	f.mu.Lock()
 	entry, seen := f.seenHashes[hash]
-	f.mu.RUnlock()
 
 	if seen {
-		// Update entry
+		// Update entry atomically under the same lock
 		entry.LastSeen = time.Now()
 		entry.Count++
-
-		f.mu.Lock()
 		f.seenHashes[hash] = entry
 		f.mu.Unlock()
 
@@ -156,7 +153,6 @@ func (f *SessionTracker) processSegment(segment string, mode Mode) string {
 		}
 	} else {
 		// New content - track it
-		f.mu.Lock()
 		if len(f.seenHashes) < f.maxEntries {
 			f.seenHashes[hash] = seenEntry{
 				FirstSeen: time.Now(),

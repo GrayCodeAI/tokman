@@ -412,15 +412,10 @@ func (c *CompactionLayer) parseTurns(content string) []Turn {
 		turns = append(turns, *currentTurn)
 	}
 
-	// If no turns detected, treat entire content as one user turn
+	// If no turns detected, content is not conversation-like.
+	// Return nil so the caller can use the fallback filter instead.
 	if len(turns) == 0 {
-		turns = []Turn{{
-			Role:      "user",
-			Content:   content,
-			Timestamp: time.Now(),
-			Hash:      c.hashContent(content),
-			Tokens:    EstimateTokens(content),
-		}}
+		return nil
 	}
 
 	return turns

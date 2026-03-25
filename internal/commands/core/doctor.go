@@ -177,7 +177,12 @@ func checkTokenizer() checkResult {
 }
 
 func checkTOMLFilters() checkResult {
-	builtinDir := filepath.Join(GetTokmanSourceDir(), "internal", "toml", "builtin")
+	srcDir := GetTokmanSourceDir()
+	if srcDir == "" {
+		// Installed binary with embedded filters - still functional
+		return checkResult{"TOML Filters", "ok", "embedded (installed binary)"}
+	}
+	builtinDir := filepath.Join(srcDir, "internal", "toml", "builtin")
 	if entries, err := os.ReadDir(builtinDir); err == nil {
 		count := 0
 		for _, e := range entries {

@@ -235,7 +235,9 @@ Examples:
   tokman init -g --uninstall   # Remove TokMan from ~/.claude/`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if initUninstall {
-			runUninstall()
+			if err := runUninstall(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
 			return
 		}
 
@@ -246,9 +248,15 @@ Examples:
 			} else if initNoPatch {
 				mode = PatchModeSkip
 			}
-			runGlobalInit(mode)
+			if err := runGlobalInit(mode); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return
+			}
 		} else {
-			runLocalInit()
+			if err := runLocalInit(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return
+			}
 		}
 
 		// Install editor-specific hooks
@@ -339,7 +347,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initContinue, "continue", false, "Install Continue integration")
 }
 
-func runLocalInit() {
+func runLocalInit() error {
 	green := color.New(color.FgGreen).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 
@@ -349,24 +357,21 @@ func runLocalInit() {
 	// Create config directory
 	configDir := filepath.Dir(config.ConfigPath())
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating config directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating config directory: %w", err)
 	}
 	fmt.Printf("  %s Config directory: %s\n", green("✓"), cyan(configDir))
 
 	// Create data directory
 	dataDir := config.DataPath()
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating data directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating data directory: %w", err)
 	}
 	fmt.Printf("  %s Data directory: %s\n", green("✓"), cyan(dataDir))
 
 	// Create hooks directory
 	hooksDir := config.HooksPath()
 	if err := os.MkdirAll(hooksDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating hooks directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating hooks directory: %w", err)
 	}
 	fmt.Printf("  %s Hooks directory: %s\n", green("✓"), cyan(hooksDir))
 
@@ -374,8 +379,7 @@ func runLocalInit() {
 	dbPath := config.DatabasePath()
 	tracker, err := tracking.NewTracker(dbPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing database: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("initializing database: %w", err)
 	}
 	tracker.Close()
 	fmt.Printf("  %s Database: %s\n", green("✓"), cyan(dbPath))
@@ -385,8 +389,7 @@ func runLocalInit() {
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		cfg := config.Defaults()
 		if err := cfg.Save(cfgPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating config file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("creating config file: %w", err)
 		}
 		fmt.Printf("  %s Config file: %s\n", green("✓"), cyan(cfgPath))
 	} else {
@@ -419,38 +422,38 @@ func runLocalInit() {
 	fmt.Println("To enable shell hooks, add to your .bashrc or .zshrc:")
 	fmt.Printf("  %s\n", cyan("source ~/.local/share/tokman/hooks/tokman-rewrite.sh"))
 	fmt.Println()
+	return nil
 }
 
 // runGlobalInit performs global initialization with Claude Code integration
-func runGlobalInit(patchMode PatchMode) {
+func runGlobalInit(patchMode PatchMode) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 
 	// First run local init
-	runLocalInit()
+	if err := runLocalInit(); err != nil {
+		return fmt.Errorf("local init failed: %w", err)
+	}
 
 	// Get Claude directory
 	claudeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting home directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting home directory: %w", err)
 	}
 	claudeDir = filepath.Join(claudeDir, ".claude")
 
 	// Create Claude hooks directory
 	claudeHooksDir := filepath.Join(claudeDir, "hooks")
 	if err := os.MkdirAll(claudeHooksDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating Claude hooks directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating Claude hooks directory: %w", err)
 	}
 
 	// Install hook
 	hookPath := filepath.Join(claudeHooksDir, "tokman-rewrite.sh")
 	hookChanged, err := ensureHookInstalled(hookPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error installing hook: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("installing hook: %w", err)
 	}
 
 	hookStatus := "already up to date"
@@ -461,8 +464,7 @@ func runGlobalInit(patchMode PatchMode) {
 	// Create TOKMAN.md
 	tokmanMdPath := filepath.Join(claudeDir, "TOKMAN.md")
 	if err := writeIfChanged(tokmanMdPath, getTokmanSlim(), "TOKMAN.md"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating TOKMAN.md: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating TOKMAN.md: %w", err)
 	}
 
 	// Patch CLAUDE.md to add @TOKMAN.md reference
@@ -498,18 +500,18 @@ func runGlobalInit(patchMode PatchMode) {
 	}
 
 	fmt.Println()
+	return nil
 }
 
 // runUninstall removes all TokMan artifacts from ~/.claude/
-func runUninstall() {
+func runUninstall() error {
 	red := color.New(color.FgRed).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 
 	// Get Claude directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting home directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting home directory: %w", err)
 	}
 	claudeDir := filepath.Join(homeDir, ".claude")
 
@@ -598,4 +600,5 @@ func runUninstall() {
 		fmt.Println("\nRestart Claude Code to apply changes.")
 	}
 	fmt.Println()
+	return nil
 }

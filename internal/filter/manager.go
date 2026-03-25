@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // CommandContext provides metadata about the command being executed.
@@ -298,6 +299,9 @@ func (m *PipelineManager) validateOutput(output, original string, ctx CommandCon
 	}
 
 	// Check for reasonable compression (not more than 99% unless aggressive)
+	if len(original) == 0 {
+		return output == ""
+	}
 	compressionRatio := float64(len(output)) / float64(len(original))
 	if compressionRatio < 0.01 {
 		// Suspicious - output is less than 1% of original
@@ -493,6 +497,7 @@ func (c *CompressionCache) Size() int {
 
 // ProcessWithBudget processes with a specific token budget
 func (m *PipelineManager) ProcessWithBudget(input string, mode Mode, budget int, ctx CommandContext) (*ProcessResult, error) {
+	m.mu.Lock()
 	// Update coordinator budget
 	m.coordinator.config.Budget = budget
 
@@ -502,12 +507,14 @@ func (m *PipelineManager) ProcessWithBudget(input string, mode Mode, budget int,
 	} else {
 		m.coordinator.budgetEnforcer.SetBudget(budget)
 	}
+	m.mu.Unlock()
 
 	return m.Process(input, mode, ctx)
 }
 
 // ProcessWithQuery processes with query-aware compression
 func (m *PipelineManager) ProcessWithQuery(input string, mode Mode, query string, ctx CommandContext) (*ProcessResult, error) {
+	m.mu.Lock()
 	// Update query intent
 	m.coordinator.config.QueryIntent = query
 	ctx.Intent = query
@@ -519,6 +526,7 @@ func (m *PipelineManager) ProcessWithQuery(input string, mode Mode, query string
 	if m.coordinator.contrastiveFilter == nil && query != "" {
 		m.coordinator.contrastiveFilter = NewContrastiveFilter(query)
 	}
+	m.mu.Unlock()
 
 	return m.Process(input, mode, ctx)
 }
@@ -582,7 +590,13 @@ func (m *PipelineManager) processFileStream(r io.Reader, mode Mode, ctx CommandC
 			break
 		}
 
+		// Ensure we don't split a multi-byte UTF-8 character
 		chunk := string(buf[:n])
+		for !utf8.ValidString(chunk) && n > 0 {
+			n--
+			chunk = string(buf[:n])
+		}
+
 		chunkResult, err := m.Process(chunk, mode, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("chunk processing error: %w", err)

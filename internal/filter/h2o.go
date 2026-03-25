@@ -358,9 +358,11 @@ func (h *H2OFilter) calculateImportance(tokens []h2oToken, content string) []flo
 	// Calculate IDF-like weights (rare words are more important)
 	totalWords := float64(len(freq))
 	idf := make(map[string]float64)
-	for word, count := range freq {
-		// IDF formula: log(N/df)
-		idf[word] = math.Log(totalWords / float64(count))
+	if totalWords > 0 {
+		for word, count := range freq {
+			// IDF formula: log(N/df)
+			idf[word] = math.Log(totalWords / float64(count))
+		}
 	}
 
 	// Track position weights with improved attention simulation

@@ -260,18 +260,22 @@ func GetTokmanSourceDir() string {
 	if err != nil {
 		return "."
 	}
+	exeDir := filepath.Dir(exe)
+
 	// For installed binaries (go install), embedded filters are in the binary itself.
-	// Try to find source from executable path (development layout: ./bin/tokman)
-	dir := filepath.Dir(filepath.Dir(exe))
-	builtinDir := filepath.Join(dir, "internal", "toml", "builtin")
-	if _, err := os.Stat(builtinDir); err == nil {
-		return dir
+	// Try common development layout: ./bin/tokman -> project root is two levels up
+	for _, dir := range []string{
+		filepath.Dir(exeDir),           // parent of exe dir (e.g., project root if exe in ./bin/)
+		filepath.Dir(filepath.Dir(exeDir)), // grandparent
+		exeDir,                         // same directory as binary
+	} {
+		builtinDir := filepath.Join(dir, "internal", "toml", "builtin")
+		if _, err := os.Stat(builtinDir); err == nil {
+			return dir
+		}
 	}
-	// Try same directory as binary (e.g., /usr/local/bin/)
-	dir = filepath.Dir(exe)
-	builtinDir = filepath.Join(dir, "internal", "toml", "builtin")
-	if _, err := os.Stat(builtinDir); err == nil {
-		return dir
-	}
-	return dir
+
+	// For installed binaries, return empty string to signal that
+	// built-in filters should be loaded from the embedded filesystem
+	return ""
 }

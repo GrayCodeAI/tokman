@@ -77,7 +77,7 @@ func runGitLog(args []string, fullOutput bool) (string, string, error) {
 	rawCmd := buildGitCmd("log", rawLogArgs...)
 	var rawOut bytes.Buffer
 	rawCmd.Stdout = &rawOut
-	rawCmd.Run()
+	_ = rawCmd.Run() // Raw capture is best-effort; filtered output is authoritative
 	raw := rawOut.String()
 
 	// Build args for filtered (compact) output
@@ -196,7 +196,7 @@ func runGitShow(args []string, verboseLevel int) (string, string, error) {
 	rawCmd := buildGitCmd("show", args...)
 	var rawOut bytes.Buffer
 	rawCmd.Stdout = &rawOut
-	rawCmd.Run()
+	_ = rawCmd.Run() // Raw capture is best-effort
 	raw := rawOut.String()
 
 	// Build filtered output
@@ -205,14 +205,14 @@ func runGitShow(args []string, verboseLevel int) (string, string, error) {
 	summaryCmd := buildGitCmd("show", summaryArgs...)
 	var summaryOut bytes.Buffer
 	summaryCmd.Stdout = &summaryOut
-	summaryCmd.Run()
+	_ = summaryCmd.Run() // Summary is best-effort
 
 	statArgs := []string{"--stat", "--pretty=format:"}
 	statArgs = append(statArgs, args...)
 	statCmd := buildGitCmd("show", statArgs...)
 	var statOut bytes.Buffer
 	statCmd.Stdout = &statOut
-	statCmd.Run()
+	_ = statCmd.Run() // Stat is best-effort
 
 	diffArgs := []string{"--pretty=format:"}
 	diffArgs = append(diffArgs, args...)

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
 // SemanticFilter prunes low-information segments using statistical analysis.
@@ -88,8 +90,7 @@ func (f *SemanticFilter) Apply(input string, mode Mode) (string, int) {
 	}
 
 	output := strings.Join(kept, "\n")
-	bytesSaved := original - len(output)
-	tokensSaved := bytesSaved / 4
+	tokensSaved := core.CalculateTokensSaved(input, output)
 
 	return output, tokensSaved
 }

@@ -36,7 +36,9 @@ func runAllAgentsInit(global bool, patchMode PatchMode) {
 		switch status.Name {
 		case "claude-code":
 			if global {
-				runGlobalInit(patchMode)
+				if err := runGlobalInit(patchMode); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				}
 			}
 		case "cursor":
 			installCursorHook()

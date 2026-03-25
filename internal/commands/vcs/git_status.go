@@ -46,7 +46,8 @@ func runGitStatus() (string, string, error) {
 	rawCmd := buildGitCmd("status")
 	var rawOut bytes.Buffer
 	rawCmd.Stdout = &rawOut
-	rawCmd.Run()
+	rawCmd.Stderr = &rawOut
+	_ = rawCmd.Run() // Raw capture is best-effort; porcelain is authoritative
 	raw := rawOut.String()
 
 	// Get porcelain data for compact formatting

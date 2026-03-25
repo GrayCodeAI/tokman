@@ -34,6 +34,7 @@ type Tracker struct {
 	db            *sql.DB
 	lastCleanupMs int64         // atomic: unix timestamp of last cleanup
 	cleanupCh     chan struct{} // non-blocking cleanup trigger
+	cleanupWg     sync.WaitGroup // waits for cleanup goroutine to finish
 }
 
 // TimedExecution tracks execution time and token savings.
@@ -177,6 +178,7 @@ func NewTracker(dbPath string) (*Tracker, error) {
 		db:        db,
 		cleanupCh: make(chan struct{}, 1),
 	}
+	t.cleanupWg.Add(1)
 	go t.cleanupWorker()
 	return t, nil
 }
@@ -184,11 +186,13 @@ func NewTracker(dbPath string) (*Tracker, error) {
 // Close closes the database connection.
 func (t *Tracker) Close() error {
 	close(t.cleanupCh)
+	t.cleanupWg.Wait() // Wait for cleanup goroutine to finish before closing DB
 	return t.db.Close()
 }
 
 // cleanupWorker processes cleanup triggers from the channel.
 func (t *Tracker) cleanupWorker() {
+	defer t.cleanupWg.Done()
 	for range t.cleanupCh {
 		t.cleanupOld()
 	}
@@ -566,7 +570,7 @@ func (t *Tracker) TopCommands(limit int) ([]string, error) {
 
 // OverallSavingsPct returns the overall savings percentage across all commands.
 func (t *Tracker) OverallSavingsPct() (float64, error) {
-	var saved, original int
+	var saved, original int64
 	err := t.db.QueryRow(
 		"SELECT COALESCE(SUM(saved_tokens), 0), COALESCE(SUM(original_tokens), 0) FROM commands",
 	).Scan(&saved, &original)

@@ -38,6 +38,9 @@ type EntropyFilter struct {
 
 	// Threshold for entropy-based pruning
 	entropyThreshold float64
+
+	// Mutex for thread-safety on mutable dynamic frequency fields
+	mu sync.Mutex
 }
 
 // NewEntropyFilter creates a new entropy-based filter
@@ -307,6 +310,9 @@ func (f *EntropyFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
 	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	original := len(input)
 

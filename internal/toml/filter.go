@@ -14,9 +14,13 @@ import (
 
 // TOMLFilterEngine applies TOML-defined filter rules to output
 type TOMLFilterEngine struct {
-	config      *FilterConfig
-	compiledRe  []*regexp.Regexp // pre-compiled replace patterns
-	compileOnce sync.Once
+	config            *FilterConfig
+	compiledRe        []*regexp.Regexp // pre-compiled replace patterns
+	compiledMatchRe   []*regexp.Regexp // pre-compiled match_output patterns
+	compiledUnlessRe  []*regexp.Regexp // pre-compiled unless patterns (nil if no unless clause)
+	compiledStripRe   []*regexp.Regexp // pre-compiled strip_lines_matching patterns
+	compiledKeepRe    []*regexp.Regexp // pre-compiled keep_lines_matching patterns
+	compileOnce       sync.Once
 }
 
 // NewTOMLFilterEngine creates a new filter engine from a TOML config
@@ -50,6 +54,7 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 
 	// Stage 2: Replace patterns
 	e.compileOnce.Do(func() {
+		// Pre-compile replace patterns
 		e.compiledRe = make([]*regexp.Regexp, len(e.config.Replace))
 		for i, rule := range e.config.Replace {
 			re, err := regexp.Compile(rule.Pattern)
@@ -58,6 +63,42 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 				continue
 			}
 			e.compiledRe[i] = re
+		}
+
+		// Pre-compile match_output patterns
+		e.compiledMatchRe = make([]*regexp.Regexp, len(e.config.MatchOutput))
+		e.compiledUnlessRe = make([]*regexp.Regexp, len(e.config.MatchOutput))
+		for i, rule := range e.config.MatchOutput {
+			re, err := regexp.Compile(rule.Pattern)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: invalid match_output pattern %q: %v\n", rule.Pattern, err)
+				continue
+			}
+			e.compiledMatchRe[i] = re
+			if rule.Unless != "" {
+				unlessRe, err := regexp.Compile(rule.Unless)
+				if err == nil {
+					e.compiledUnlessRe[i] = unlessRe
+				}
+			}
+		}
+
+		// Pre-compile strip_lines_matching patterns
+		e.compiledStripRe = make([]*regexp.Regexp, 0, len(e.config.StripLinesMatching))
+		for _, p := range e.config.StripLinesMatching {
+			re, err := regexp.Compile(p)
+			if err == nil {
+				e.compiledStripRe = append(e.compiledStripRe, re)
+			}
+		}
+
+		// Pre-compile keep_lines_matching patterns
+		e.compiledKeepRe = make([]*regexp.Regexp, 0, len(e.config.KeepLinesMatching))
+		for _, p := range e.config.KeepLinesMatching {
+			re, err := regexp.Compile(p)
+			if err == nil {
+				e.compiledKeepRe = append(e.compiledKeepRe, re)
+			}
 		}
 	})
 	for i, rule := range e.config.Replace {
@@ -69,19 +110,14 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 	// Stage 3: Match output (short-circuit)
 	// If pattern matches, return message immediately.
 	// If `unless` is set and also matches, skip this rule (prevents swallowing errors).
-	for _, rule := range e.config.MatchOutput {
-		re, err := regexp.Compile(rule.Pattern)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: invalid regex pattern %q: %v\n", rule.Pattern, err)
+	for i, rule := range e.config.MatchOutput {
+		if e.compiledMatchRe[i] == nil {
 			continue
 		}
-		if re.MatchString(output) {
+		if e.compiledMatchRe[i].MatchString(output) {
 			// Check unless clause - if set and matches, skip this rule
-			if rule.Unless != "" {
-				unlessRe, err := regexp.Compile(rule.Unless)
-				if err == nil && unlessRe.MatchString(output) {
-					continue // unless pattern matches - skip this rule
-				}
+			if e.compiledUnlessRe[i] != nil && e.compiledUnlessRe[i].MatchString(output) {
+				continue // unless pattern matches - skip this rule
 			}
 			output = rule.Message
 			return output, originalLen - len(output)
@@ -121,25 +157,8 @@ func (e *TOMLFilterEngine) Apply(input string, mode filter.Mode) (string, int) {
 
 // filterLines filters lines based on strip/keep patterns
 func (e *TOMLFilterEngine) filterLines(input string) string {
-	if len(e.config.StripLinesMatching) == 0 && len(e.config.KeepLinesMatching) == 0 {
+	if len(e.compiledStripRe) == 0 && len(e.compiledKeepRe) == 0 {
 		return input
-	}
-
-	// Compile regex patterns once
-	stripPatterns := make([]*regexp.Regexp, 0, len(e.config.StripLinesMatching))
-	for _, p := range e.config.StripLinesMatching {
-		re, err := regexp.Compile(p)
-		if err == nil {
-			stripPatterns = append(stripPatterns, re)
-		}
-	}
-
-	keepPatterns := make([]*regexp.Regexp, 0, len(e.config.KeepLinesMatching))
-	for _, p := range e.config.KeepLinesMatching {
-		re, err := regexp.Compile(p)
-		if err == nil {
-			keepPatterns = append(keepPatterns, re)
-		}
 	}
 
 	var result strings.Builder
@@ -150,7 +169,7 @@ func (e *TOMLFilterEngine) filterLines(input string) string {
 		keep := true
 
 		// Check strip patterns
-		for _, re := range stripPatterns {
+		for _, re := range e.compiledStripRe {
 			if re.MatchString(line) {
 				keep = false
 				break
@@ -158,9 +177,9 @@ func (e *TOMLFilterEngine) filterLines(input string) string {
 		}
 
 		// Check keep patterns (if any defined, line must match at least one)
-		if keep && len(keepPatterns) > 0 {
+		if keep && len(e.compiledKeepRe) > 0 {
 			keep = false
-			for _, re := range keepPatterns {
+			for _, re := range e.compiledKeepRe {
 				if re.MatchString(line) {
 					keep = true
 					break
@@ -285,6 +304,7 @@ func MatchAndFilter(command string, output string, registry *FilterRegistry) (st
 type TOMLFilterWrapper struct {
 	config *FilterConfig
 	name   string
+	engine *TOMLFilterEngine // cached engine for regex compilation reuse
 }
 
 // NewTOMLFilterWrapper creates a filter.Filter wrapper for a TOML filter
@@ -292,6 +312,7 @@ func NewTOMLFilterWrapper(name string, config *FilterConfig) *TOMLFilterWrapper 
 	return &TOMLFilterWrapper{
 		config: config,
 		name:   name,
+		engine: NewTOMLFilterEngine(config),
 	}
 }
 
@@ -302,6 +323,5 @@ func (f *TOMLFilterWrapper) Name() string {
 
 // Apply implements the filter.Filter interface
 func (f *TOMLFilterWrapper) Apply(input string, mode filter.Mode) (string, int) {
-	engine := NewTOMLFilterEngine(f.config)
-	return engine.Apply(input, mode)
+	return f.engine.Apply(input, mode)
 }
