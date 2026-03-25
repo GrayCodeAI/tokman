@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -146,7 +147,7 @@ func (f *SessionTracker) processSegment(segment string, mode Mode) string {
 		if entry.Count >= 3 && len(segment) > 100 {
 			// Return a compressed marker
 			summary := f.summarizeSegment(segment)
-			return "[seen x" + itoa(entry.Count) + ": " + summary + "]"
+			return "[seen x" + strconv.Itoa(entry.Count) + ": " + summary + "]"
 		}
 
 		// If seen twice, add marker but keep content
@@ -208,7 +209,7 @@ func (f *SessionTracker) summarizeSegment(segment string) string {
 	}
 
 	if bestLine == "" {
-		return itoa(len(lines)) + " lines"
+		return strconv.Itoa(len(lines)) + " lines"
 	}
 
 	// Truncate

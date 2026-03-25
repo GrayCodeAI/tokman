@@ -43,10 +43,11 @@ type Server struct {
 
 // rateLimiter implements a simple IP-based rate limiter
 type rateLimiter struct {
-	requests map[string]*clientInfo
-	mu       sync.RWMutex
-	limit    int           // requests per minute
-	window   time.Duration // time window
+	requests  map[string]*clientInfo
+	mu        sync.RWMutex
+	limit     int           // requests per minute
+	window    time.Duration // time window
+	lastClean time.Time
 }
 
 type clientInfo struct {
@@ -67,6 +68,16 @@ func (rl *rateLimiter) Allow(ip string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
+
+	if now.Sub(rl.lastClean) > time.Minute {
+		for key, info := range rl.requests {
+			if now.After(info.resetTime) {
+				delete(rl.requests, key)
+			}
+		}
+		rl.lastClean = now
+	}
+
 	info, exists := rl.requests[ip]
 
 	if !exists || now.After(info.resetTime) {

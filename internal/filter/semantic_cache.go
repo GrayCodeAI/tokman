@@ -1,8 +1,8 @@
 package filter
 
 import (
-	"hash/fnv"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/GrayCodeAI/tokman/internal/core"
@@ -277,7 +277,7 @@ func (f *SemanticCacheFilter) mergeToCores(clusters []semanticCluster, mode Mode
 			result.WriteString(cluster.core)
 			if cluster.frequency > 2 {
 				result.WriteString(" [×")
-				result.WriteString(intToA(cluster.frequency))
+				result.WriteString(strconv.Itoa(cluster.frequency))
 				result.WriteString("]")
 			}
 		} else {
@@ -322,23 +322,4 @@ func regexpSplit(text string, pattern string) []string {
 		}
 	}
 	return result
-}
-
-func intToA(n int) string {
-	if n < 10 {
-		return string(rune('0' + n))
-	}
-	var digits []rune
-	for n > 0 {
-		digits = append([]rune{rune('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
-}
-
-// contentHash computes a fast hash for content deduplication
-func contentHash(text string) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(text))
-	return h.Sum64()
 }

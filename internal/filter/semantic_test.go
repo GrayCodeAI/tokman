@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -396,7 +397,7 @@ func BenchmarkSemanticFilter_Apply(b *testing.B) {
 	// Create a realistic large output
 	var lines []string
 	for i := 0; i < 100; i++ {
-		lines = append(lines, "Compiling module"+itoa(i)+"...")
+		lines = append(lines, "Compiling module"+strconv.Itoa(i)+"...")
 	}
 	lines = append(lines, "ERROR: Failed to compile module50")
 	lines = append(lines, "error: undefined reference")

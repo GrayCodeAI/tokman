@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -211,20 +212,9 @@ func (s *SmallKVCompensator) addSectionMarkers(input string) string {
 
 	if compressionMarkers > len(lines)/3 {
 		// Heavily compressed - add a summary header
-		return "[Compressed output - " + itoaSmallKV(len(lines)) + " lines from original]\n" + input
+		return "[Compressed output - " + strconv.Itoa(len(lines)) + " lines from original]\n" + input
 	}
 
 	return input
 }
 
-func itoaSmallKV(n int) string {
-	if n < 10 {
-		return string(rune('0' + n))
-	}
-	var digits []rune
-	for n > 0 {
-		digits = append([]rune{rune('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
-}

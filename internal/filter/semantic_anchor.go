@@ -368,14 +368,6 @@ func abs(x int) int {
 	return x
 }
 
-// min returns minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // GetAnchors returns all detected anchor tokens
 func (f *SemanticAnchorFilter) GetAnchors() []AnchorToken {
 	return f.anchorTokens

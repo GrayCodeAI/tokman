@@ -170,7 +170,7 @@ func (a *AttentionPredictor) detectContentType(input string) string {
 			continue
 		}
 
-		prefix := trimmed[:minInt(4, len(trimmed))]
+		prefix := trimmed[:min(4, len(trimmed))]
 
 		if prefix == "func" || prefix == "def " || prefix == "clas" || prefix == "impo" {
 			codeScore++
@@ -261,9 +261,3 @@ func (a *AttentionPredictor) learnFromCompression(original, compressed, contentT
 	a.patterns[contentType] = pattern
 }
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

@@ -141,9 +141,6 @@ type PipelineCoordinator struct {
 	// NEW: Dynamic Compression Ratio (PruneSID, Mar 2026)
 	dynamicRatioFilter *DynamicRatioFilter
 
-	// NEW: LoPace Lossless Compressor (Feb 2026)
-	lopaceCompressor *LoPaceCompressor
-
 	// NEW: Inter-Layer Feedback Mechanism
 	feedback *InterLayerFeedback
 
@@ -592,9 +589,6 @@ func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 	// NEW: Inter-Layer Feedback Mechanism
 	p.feedback = NewInterLayerFeedback()
 	p.qualityEstimator = NewQualityEstimator()
-
-	// NEW: LoPace Lossless Compressor (for tee/cache)
-	p.lopaceCompressor = NewLoPaceCompressor()
 
 	// Phase 2: Hypernym Concept Compression (Mercury, May 2025)
 	if cfg.EnableHypernym {

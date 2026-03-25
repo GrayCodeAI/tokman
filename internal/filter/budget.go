@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -82,7 +83,7 @@ func (f *BudgetEnforcer) enforceBudget(input string, mode Mode) string {
 
 	remainingTokens := EstimateTokens(input) - EstimateTokens(output)
 	if remainingTokens > 0 {
-		output += "\n\n[... truncated: " + itoa(remainingTokens) + " tokens omitted]"
+		output += "\n\n[... truncated: " + strconv.Itoa(remainingTokens) + " tokens omitted]"
 	}
 
 	return output
@@ -250,7 +251,7 @@ func (f *BudgetEnforcer) selectLines(scored []scoredLine, targetTokens int, tota
 			if lastKept >= 0 && i-lastKept > 1 {
 				gap := i - lastKept - 1
 				if gap > 3 {
-					result = append(result, "... ["+itoa(gap)+" lines omitted]")
+					result = append(result, "... ["+strconv.Itoa(gap)+" lines omitted]")
 				} else {
 					// Small gaps - just add an empty line
 					result = append(result, "")

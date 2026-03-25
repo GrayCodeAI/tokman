@@ -1,6 +1,8 @@
 package filter
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -371,29 +373,19 @@ func (f *HierarchicalFilter) buildHierarchicalOutput(sections []section, mode Mo
 
 // formatHeader creates the compression header
 func (f *HierarchicalFilter) formatHeader(totalLines, sectionCount int) string {
-	return "\n[Hierarchical Summary: " + itoa(totalLines) + " lines → " + itoa(sectionCount) + " sections]\n"
+	return "\n[Hierarchical Summary: " + strconv.Itoa(totalLines) + " lines → " + strconv.Itoa(sectionCount) + " sections]\n"
 }
 
 // formatSummarySection formats a section as a summary
 func (f *HierarchicalFilter) formatSummarySection(s section) string {
 	lineCount := s.endLine - s.startLine + 1
-	return "\n├─ [L" + itoa(s.startLine+1) + "-" + itoa(s.endLine+1) + "] " + s.summary + " (" + itoa(lineCount) + " lines, score: " + f.formatScore(s.score) + ")\n"
+	return "\n├─ [L" + strconv.Itoa(s.startLine+1) + "-" + strconv.Itoa(s.endLine+1) + "] " + s.summary + " (" + strconv.Itoa(lineCount) + " lines, score: " + f.formatScore(s.score) + ")\n"
 }
 
 // formatScore formats a score to 2 decimal places
 func (f *HierarchicalFilter) formatScore(score float64) string {
-	// Simple formatting without strconv
 	intPart := int(score * 100)
-	return itoa(intPart/100) + "." + itoaPad(intPart%100, 2)
-}
-
-// itoaPad pads an integer with zeros
-func itoaPad(n, width int) string {
-	s := itoa(n)
-	for len(s) < width {
-		s = "0" + s
-	}
-	return s
+	return strconv.Itoa(intPart/100) + "." + fmt.Sprintf("%02d", intPart%100)
 }
 
 // getThresholds returns score thresholds for different compression levels

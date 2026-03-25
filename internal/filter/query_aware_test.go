@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -346,12 +347,12 @@ func BenchmarkQueryAwareFilter_Apply(b *testing.B) {
 
 	var lines []string
 	for i := 0; i < 50; i++ {
-		lines = append(lines, "Compiling module"+itoa(i)+"...")
+		lines = append(lines, "Compiling module"+strconv.Itoa(i)+"...")
 	}
 	lines = append(lines, "ERROR: Failed at module25")
 	lines = append(lines, "  --> src/main.rs:100:5")
 	for i := 0; i < 50; i++ {
-		lines = append(lines, "Processing step"+itoa(i))
+		lines = append(lines, "Processing step"+strconv.Itoa(i))
 	}
 
 	input := strings.Join(lines, "\n")

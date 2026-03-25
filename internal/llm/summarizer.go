@@ -45,7 +45,7 @@ func DefaultConfig() Config {
 	return Config{
 		Provider:   ProviderOllama,
 		Model:      "llama3.2:3b",
-		BaseURL:    "http://localhost:11434",
+		BaseURL:    "https://localhost:11434",
 		Timeout:    30 * time.Second,
 		MaxRetries: 2,
 	}

@@ -2,6 +2,7 @@ package filter
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -363,13 +364,13 @@ func (f *ErrorTraceFilter) compressGenericTrace(input string, mode Mode) string 
 		if f.isImportantLine(trimmed) {
 			result = append(result, line)
 		} else if omitted > 0 {
-			result = append(result, "... ["+itoa(omitted)+" lines omitted]")
+			result = append(result, "... ["+strconv.Itoa(omitted)+" lines omitted]")
 			omitted = 0
 		}
 	}
 
 	if omitted > 0 {
-		result = append(result, "... ["+itoa(omitted)+" lines omitted]")
+		result = append(result, "... ["+strconv.Itoa(omitted)+" lines omitted]")
 	}
 
 	return strings.Join(result, "\n")
@@ -461,7 +462,7 @@ func (f *ErrorTraceFilter) formatCompressedError(errorType, errorMsg string, use
 	if totalFrames > len(userFrames) {
 		omitted := totalFrames - len(userFrames)
 		if omitted > 0 {
-			result = append(result, "["+itoa(omitted)+" stack frames omitted]")
+			result = append(result, "["+strconv.Itoa(omitted)+" stack frames omitted]")
 		}
 	}
 
@@ -497,7 +498,7 @@ func (f *ErrorTraceFilter) formatGoPanic(msg string, userFrames []stackFrame, to
 	// Omitted frames
 	omitted := totalFrames - len(userFrames)
 	if omitted > 0 {
-		result = append(result, "["+itoa(omitted)+" stack frames omitted]")
+		result = append(result, "["+strconv.Itoa(omitted)+" stack frames omitted]")
 	}
 
 	return strings.Join(result, "\n")
@@ -526,7 +527,7 @@ func (f *ErrorTraceFilter) formatRustPanic(msg string, userFrames []stackFrame, 
 	// Omitted frames
 	omitted := totalFrames - len(userFrames)
 	if omitted > 0 {
-		result = append(result, "["+itoa(omitted)+" stack frames omitted]")
+		result = append(result, "["+strconv.Itoa(omitted)+" stack frames omitted]")
 	}
 
 	return strings.Join(result, "\n")

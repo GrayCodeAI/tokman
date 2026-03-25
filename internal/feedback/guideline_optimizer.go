@@ -362,15 +362,7 @@ func (o *GuidelineOptimizer) trimGuidelines() {
 		o.guidelines[i], o.guidelines[maxIdx] = o.guidelines[maxIdx], o.guidelines[i]
 	}
 
-	o.guidelines = o.guidelines[:minInt(target, len(o.guidelines))]
-}
-
-// minInt returns the minimum of two integers
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+	o.guidelines = o.guidelines[:min(target, len(o.guidelines))]
 }
 
 // minFloat64 returns the minimum of two floats

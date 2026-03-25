@@ -152,7 +152,8 @@ func (c *Client) sendPing() {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-TokMan-Token", c.token)
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}

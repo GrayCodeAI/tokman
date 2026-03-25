@@ -284,7 +284,7 @@ func (a *AttributionFilter) computeTokenConnectivity(tokens []token) []float64 {
 				}
 			}
 			// Structural co-occurrence: adjacent tokens in code
-			if intAbs(i-j) == 1 && (isCodeSymbol(tokens[i].text) || isCodeSymbol(tokens[j].text)) {
+			if abs(i-j) == 1 && (isCodeSymbol(tokens[i].text) || isCodeSymbol(tokens[j].text)) {
 				connectivity[i] += 0.15
 			}
 		}
@@ -312,7 +312,7 @@ func (a *AttributionFilter) isInImportantRegion(tokens []token, idx int) bool {
 	// Check if surrounded by important tokens
 	windowSize := 3
 	importantCount := 0
-	for j := intMax(0, idx-windowSize); j < intMin(len(tokens), idx+windowSize+1); j++ {
+	for j := max(0, idx-windowSize); j < min(len(tokens), idx+windowSize+1); j++ {
 		if j == idx {
 			continue
 		}
@@ -322,28 +322,6 @@ func (a *AttributionFilter) isInImportantRegion(tokens []token, idx int) bool {
 		}
 	}
 	return importantCount >= 2
-}
-
-// Helper functions for int math
-func intMax(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func intMin(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func intAbs(a int) int {
-	if a < 0 {
-		return -a
-	}
-	return a
 }
 
 // semanticScore returns importance score for semantic content

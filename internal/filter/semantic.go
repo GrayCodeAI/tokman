@@ -3,6 +3,7 @@ package filter
 import (
 	"bufio"
 	"math"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -380,33 +381,10 @@ func (f *SemanticFilter) compressSegment(segment string) string {
 	// Keep first line, ellipsis, last line
 	var result []string
 	result = append(result, lines[0])
-	result = append(result, "... ["+itoa(len(lines)-2)+" lines omitted]")
+	result = append(result, "... ["+strconv.Itoa(len(lines)-2)+" lines omitted]")
 	result = append(result, lines[len(lines)-1])
 
 	return strings.Join(result, "\n")
 }
 
-// itoa converts int to string (avoids strconv import)
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
 
-	var digits []byte
-	neg := false
-	if n < 0 {
-		neg = true
-		n = -n
-	}
-
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-
-	if neg {
-		digits = append([]byte{'-'}, digits...)
-	}
-
-	return string(digits)
-}

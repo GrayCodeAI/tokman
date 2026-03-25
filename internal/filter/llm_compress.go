@@ -248,7 +248,8 @@ func (l *LLMCompressor) callOpenAI(ctx context.Context, prompt string) (string, 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
@@ -315,7 +316,8 @@ func (l *LLMCompressor) callAnthropic(ctx context.Context, prompt string) (strin
 	httpReq.Header.Set("x-api-key", apiKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
@@ -367,7 +369,7 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 
 	baseURL := l.BaseURL
 	if baseURL == "" {
-		baseURL = "http://localhost:11434"
+		baseURL = "https://localhost:11434"
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/generate", strings.NewReader(string(reqJSON)))
@@ -376,7 +378,8 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
@@ -414,15 +417,15 @@ func (l *LLMCompressor) callLocal(ctx context.Context, prompt string) (string, e
 	return "", fmt.Errorf("no local LLM available")
 }
 
-// hashString creates a proper hash for cache keys
-func hashString(s string) string {
+// contentHash creates a proper hash for cache keys
+func contentHash(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:16]) // 32-char hex prefix is sufficient for cache keys
 }
 
 // cacheKey generates a cache key from input and intent
 func (l *LLMCompressor) cacheKey(input, intent string) string {
-	return fmt.Sprintf("%s:%s", intent, hashString(input))
+	return fmt.Sprintf("%s:%s", intent, contentHash(input))
 }
 
 // estimateTokens estimates token count

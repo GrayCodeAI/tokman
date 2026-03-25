@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -243,7 +244,7 @@ func (f *GistFilter) createGist(input string, chunks []chunk, mode Mode) string 
 			if lastGisted < i-1 {
 				gist := f.gistForType(chunkTypes[i])
 				count := f.countChunkLines(chunks, chunkTypes[i], i)
-				result = append(result, gist+" ("+itoa(count)+" lines)")
+				result = append(result, gist+" ("+strconv.Itoa(count)+" lines)")
 			}
 			lastGisted = i
 		} else {

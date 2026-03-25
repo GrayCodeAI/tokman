@@ -2,7 +2,6 @@ package container
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -499,52 +498,4 @@ func filterComposeBuild(output string) string {
 	return result.String()
 }
 
-// JSON structures for kubectl/aws
-type K8sPodList struct {
-	Items []K8sPod `json:"items"`
-}
 
-type K8sPod struct {
-	Metadata K8sMetadata  `json:"metadata"`
-	Status   K8sPodStatus `json:"status"`
-}
-
-type K8sMetadata struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-}
-
-type K8sPodStatus struct {
-	Phase             string               `json:"phase"`
-	ContainerStatuses []K8sContainerStatus `json:"containerStatuses"`
-}
-
-type K8sContainerStatus struct {
-	Name         string         `json:"name"`
-	RestartCount int            `json:"restartCount"`
-	State        map[string]any `json:"state"`
-}
-
-type K8sServiceList struct {
-	Items []K8sService `json:"items"`
-}
-
-type K8sService struct {
-	Metadata K8sMetadata    `json:"metadata"`
-	Spec     K8sServiceSpec `json:"spec"`
-}
-
-type K8sServiceSpec struct {
-	Type  string           `json:"type"`
-	Ports []K8sServicePort `json:"ports"`
-}
-
-type K8sServicePort struct {
-	Port       int    `json:"port"`
-	TargetPort string `json:"targetPort"`
-}
-
-// Helper to unmarshal JSON
-func unmarshalJSON(data string, v any) error {
-	return json.Unmarshal([]byte(data), v)
-}

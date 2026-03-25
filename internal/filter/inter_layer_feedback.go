@@ -1,7 +1,6 @@
 package filter
 
 import (
-	"hash/fnv"
 	"strings"
 	"sync"
 )
@@ -261,11 +260,4 @@ func extractKeyTerms(text string) map[string]bool {
 	}
 
 	return terms
-}
-
-// computeContentHash computes a hash for content similarity detection
-func computeContentHash(text string) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(text))
-	return h.Sum64()
 }

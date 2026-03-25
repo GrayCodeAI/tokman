@@ -2,6 +2,7 @@ package filter
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/GrayCodeAI/tokman/internal/core"
@@ -264,7 +265,7 @@ func (f *KVzipFilter) summarizeBlock(block contextBlock) string {
 	summary.WriteString(lines[0])
 	if len(lines) > 2 {
 		summary.WriteString("\n[... ")
-		summary.WriteString(itoaKVzip(len(lines) - 2))
+		summary.WriteString(strconv.Itoa(len(lines) - 2))
 		summary.WriteString(" lines ...]")
 	}
 	summary.WriteString("\n")
@@ -320,14 +321,3 @@ func (f *KVzipFilter) isBlockRelevant(blockType, query string) bool {
 	}
 }
 
-func itoaKVzip(n int) string {
-	if n < 10 {
-		return string(rune('0' + n))
-	}
-	var digits []rune
-	for n > 0 {
-		digits = append([]rune{rune('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
-}
