@@ -44,7 +44,7 @@ func runGeminiInit(global bool, patchMode PatchMode) {
 	}
 
 	hookPath := filepath.Join(hookDir, "tokman-hook-gemini.sh")
-	if err := os.WriteFile(hookPath, []byte(geminiHookScript), 0755); err != nil {
+	if err := os.WriteFile(hookPath, []byte(geminiHookScript), 0700); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing Gemini hook: %v\n", err)
 		return
 	}

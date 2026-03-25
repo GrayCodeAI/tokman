@@ -140,7 +140,10 @@ func modelBreakdownHandler(tracker *tracking.Tracker) http.HandlerFunc {
 }
 
 func detectLLMProvider() LLMProvider {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 
 	// Check OpenCode first (most specific)
 	opencodePath := filepath.Join(home, ".config", "opencode", "opencode.json")

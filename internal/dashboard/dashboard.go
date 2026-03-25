@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -174,7 +175,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			if APIKey == "" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				// Only allow localhost origins when no API key is set
+				origin := r.Header.Get("Origin")
+				if origin != "" && (strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1")) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				}
 			} else {
 				origin := r.Header.Get("Origin")
 				if origin != "" {
@@ -205,7 +210,7 @@ func authMiddleware(apiKey string, next http.Handler) http.Handler {
 			key = key[7:]
 		}
 
-		if key != apiKey {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) != 1 {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

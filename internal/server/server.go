@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -146,6 +147,10 @@ func (s *Server) Start() error {
 	addr := fmt.Sprintf(":%d", s.port)
 	s.logger.Info("TokMan server starting", map[string]any{"port": s.port})
 
+	if s.apiKey == "" {
+		log.Println("WARNING: Server running without authentication - API is open to all clients")
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
@@ -233,7 +238,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			key = key[7:]
 		}
 
-		if key != s.apiKey {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(s.apiKey)) != 1 {
 			s.metrics.RecordError()
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return

@@ -17,7 +17,7 @@ func ensureHookInstalled(hookPath string) (bool, error) {
 	}
 
 	// Write hook
-	if err := os.WriteFile(hookPath, []byte(rewriteHook), 0755); err != nil {
+	if err := os.WriteFile(hookPath, []byte(rewriteHook), 0700); err != nil {
 		return false, err
 	}
 	changed = true

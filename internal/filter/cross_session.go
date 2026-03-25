@@ -50,7 +50,10 @@ type LearnerRecord struct {
 
 // DefaultLearnerConfig returns default configuration
 func DefaultLearnerConfig() LearnerConfig {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = os.TempDir()
+	}
 	return LearnerConfig{
 		Enabled:      true,
 		DataDir:      filepath.Join(homeDir, ".local", "share", "tokman"),

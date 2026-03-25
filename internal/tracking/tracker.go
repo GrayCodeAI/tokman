@@ -139,22 +139,26 @@ func NewTracker(dbPath string) (*Tracker, error) {
 
 	// Enable WAL mode for better performance
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
 
 	// Set busy timeout to retry on locked database
 	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
 	}
 
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
 	// Run migrations
 	for _, migration := range InitSchema() {
 		if _, err := db.Exec(migration); err != nil {
+			db.Close()
 			return nil, fmt.Errorf("failed to run migration: %w", err)
 		}
 	}

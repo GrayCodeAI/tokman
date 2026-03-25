@@ -186,7 +186,7 @@ func installHookForAgent(agent agentInfo) error {
 
 	// Generate hook script
 	hookScript := generateHookScript()
-	if err := os.WriteFile(agent.HookPath, []byte(hookScript), 0755); err != nil {
+	if err := os.WriteFile(agent.HookPath, []byte(hookScript), 0700); err != nil {
 		return fmt.Errorf("cannot write hook: %w", err)
 	}
 

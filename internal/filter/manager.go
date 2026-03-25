@@ -383,7 +383,11 @@ func (m *PipelineManager) saveTee(input string, ctx CommandContext, reason strin
 		Context:    ctx,
 	}
 
-	content, _ := json.MarshalIndent(data, "", "  ")
+	content, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to marshal tee data: %v\n", err)
+		return path
+	}
 	if err := os.WriteFile(path, content, 0600); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", path, err)
 	}

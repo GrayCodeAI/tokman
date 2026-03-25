@@ -50,6 +50,8 @@ func init() {
 }
 
 func sanitizeSnapshotName(name string) string {
+	// Take only the basename first
+	name = filepath.Base(name)
 	// Remove null bytes
 	name = strings.ReplaceAll(name, "\x00", "")
 	// Remove path traversal attempts
@@ -57,8 +59,6 @@ func sanitizeSnapshotName(name string) string {
 	// Remove path separators
 	name = strings.ReplaceAll(name, "/", "_")
 	name = strings.ReplaceAll(name, "\\", "_")
-	// Take only the basename
-	name = filepath.Base(name)
 	// Final safety: reject empty names
 	if name == "" || name == "." {
 		return "unnamed"

@@ -469,7 +469,10 @@ func (s *Summarizer) listOllamaModels() ([]string, error) {
 		} `json:"models"`
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
@@ -497,7 +500,10 @@ func (s *Summarizer) listOpenAIModels() ([]string, error) {
 		} `json:"data"`
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}

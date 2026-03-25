@@ -103,7 +103,11 @@ func printGeminiRewrite(cmd string) {
 			},
 		},
 	}
-	data, _ := json.Marshal(output)
+	data, err := json.Marshal(output)
+	if err != nil {
+		printGeminiAllow()
+		return
+	}
 	fmt.Println(string(data))
 }
 
@@ -202,7 +206,11 @@ func handleCopilotVsCode(cmd string) {
 			},
 		},
 	}
-	data, _ := json.Marshal(output)
+	data, err := json.Marshal(output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[tokman hook] Failed to marshal output: %v\n", err)
+		return
+	}
 	fmt.Println(string(data))
 }
 
@@ -217,6 +225,10 @@ func handleCopilotCli(cmd string) {
 		"permissionDecision":       "deny",
 		"permissionDecisionReason": fmt.Sprintf("Token savings: use `%s` instead (tokman saves 60-90%% tokens)", rewritten),
 	}
-	data, _ := json.Marshal(output)
+	data, err := json.Marshal(output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[tokman hook] Failed to marshal output: %v\n", err)
+		return
+	}
 	fmt.Println(string(data))
 }

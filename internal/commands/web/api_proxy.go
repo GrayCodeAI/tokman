@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,7 +136,7 @@ func runAPIProxy(cmd *cobra.Command, args []string) error {
 func authMiddleware(key string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
-		if auth != "Bearer "+key {
+		if subtle.ConstantTimeCompare([]byte(auth), []byte("Bearer "+key)) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

@@ -56,7 +56,10 @@ type TuningRecord struct {
 
 // DefaultAutoTunerConfig returns default configuration
 func DefaultAutoTunerConfig() AutoTunerConfig {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = os.TempDir()
+	}
 	return AutoTunerConfig{
 		Enabled:      true,
 		LearningRate: 0.1,

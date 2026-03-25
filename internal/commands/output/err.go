@@ -83,6 +83,9 @@ func runErr(args []string, verbose bool) int {
 		for scanner.Scan() {
 			stdoutBuf.WriteString(scanner.Text() + "\n")
 		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "stdout read error: %v\n", err)
+		}
 		close(doneOut)
 	}()
 
@@ -90,6 +93,9 @@ func runErr(args []string, verbose bool) int {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			stderrBuf.WriteString(scanner.Text() + "\n")
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "stderr read error: %v\n", err)
 		}
 		close(doneErr)
 	}()

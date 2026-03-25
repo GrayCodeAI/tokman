@@ -76,7 +76,10 @@ type PluginLayer struct {
 
 // DefaultWASMPluginConfig returns default configuration
 func DefaultWASMPluginConfig() WASMPluginConfig {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = os.TempDir()
+	}
 	return WASMPluginConfig{
 		Enabled:    true,
 		PluginDir:  filepath.Join(homeDir, ".config", "tokman", "plugins"),

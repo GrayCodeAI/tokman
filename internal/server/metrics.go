@@ -244,6 +244,10 @@ func (l *Logger) log(level, msg string, fields map[string]any) {
 		Fields:  fields,
 	}
 
-	data, _ := json.Marshal(entry)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to marshal log entry: %v\n", err)
+		return
+	}
 	fmt.Fprintf(l.output, "%s\n", data)
 }

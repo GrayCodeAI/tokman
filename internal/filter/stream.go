@@ -133,6 +133,10 @@ func (lp *LineProcessor) ProcessReader(r io.Reader) (string, int) {
 		totalSaved += saved
 	}
 
+	if err := scanner.Err(); err != nil {
+		return strings.TrimSpace(result.String()), totalSaved
+	}
+
 	return strings.TrimSpace(result.String()), totalSaved
 }
 

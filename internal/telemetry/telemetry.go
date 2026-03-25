@@ -156,8 +156,8 @@ func (c *Client) sendPing() {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
 }
 
 func (c *Client) markerPath() string {

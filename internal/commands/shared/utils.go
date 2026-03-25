@@ -131,6 +131,13 @@ func SanitizePath(path string) (string, error) {
 		return "", fmt.Errorf("path contains null byte")
 	}
 	cleaned := filepath.Clean(path)
+	// Reject absolute paths and traversal attempts
+	if filepath.IsAbs(cleaned) {
+		return "", fmt.Errorf("absolute paths not allowed")
+	}
+	if strings.HasPrefix(cleaned, "..") {
+		return "", fmt.Errorf("path traversal not allowed")
+	}
 	return cleaned, nil
 }
 

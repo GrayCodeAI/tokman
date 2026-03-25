@@ -35,7 +35,7 @@ func installCursorHook() {
 		"[ \"$CMD\" = \"$REWRITTEN\" ] && echo '{}' && exit 0\n" +
 		"jq -n --arg cmd \"$REWRITTEN\" '{\"permission\":\"allow\",\"updated_input\":{\"command\":$cmd}}'\n"
 
-	if err := os.WriteFile(hookPath, []byte(hookContent), 0755); err != nil {
+	if err := os.WriteFile(hookPath, []byte(hookContent), 0700); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing Cursor hook: %v\n", err)
 		return
 	}
@@ -79,7 +79,7 @@ func installCopilotHook() {
 		"fi\n" +
 		"echo '{}'\n"
 
-	if err := os.WriteFile(hookPath, []byte(hookContent), 0755); err != nil {
+	if err := os.WriteFile(hookPath, []byte(hookContent), 0700); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing Copilot hook: %v\n", err)
 		return
 	}

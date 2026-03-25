@@ -2,6 +2,8 @@ package filter
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,7 +19,7 @@ import (
 // Uses local or API-based LLMs for context-aware token reduction
 type LLMCompressor struct {
 	Provider     string        // openai, anthropic, ollama, local
-	Model        string        // gpt-4, claude-3-sonnet, llama3, etc.
+	Model        string        // Model name
 	APIKey       string        // API key for cloud providers
 	BaseURL      string        // Custom endpoint (for Ollama, etc.)
 	Timeout      time.Duration // Request timeout
@@ -24,6 +27,7 @@ type LLMCompressor struct {
 	Temperature  float64       // Sampling temperature
 	CacheEnabled bool          // Enable response caching
 	Cache        map[string]string
+	cacheMu      sync.RWMutex // Protects Cache from concurrent access
 }
 
 // LLMCompressConfig holds configuration for LLM compression
@@ -82,7 +86,10 @@ func (l *LLMCompressor) Compress(req CompressionRequest) (*CompressionResult, er
 	// Check cache first
 	if l.CacheEnabled {
 		cacheKey := l.cacheKey(req.Input, req.QueryIntent)
-		if cached, ok := l.Cache[cacheKey]; ok {
+		l.cacheMu.RLock()
+		cached, ok := l.Cache[cacheKey]
+		l.cacheMu.RUnlock()
+		if ok {
 			origTokens := estimateTokens(req.Input)
 			compTokens := estimateTokens(cached)
 			return &CompressionResult{
@@ -121,7 +128,9 @@ func (l *LLMCompressor) Compress(req CompressionRequest) (*CompressionResult, er
 	// Cache result
 	if l.CacheEnabled {
 		cacheKey := l.cacheKey(req.Input, req.QueryIntent)
+		l.cacheMu.Lock()
 		l.Cache[cacheKey] = output
+		l.cacheMu.Unlock()
 	}
 
 	return result, nil
@@ -222,7 +231,10 @@ func (l *LLMCompressor) callOpenAI(ctx context.Context, prompt string) (string, 
 		"temperature": l.Temperature,
 	}
 
-	reqJSON, _ := json.Marshal(reqBody)
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
 
 	baseURL := l.BaseURL
 	if baseURL == "" {
@@ -290,7 +302,10 @@ func (l *LLMCompressor) callAnthropic(ctx context.Context, prompt string) (strin
 		},
 	}
 
-	reqJSON, _ := json.Marshal(reqBody)
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", strings.NewReader(string(reqJSON)))
 	if err != nil {
@@ -345,7 +360,10 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 		},
 	}
 
-	reqJSON, _ := json.Marshal(reqBody)
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
 
 	baseURL := l.BaseURL
 	if baseURL == "" {
@@ -384,7 +402,8 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 func (l *LLMCompressor) callLocal(ctx context.Context, prompt string) (string, error) {
 	// Try llm CLI tool if available
 	if _, err := exec.LookPath("llm"); err == nil {
-		cmd := exec.CommandContext(ctx, "llm", "-m", l.Model, prompt)
+		cmd := exec.CommandContext(ctx, "llm", "-m", l.Model)
+		cmd.Stdin = strings.NewReader(prompt)
 		output, err := cmd.Output()
 		if err != nil {
 			return "", err
@@ -395,17 +414,15 @@ func (l *LLMCompressor) callLocal(ctx context.Context, prompt string) (string, e
 	return "", fmt.Errorf("no local LLM available")
 }
 
-// cacheKey generates a cache key
-func (l *LLMCompressor) cacheKey(input, intent string) string {
-	return fmt.Sprintf("%s:%s", intent, hashString(input))
+// hashString creates a proper hash for cache keys
+func hashString(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:16]) // 32-char hex prefix is sufficient for cache keys
 }
 
-// hashString creates a simple hash
-func hashString(s string) string {
-	if len(s) > 64 {
-		s = s[:64]
-	}
-	return fmt.Sprintf("%x", len(s)^0xDEADBEEF)
+// cacheKey generates a cache key from input and intent
+func (l *LLMCompressor) cacheKey(input, intent string) string {
+	return fmt.Sprintf("%s:%s", intent, hashString(input))
 }
 
 // estimateTokens estimates token count

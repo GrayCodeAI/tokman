@@ -139,6 +139,10 @@ func (f *SemanticFilter) segmentOutput(input string) []segment {
 		prevLine = line
 	}
 
+	if err := scanner.Err(); err != nil {
+		return segments
+	}
+
 	// Add final segment
 	if currentSegment.Len() > 0 {
 		segments = append(segments, segment{

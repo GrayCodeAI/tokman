@@ -63,7 +63,11 @@ func (s *ReversibleStore) Store(command, original, compressed string, mode strin
 		LayerStats:   layerStats,
 	}
 
-	data, _ := json.Marshal(entry)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to marshal entry: %v\n", err)
+		return hash[:12]
+	}
 	filename := fmt.Sprintf("%s_%s.json", time.Now().Format("20060102_150405"), hash[:8])
 	path := filepath.Join(s.baseDir, filename)
 	if err := os.WriteFile(path, data, 0600); err != nil {

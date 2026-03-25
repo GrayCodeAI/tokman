@@ -174,6 +174,10 @@ func (e *TOMLFilterEngine) filterLines(input string) string {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return input
+	}
+
 	return strings.TrimRight(result.String(), "\n")
 }
 
@@ -194,6 +198,10 @@ func truncateLines(input string, maxLen int) string {
 		}
 		result.WriteString(line)
 		result.WriteByte('\n')
+	}
+
+	if err := scanner.Err(); err != nil {
+		return input
 	}
 
 	return strings.TrimRight(result.String(), "\n")

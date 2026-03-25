@@ -9,6 +9,9 @@ import (
 // Logger is the global logger instance.
 var Logger *slog.Logger
 
+// logFile stores the file handle for cleanup
+var logFile *os.File
+
 // LogLevel represents logging severity.
 type LogLevel string
 
@@ -30,6 +33,7 @@ func InitLogger(logPath string, level LogLevel) error {
 	if err != nil {
 		return err
 	}
+	logFile = file
 
 	var slogLevel slog.Level
 	switch level {
@@ -100,4 +104,12 @@ func With(args ...any) *slog.Logger {
 		return nil
 	}
 	return Logger.With(args...)
+}
+
+// CloseLogger closes the log file handle.
+func CloseLogger() {
+	if logFile != nil {
+		logFile.Close()
+		logFile = nil
+	}
 }
