@@ -64,14 +64,14 @@ func RecordCommand(command, originalOutput, filteredOutput string, execTimeMs in
 
 // ExecuteAndRecord runs a command function, prints output, and records metrics.
 // This consolidates the common pattern of: time -> execute -> print -> record.
-func ExecuteAndRecord(name string, fn func() (string, string, error)) {
+// Returns an error instead of calling os.Exit so callers control exit behavior.
+func ExecuteAndRecord(name string, fn func() (string, string, error)) error {
 	startTime := time.Now()
 	raw, filtered, err := fn()
 	execTime := time.Since(startTime).Milliseconds()
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	fmt.Print(filtered)
@@ -79,4 +79,5 @@ func ExecuteAndRecord(name string, fn func() (string, string, error)) {
 	if rerr := RecordCommand(name, raw, filtered, execTime, true); rerr != nil && Verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Warning: failed to record: %v\n", rerr)
 	}
+	return nil
 }

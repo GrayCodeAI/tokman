@@ -196,88 +196,34 @@ func mergeConfig(dst, src *Config) {
 	if src.Pipeline.BudgetOverflowFile != "" {
 		dst.Pipeline.BudgetOverflowFile = src.Pipeline.BudgetOverflowFile
 	}
-	// Boolean layer toggles - merge by checking if src explicitly sets them to true.
-	// Since false is the zero value in Go, we only override when src is true.
-	// This prevents lower-priority configs with unspecified booleans from overriding
-	// the default true values set by Defaults().
-	if src.Pipeline.EnableEntropy {
-		dst.Pipeline.EnableEntropy = true
-	}
-	if src.Pipeline.EnablePerplexity {
-		dst.Pipeline.EnablePerplexity = true
-	}
-	if src.Pipeline.EnableGoalDriven {
-		dst.Pipeline.EnableGoalDriven = true
-	}
-	if src.Pipeline.EnableAST {
-		dst.Pipeline.EnableAST = true
-	}
-	if src.Pipeline.EnableContrastive {
-		dst.Pipeline.EnableContrastive = true
-	}
-	if src.Pipeline.EnableNgram {
-		dst.Pipeline.EnableNgram = true
-	}
-	if src.Pipeline.EnableEvaluator {
-		dst.Pipeline.EnableEvaluator = true
-	}
-	if src.Pipeline.EnableGist {
-		dst.Pipeline.EnableGist = true
-	}
-	if src.Pipeline.EnableHierarchical {
-		dst.Pipeline.EnableHierarchical = true
-	}
-	if src.Pipeline.EnableBudget {
-		dst.Pipeline.EnableBudget = true
-	}
-	if src.Pipeline.EnableCompaction {
-		dst.Pipeline.EnableCompaction = true
-	}
-	if src.Pipeline.EnableAttribution {
-		dst.Pipeline.EnableAttribution = true
-	}
-	if src.Pipeline.EnableH2O {
-		dst.Pipeline.EnableH2O = true
-	}
-	if src.Pipeline.EnableAttentionSink {
-		dst.Pipeline.EnableAttentionSink = true
-	}
-	if src.Pipeline.HardBudgetLimit {
-		dst.Pipeline.HardBudgetLimit = true
-	}
-	if src.Pipeline.TeeOnFailure {
-		dst.Pipeline.TeeOnFailure = true
-	}
-	if src.Pipeline.FailSafeMode {
-		dst.Pipeline.FailSafeMode = true
-	}
-	if src.Pipeline.ValidateOutput {
-		dst.Pipeline.ValidateOutput = true
-	}
-	if src.Pipeline.ShortCircuitBudget {
-		dst.Pipeline.ShortCircuitBudget = true
-	}
-	if src.Pipeline.ParallelLayers {
-		dst.Pipeline.ParallelLayers = true
-	}
-	if src.Pipeline.CacheEnabled {
-		dst.Pipeline.CacheEnabled = true
-	}
-	if src.Pipeline.CompactionStateSnapshot {
-		dst.Pipeline.CompactionStateSnapshot = true
-	}
-	if src.Pipeline.CompactionAutoDetect {
-		dst.Pipeline.CompactionAutoDetect = true
-	}
-	if src.Pipeline.AttributionPositional {
-		dst.Pipeline.AttributionPositional = true
-	}
-	if src.Pipeline.AttributionFrequency {
-		dst.Pipeline.AttributionFrequency = true
-	}
-	if src.Pipeline.AttributionSemantic {
-		dst.Pipeline.AttributionSemantic = true
-	}
+	// Boolean layer toggles - unconditionally propagate src values so that explicit
+	// false (disable) is honoured, not silently ignored.
+	dst.Pipeline.EnableEntropy = src.Pipeline.EnableEntropy
+	dst.Pipeline.EnablePerplexity = src.Pipeline.EnablePerplexity
+	dst.Pipeline.EnableGoalDriven = src.Pipeline.EnableGoalDriven
+	dst.Pipeline.EnableAST = src.Pipeline.EnableAST
+	dst.Pipeline.EnableContrastive = src.Pipeline.EnableContrastive
+	dst.Pipeline.EnableNgram = src.Pipeline.EnableNgram
+	dst.Pipeline.EnableEvaluator = src.Pipeline.EnableEvaluator
+	dst.Pipeline.EnableGist = src.Pipeline.EnableGist
+	dst.Pipeline.EnableHierarchical = src.Pipeline.EnableHierarchical
+	dst.Pipeline.EnableBudget = src.Pipeline.EnableBudget
+	dst.Pipeline.EnableCompaction = src.Pipeline.EnableCompaction
+	dst.Pipeline.EnableAttribution = src.Pipeline.EnableAttribution
+	dst.Pipeline.EnableH2O = src.Pipeline.EnableH2O
+	dst.Pipeline.EnableAttentionSink = src.Pipeline.EnableAttentionSink
+	dst.Pipeline.HardBudgetLimit = src.Pipeline.HardBudgetLimit
+	dst.Pipeline.TeeOnFailure = src.Pipeline.TeeOnFailure
+	dst.Pipeline.FailSafeMode = src.Pipeline.FailSafeMode
+	dst.Pipeline.ValidateOutput = src.Pipeline.ValidateOutput
+	dst.Pipeline.ShortCircuitBudget = src.Pipeline.ShortCircuitBudget
+	dst.Pipeline.ParallelLayers = src.Pipeline.ParallelLayers
+	dst.Pipeline.CacheEnabled = src.Pipeline.CacheEnabled
+	dst.Pipeline.CompactionStateSnapshot = src.Pipeline.CompactionStateSnapshot
+	dst.Pipeline.CompactionAutoDetect = src.Pipeline.CompactionAutoDetect
+	dst.Pipeline.AttributionPositional = src.Pipeline.AttributionPositional
+	dst.Pipeline.AttributionFrequency = src.Pipeline.AttributionFrequency
+	dst.Pipeline.AttributionSemantic = src.Pipeline.AttributionSemantic
 
 	if src.Filter.Mode != "" {
 		dst.Filter.Mode = src.Filter.Mode

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,9 +25,9 @@ type FingerprintCache struct {
 	// ttl for cache entries
 	ttl time.Duration
 
-	// stats
-	hits   int64
-	misses int64
+	// stats — accessed atomically, kept separate from mutex-protected fields
+	hits   atomic.Int64
+	misses atomic.Int64
 }
 
 // CachedResult holds a cached compression result
@@ -38,7 +39,7 @@ type CachedResult struct {
 	TokensSaved    int
 	CreatedAt      time.Time
 	ExpiresAt      time.Time
-	AccessCount    int
+	AccessCount    int64 // accessed atomically
 }
 
 // FingerprintResult holds the result of a fingerprint operation
@@ -79,24 +80,20 @@ func (fc *FingerprintCache) Get(content string) *FingerprintResult {
 
 // GetByFingerprint retrieves a cached result by fingerprint
 func (fc *FingerprintCache) GetByFingerprint(fp string) *FingerprintResult {
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
+	fc.mu.RLock()
+	cached, exists := fc.cache[fp]
+	fc.mu.RUnlock()
 
-	result := &FingerprintResult{
-		Hash: fp,
-		Hit:  false,
-	}
-
-	if cached, exists := fc.cache[fp]; exists {
-		// Check if expired
+	result := &FingerprintResult{Hash: fp}
+	if exists {
 		if time.Now().Before(cached.ExpiresAt) {
 			result.Hit = true
 			result.Cached = cached
-			cached.AccessCount++
-			fc.hits++
+			atomic.AddInt64(&cached.AccessCount, 1)
+			fc.hits.Add(1)
 		}
 	} else {
-		fc.misses++
+		fc.misses.Add(1)
 	}
 
 	return result
@@ -151,13 +148,14 @@ func (fc *FingerprintCache) evictOldest() {
 // Stats returns cache statistics
 func (fc *FingerprintCache) Stats() CacheStats {
 	fc.mu.RLock()
-	defer fc.mu.RUnlock()
+	entries := len(fc.cache)
+	fc.mu.RUnlock()
 
 	return CacheStats{
-		Entries:    len(fc.cache),
+		Entries:    entries,
 		MaxEntries: fc.maxEntries,
-		Hits:       fc.hits,
-		Misses:     fc.misses,
+		Hits:       fc.hits.Load(),
+		Misses:     fc.misses.Load(),
 		HitRate:    fc.computeHitRate(),
 	}
 }
@@ -172,21 +170,22 @@ type CacheStats struct {
 }
 
 func (fc *FingerprintCache) computeHitRate() float64 {
-	total := fc.hits + fc.misses
+	hits := fc.hits.Load()
+	misses := fc.misses.Load()
+	total := hits + misses
 	if total == 0 {
 		return 0
 	}
-	return float64(fc.hits) / float64(total)
+	return float64(hits) / float64(total)
 }
 
 // Clear clears the cache
 func (fc *FingerprintCache) Clear() {
 	fc.mu.Lock()
-	defer fc.mu.Unlock()
-
 	fc.cache = make(map[string]*CachedResult)
-	fc.hits = 0
-	fc.misses = 0
+	fc.mu.Unlock()
+	fc.hits.Store(0)
+	fc.misses.Store(0)
 }
 
 // Prune removes expired entries

@@ -29,6 +29,12 @@ func InitLogger(logPath string, level LogLevel) error {
 		return err
 	}
 
+	// Close any previously opened log file to prevent descriptor leak.
+	if logFile != nil {
+		logFile.Close()
+		logFile = nil
+	}
+
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return err

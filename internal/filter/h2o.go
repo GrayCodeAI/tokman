@@ -70,13 +70,21 @@ func (h *H2OFilter) Name() string {
 }
 
 // Apply applies H2O compression to the input
+// Optimized: Early exit for small/medium inputs, reduced processing for large
 func (h *H2OFilter) Apply(input string, mode Mode) (string, int) {
 	if !h.config.Enabled {
 		return input, 0
 	}
 
-	// Skip short content
-	if len(input) < h.config.MinContentLength {
+	// Quick size check - skip if too small
+	inputLen := len(input)
+	if inputLen < h.config.MinContentLength {
+		return input, 0
+	}
+
+	// Estimate tokens without full processing
+	estimatedTokens := inputLen / 4
+	if estimatedTokens < h.config.SinkSize+h.config.RecentSize+h.config.HeavyHitterSize {
 		return input, 0
 	}
 
@@ -86,6 +94,11 @@ func (h *H2OFilter) Apply(input string, mode Mode) (string, int) {
 	// Line-based approach reduces allocations by 10-20x
 	if originalTokens > 50000 {
 		return h.applyLineBased(input, mode, originalTokens)
+	}
+
+	// For medium-large content (>10K tokens), use sampled scoring
+	if originalTokens > 10000 {
+		return h.applySampled(input, mode, originalTokens)
 	}
 
 	// Tokenize
@@ -112,6 +125,80 @@ func (h *H2OFilter) Apply(input string, mode Mode) (string, int) {
 	}
 
 	return output, saved
+}
+
+// applySampled processes medium-large content with sampling for P99 optimization
+// Instead of scoring every token, sample every Nth token for importance estimation
+func (h *H2OFilter) applySampled(input string, mode Mode, originalTokens int) (string, int) {
+	tokens := h.tokenize(input)
+	n := len(tokens)
+	
+	if n < h.config.SinkSize+h.config.RecentSize+h.config.HeavyHitterSize {
+		return input, 0
+	}
+
+	// Sample rate: process 1 in every N tokens for scoring
+	sampleRate := 4
+	if originalTokens > 20000 {
+		sampleRate = 8
+	}
+
+	// Score only sampled tokens
+	sampledScores := make([]float64, n)
+	for i := 0; i < n; i += sampleRate {
+		score := h.scoreTokenQuick(tokens[i], i, n)
+		sampledScores[i] = score
+		// Propagate score to nearby tokens
+		for j := i + 1; j < i+sampleRate && j < n; j++ {
+			sampledScores[j] = score * 0.9 // Slight decay
+		}
+	}
+
+	// Build heavy hitter set
+	heavyHitters := h.identifyHeavyHitters(tokens, sampledScores)
+
+	// Build output
+	output := h.buildOutput(tokens, heavyHitters, sampledScores)
+
+	finalTokens := EstimateTokens(output)
+	saved := originalTokens - finalTokens
+
+	if saved < 5 {
+		return input, 0
+	}
+
+	return output, saved
+}
+
+// scoreTokenQuick provides a fast importance score for a single token
+func (h *H2OFilter) scoreTokenQuick(t h2oToken, index, total int) float64 {
+	var score float64
+
+	// Positional weight
+	if index < h.config.SinkSize {
+		score += 1.5 - float64(index)/float64(h.config.SinkSize)*0.5
+	}
+
+	pos := float64(index) / float64(total)
+	if pos > 0.8 {
+		score += 0.6 * (pos - 0.8) / 0.2
+	}
+
+	// Quick semantic check
+	text := strings.ToLower(t.text)
+	if isNumeric(t.text) || isCodeSymbol(t.text) || isFilePath(t.text) {
+		score += 0.5
+	}
+
+	// Keyword check (fast)
+	for _, kw := range []string{"error", "fail", "warn", "file", "path"} {
+		if strings.Contains(text, kw) {
+			score += 0.3
+			break
+		}
+	}
+
+	return score
 }
 
 // applyLineBased processes content line-by-line for memory efficiency

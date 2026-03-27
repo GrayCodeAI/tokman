@@ -8,6 +8,8 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
+var paragraphSplitRe = regexp.MustCompile(`\n\s*\n`)
+
 // SemanticCacheFilter implements SemantiCache-style clustered merging.
 // Research Source: "SemantiCache: Efficient KV Cache Compression via Semantic
 // Chunking and Clustered Merging" (Mar 2026)
@@ -106,7 +108,7 @@ func (f *SemanticCacheFilter) Apply(input string, mode Mode) (string, int) {
 // splitIntoUnits splits content into semantic units
 func (f *SemanticCacheFilter) splitIntoUnits(input string) []string {
 	// Try paragraph splitting first
-	paragraphs := regexpSplit(input, `\n\s*\n`)
+	paragraphs := splitParagraphs(input)
 	if len(paragraphs) >= f.config.MinClusterSize*2 {
 		return paragraphs
 	}
@@ -124,25 +126,46 @@ func (f *SemanticCacheFilter) splitIntoUnits(input string) []string {
 }
 
 // greedySeedCluster implements Greedy Seed-Based Clustering (GSC).
-// Each seed starts a cluster; remaining items join the most similar cluster.
+// Precomputes the full pairwise similarity matrix once (O(n²)) to avoid
+// redundant similarity computation during seed selection and assignment.
 func (f *SemanticCacheFilter) greedySeedCluster(units []string) []semanticCluster {
 	n := len(units)
 	assigned := make([]bool, n)
 	var clusters []semanticCluster
 
+	// Precompute pairwise similarity matrix: O(n²) once.
+	sim := make([][]float64, n)
+	for i := 0; i < n; i++ {
+		sim[i] = make([]float64, n)
+	}
+	for i := 0; i < n; i++ {
+		sim[i][i] = 1.0
+		for j := i + 1; j < n; j++ {
+			s := f.computeSimilarity(units[i], units[j])
+			sim[i][j] = s
+			sim[j][i] = s
+		}
+	}
+
+	// Precompute representativeness scores (sum of similarity to all others).
+	repScore := make([]float64, n)
+	for i := 0; i < n; i++ {
+		total := 0.0
+		for j := 0; j < n; j++ {
+			if j != i {
+				total += sim[i][j]
+			}
+		}
+		repScore[i] = total
+	}
+
 	for {
-		// Find the unassigned item with highest "representativeness"
-		// (most similar to other unassigned items)
+		// Find unassigned item with highest representativeness: O(n).
 		seedIdx := -1
 		bestScore := -1.0
-
 		for i := 0; i < n; i++ {
-			if assigned[i] {
-				continue
-			}
-			score := f.computeRepresentativeness(units, i, assigned)
-			if score > bestScore {
-				bestScore = score
+			if !assigned[i] && repScore[i] > bestScore {
+				bestScore = repScore[i]
 				seedIdx = i
 			}
 		}
@@ -151,7 +174,7 @@ func (f *SemanticCacheFilter) greedySeedCluster(units []string) []semanticCluste
 			break
 		}
 
-		// Create cluster with seed
+		// Create cluster with seed.
 		cluster := semanticCluster{
 			items:     []string{units[seedIdx]},
 			core:      units[seedIdx],
@@ -159,23 +182,34 @@ func (f *SemanticCacheFilter) greedySeedCluster(units []string) []semanticCluste
 		}
 		assigned[seedIdx] = true
 
-		// Assign similar items to this cluster
+		// Assign similar items to this cluster: O(n) using precomputed sim.
 		for i := 0; i < n; i++ {
 			if assigned[i] {
 				continue
 			}
-			similarity := f.computeSimilarity(units[seedIdx], units[i])
-			if similarity >= f.config.SimilarityThreshold {
+			if sim[seedIdx][i] >= f.config.SimilarityThreshold {
 				cluster.items = append(cluster.items, units[i])
 				cluster.frequency++
 				assigned[i] = true
+				// Remove this item's contribution from remaining repScores.
+				for k := 0; k < n; k++ {
+					if !assigned[k] {
+						repScore[k] -= sim[k][i]
+					}
+				}
+			}
+		}
+		// Remove seed's contribution from remaining repScores.
+		for k := 0; k < n; k++ {
+			if !assigned[k] {
+				repScore[k] -= sim[k][seedIdx]
 			}
 		}
 
 		clusters = append(clusters, cluster)
 	}
 
-	// Add any remaining unassigned items as single-item clusters
+	// Add any remaining unassigned items as single-item clusters.
 	for i := 0; i < n; i++ {
 		if !assigned[i] {
 			clusters = append(clusters, semanticCluster{
@@ -187,25 +221,6 @@ func (f *SemanticCacheFilter) greedySeedCluster(units []string) []semanticCluste
 	}
 
 	return clusters
-}
-
-// computeRepresentativeness scores how representative an item is for clustering
-func (f *SemanticCacheFilter) computeRepresentativeness(units []string, idx int, assigned []bool) float64 {
-	totalSim := 0.0
-	count := 0
-
-	for i, unit := range units {
-		if i == idx || assigned[i] {
-			continue
-		}
-		totalSim += f.computeSimilarity(units[idx], unit)
-		count++
-	}
-
-	if count == 0 {
-		return 0
-	}
-	return totalSim / float64(count)
 }
 
 // computeSimilarity computes semantic similarity between two text units.
@@ -311,9 +326,8 @@ func extractCharNgrams(text string, n int) map[string]bool {
 	return ngrams
 }
 
-func regexpSplit(text string, pattern string) []string {
-	re := regexp.MustCompile(pattern)
-	parts := re.Split(text, -1)
+func splitParagraphs(text string) []string {
+	parts := paragraphSplitRe.Split(text, -1)
 	var result []string
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)

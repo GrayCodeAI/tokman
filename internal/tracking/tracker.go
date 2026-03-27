@@ -855,6 +855,9 @@ func (t *Tracker) GetParseFailureSummary() (*ParseFailureSummary, error) {
 			summary.RecentFailures = append(summary.RecentFailures, pfr)
 		}
 	}
+	if err := recentRows.Err(); err != nil {
+		log.Printf("[tokman] error iterating parse failure rows: %v", err)
+	}
 
 	return summary, nil
 }

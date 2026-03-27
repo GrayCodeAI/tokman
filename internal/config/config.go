@@ -392,9 +392,11 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetConfigType("toml")
 
 	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
+		viper.SetConfigFile(os.ExpandEnv(cfgFile))
 	} else {
-		viper.AddConfigPath("$HOME/.config/tokman")
+		if home, err := os.UserHomeDir(); err == nil {
+			viper.AddConfigPath(filepath.Join(home, ".config", "tokman"))
+		}
 		viper.SetConfigName("config")
 	}
 

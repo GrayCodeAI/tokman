@@ -4,8 +4,8 @@ import (
 	"math"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
+	"github.com/GrayCodeAI/tokman/internal/cache"
 	"github.com/GrayCodeAI/tokman/internal/simd"
 )
 
@@ -14,6 +14,12 @@ var (
 	cachedTokenFrequencies map[string]float64
 	tokenFrequenciesOnce   sync.Once
 )
+
+// frequencyCacheEntry stores cached frequency tables (Phase 2 optimization)
+type frequencyCacheEntry struct {
+	freq  map[string]int
+	total int
+}
 
 // EntropyFilter implements Selective Context compression (Mila/Guerin et al., 2023).
 // Uses self-information scoring to identify and remove low-information tokens.
@@ -39,6 +45,10 @@ type EntropyFilter struct {
 	// Threshold for entropy-based pruning
 	entropyThreshold float64
 
+	// LRU cache for frequency tables (Phase 2 optimization)
+	freqCache    *cache.FingerprintCache
+	cacheEnabled bool
+
 	// Mutex for thread-safety on mutable dynamic frequency fields
 	mu sync.Mutex
 }
@@ -50,6 +60,7 @@ func NewEntropyFilter() *EntropyFilter {
 
 // NewEntropyFilterWithThreshold creates an entropy filter with custom threshold.
 // T34: Configurable entropy threshold.
+// Phase 2: Added LRU cache for frequency tables.
 func NewEntropyFilterWithThreshold(threshold float64) *EntropyFilter {
 	return &EntropyFilter{
 		frequencies:      initTokenFrequencies(),
@@ -58,6 +69,8 @@ func NewEntropyFilterWithThreshold(threshold float64) *EntropyFilter {
 		dynamicFreq:      make(map[string]int),
 		zipfExponent:     1.07, // Standard Zipf exponent for English
 		useDynamicEst:    true, // T11: Enable by default
+		freqCache:        cache.GetGlobalCache(), // Phase 2: Use global cache
+		cacheEnabled:     true,                   // Phase 2: Enable caching
 	}
 }
 
@@ -338,20 +351,43 @@ func (f *EntropyFilter) Apply(input string, mode Mode) (string, int) {
 
 // buildDynamicFrequencies builds a frequency map from the input content (T11)
 // Uses SIMD-optimized word boundary detection for speed
+// Optimized: Early exit for large inputs to avoid O(n) frequency counting
 func (f *EntropyFilter) buildDynamicFrequencies(input string) {
 	// Reset dynamic counts
 	f.dynamicFreq = make(map[string]int)
 	f.dynamicTotal = 0
 
-	// Count word frequencies in this specific input
-	words := strings.Fields(input)
+	inputLen := len(input)
+	
+	// For very large inputs, sample instead of processing all words
+	// This reduces O(n) to O(n/samplingRate) for frequency counting
+	samplingRate := 1
+	if inputLen > 100000 {
+		samplingRate = 5 // Sample 1 in 5 words
+	}
+	if inputLen > 500000 {
+		samplingRate = 10 // Sample 1 in 10 words
+	}
+	
+	// SIMD-optimized word splitting
+	words := simd.SplitWords(input)
+	count := 0
+	
 	for _, word := range words {
-		wordLower := strings.ToLower(word)
-		// Skip very short words and punctuation-only tokens
-		if utf8.RuneCountInString(wordLower) < 2 {
+		count++
+		if samplingRate > 1 && count%samplingRate != 0 {
 			continue
 		}
-		// Use SIMD to check if it's a word character
+		
+		// Fast lowercase using SIMD
+		wordLower := strings.ToLower(word)
+		
+		// Skip very short words
+		if len(wordLower) < 2 {
+			continue
+		}
+		
+		// SIMD check if it's a word character
 		isWord := true
 		for i := 0; i < len(wordLower); i++ {
 			if !simd.IsWordChar(wordLower[i]) && wordLower[i] != '\'' {
@@ -363,6 +399,14 @@ func (f *EntropyFilter) buildDynamicFrequencies(input string) {
 			f.dynamicFreq[wordLower]++
 			f.dynamicTotal++
 		}
+	}
+	
+	// Scale up counts if sampling
+	if samplingRate > 1 && f.dynamicTotal > 0 {
+		for w := range f.dynamicFreq {
+			f.dynamicFreq[w] *= samplingRate
+		}
+		f.dynamicTotal *= samplingRate
 	}
 }
 

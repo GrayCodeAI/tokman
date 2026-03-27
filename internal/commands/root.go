@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -264,7 +265,9 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		viper.AddConfigPath("$HOME/.config/tokman")
+		if home, err := os.UserHomeDir(); err == nil {
+			viper.AddConfigPath(filepath.Join(home, ".config", "tokman"))
+		}
 		viper.SetConfigName("config")
 		viper.SetConfigType("toml")
 	}

@@ -39,14 +39,6 @@ All notable changes to TokMan will be documented in this file.
   - Adaptive pipeline: 1.33x speedup over full
   - Simple inputs: <0.5ms (3 layers)
 
-### RTK Feature Parity
-- **Full rtk feature comparison completed** - tokman already implements all rtk features:
-  - Ruby toolchain: rspec, rake, rubocop, bundle (all implemented)
-  - Trust/verification: trust, untrust, list-trusted, verify (all implemented)
-  - Session management: session, sessions, snapshot, restore, history (all implemented)
-  - AI agents: 14+ agents vs rtk's 9
-  - TOML filters: 93 vs rtk's 58
-  - Compression: 31 research-backed layers vs rtk's 3 filter levels
 
 ## [2.1.0] - 2026-03-21
 

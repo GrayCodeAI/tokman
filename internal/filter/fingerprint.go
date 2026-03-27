@@ -10,6 +10,7 @@ import (
 // R13: Cache by content hash, not full content — faster lookups.
 type ResultFingerprinter struct {
 	cache   map[string]*FingerPrintEntry
+	keys    []string // insertion order for FIFO eviction
 	mu      sync.RWMutex
 	maxSize int
 }
@@ -58,12 +59,14 @@ func (f *ResultFingerprinter) Set(fp string, entry *FingerPrintEntry) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// Evict if at capacity
-	if len(f.cache) >= f.maxSize {
-		for k := range f.cache {
-			delete(f.cache, k)
-			break
+	if _, exists := f.cache[fp]; !exists {
+		// Evict oldest entry (FIFO) if at capacity.
+		if len(f.cache) >= f.maxSize && len(f.keys) > 0 {
+			oldest := f.keys[0]
+			f.keys = f.keys[1:]
+			delete(f.cache, oldest)
 		}
+		f.keys = append(f.keys, fp)
 	}
 
 	f.cache[fp] = entry
@@ -81,4 +84,5 @@ func (f *ResultFingerprinter) Clear() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cache = make(map[string]*FingerPrintEntry)
+	f.keys = f.keys[:0]
 }

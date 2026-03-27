@@ -109,15 +109,14 @@ func (n *NumericalQuantizer) Apply(input string, mode Mode) (string, int) {
 	return output, saved
 }
 
-// compressDecimals reduces decimal precision
+// compressDecimals reduces decimal precision using pre-compiled regexes.
 func (n *NumericalQuantizer) compressDecimals(input string, mode Mode) string {
 	maxDecimals := n.config.DecimalPlaces
+	re := numDecimalMinRe
 	if mode == ModeAggressive {
 		maxDecimals = 1
+		re = numDecimalAggrRe
 	}
-
-	// Match floating point numbers
-	re := regexp.MustCompile(`\d+\.\d{` + strconv.Itoa(maxDecimals+1) + `,}`)
 	return re.ReplaceAllStringFunc(input, func(match string) string {
 		val, err := strconv.ParseFloat(match, 64)
 		if err != nil {
@@ -127,11 +126,28 @@ func (n *NumericalQuantizer) compressDecimals(input string, mode Mode) string {
 	})
 }
 
-// compressLargeNumbers replaces large numbers with K/M/B suffixes
+// numLargeRe matches a number token which may be a plain integer or a float.
+// We capture the whole potential float (digits, optional dot+digits) so we can
+// skip entries that have a fractional part in compressLargeNumbers.
+var numLargeRe = regexp.MustCompile(`\b(\d{4,})(\.\d+)?\b`)
+
+// numDecimalMinRe / numDecimalAggrRe match floats with more precision than needed.
+var (
+	numDecimalMinRe  = regexp.MustCompile(`\d+\.\d{4,}`)  // >3 decimals → keep 2
+	numDecimalAggrRe = regexp.MustCompile(`\d+\.\d{3,}`)  // >2 decimals → keep 1
+	numPercentRe     = regexp.MustCompile(`(\d+\.\d{3,})%`)
+)
+
+// compressLargeNumbers replaces large integers with K/M/B suffixes.
+// Floats (e.g. "12345.68") are left unchanged because their decimal part is
+// already handled by the decimal-precision passes.
 func (n *NumericalQuantizer) compressLargeNumbers(input string) string {
 	threshold := n.config.LargeNumberThreshold
-	re := regexp.MustCompile(`\b(\d{4,})\b`)
-	return re.ReplaceAllStringFunc(input, func(match string) string {
+	return numLargeRe.ReplaceAllStringFunc(input, func(match string) string {
+		// If the matched text contains a dot it's a float — skip it.
+		if strings.Contains(match, ".") {
+			return match
+		}
 		val, err := strconv.ParseFloat(match, 64)
 		if err != nil {
 			return match
@@ -156,11 +172,10 @@ func (n *NumericalQuantizer) compressLargeNumbers(input string) string {
 	})
 }
 
-// compressPercentages simplifies percentage display
+// compressPercentages simplifies percentage display.
 func (n *NumericalQuantizer) compressPercentages(input string) string {
 	// "95.123456%" → "95.1%"
-	re := regexp.MustCompile(`(\d+\.\d{3,})%`)
-	return re.ReplaceAllStringFunc(input, func(match string) string {
+	return numPercentRe.ReplaceAllStringFunc(input, func(match string) string {
 		val, err := strconv.ParseFloat(match[:len(match)-1], 64)
 		if err != nil {
 			return match
@@ -169,12 +184,13 @@ func (n *NumericalQuantizer) compressPercentages(input string) string {
 	})
 }
 
+// byteSizeRe matches byte/octet size expressions (case-insensitive, single pass)
+var byteSizeRe = regexp.MustCompile(`(?i)(\d+)\s*(?:bytes|octets)`)
+
 // compressByteSizes replaces verbose byte size displays
 func (n *NumericalQuantizer) compressByteSizes(input string) string {
-	// "1048576 bytes" → "1MB"
-	re := regexp.MustCompile(`(\d+)\s*bytes`)
-	input = re.ReplaceAllStringFunc(input, func(match string) string {
-		sub := re.FindStringSubmatch(match)
+	return byteSizeRe.ReplaceAllStringFunc(input, func(match string) string {
+		sub := byteSizeRe.FindStringSubmatch(match)
 		if len(sub) < 2 {
 			return match
 		}
@@ -194,46 +210,24 @@ func (n *NumericalQuantizer) compressByteSizes(input string) string {
 			return match
 		}
 	})
-
-	// "1048576 bytes" → "1MB" (case-insensitive)
-	re2 := regexp.MustCompile(`(?i)(\d+)\s*(?:bytes|octets)`)
-	input = re2.ReplaceAllStringFunc(input, func(match string) string {
-		sub := re2.FindStringSubmatch(match)
-		if len(sub) < 2 {
-			return match
-		}
-		val, err := strconv.ParseFloat(sub[1], 64)
-		if err != nil {
-			return match
-		}
-
-		switch {
-		case val >= 1073741824:
-			return strconv.FormatFloat(val/1073741824, 'f', 1, 64) + "GB"
-		case val >= 1048576:
-			return strconv.FormatFloat(val/1048576, 'f', 1, 64) + "MB"
-		case val >= 1024:
-			return strconv.FormatFloat(val/1024, 'f', 1, 64) + "KB"
-		default:
-			return match
-		}
-	})
-
-	return input
 }
 
-// compressTimestamps simplifies verbose timestamps
+var (
+	numTimestampRe = regexp.MustCompile(`(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}[\d.Z]*`)
+	numMonthNameRe = regexp.MustCompile(`(?i)(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})`)
+)
+
+// compressTimestamps simplifies verbose timestamps (aggressive mode only).
 func (n *NumericalQuantizer) compressTimestamps(input string, mode Mode) string {
 	if mode != ModeAggressive {
 		return input
 	}
 
 	// "2024-01-15T10:30:45.123Z" → "01-15 10:30"
-	re := regexp.MustCompile(`(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}[\d.Z]*`)
-	result := re.ReplaceAllString(input, "$2-$3 $4:$5")
+	result := numTimestampRe.ReplaceAllString(input, "$2-$3 $4:$5")
 
 	// Compress verbose date strings
-	re2 := regexp.MustCompile(`(?i)(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})`)
+	re2 := numMonthNameRe
 	monthMap := map[string]string{
 		"january": "Jan", "february": "Feb", "march": "Mar",
 		"april": "Apr", "may": "May", "june": "Jun",

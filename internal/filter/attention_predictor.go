@@ -175,7 +175,7 @@ func (a *AttentionPredictor) detectContentType(input string) string {
 		if prefix == "func" || prefix == "def " || prefix == "clas" || prefix == "impo" {
 			codeScore++
 		}
-		if prefix == "2026" || prefix == "2025" || prefix == "ERRO" || prefix == "WARN" {
+		if (len(prefix) == 4 && prefix[0] == '2' && prefix[1] == '0' && prefix[2] >= '0' && prefix[2] <= '9' && prefix[3] >= '0' && prefix[3] <= '9') || prefix == "ERRO" || prefix == "WARN" {
 			logScore++
 		}
 		if prefix == "diff" || prefix == "comm" || prefix == "--- " || prefix == "+++ " {

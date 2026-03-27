@@ -1,6 +1,7 @@
 package vcs
 
 import (
+	"os"
 	"bytes"
 	"fmt"
 	"strings"
@@ -30,9 +31,12 @@ var gitLogCmd = &cobra.Command{
 			gitArgs = append([]string{fmt.Sprintf("-n%d", gitLogCount)}, gitArgs...)
 		}
 
-		shared.ExecuteAndRecord("git log", func() (string, string, error) {
+		if err := shared.ExecuteAndRecord("git log", func() (string, string, error) {
 			return runGitLog(gitArgs, shared.Verbose > 0)
-		})
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 
@@ -43,9 +47,12 @@ var gitShowCmd = &cobra.Command{
 - Compact summary first (hash + subject)
 - Diff limited to 30 lines per hunk`,
 	Run: func(cmd *cobra.Command, args []string) {
-		shared.ExecuteAndRecord("git show", func() (string, string, error) {
+		if err := shared.ExecuteAndRecord("git show", func() (string, string, error) {
 			return runGitShow(args, shared.Verbose)
-		})
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 

@@ -123,6 +123,13 @@ var (
 
 	// Env prefix regex (sudo, env VAR=val, VAR=val)
 	envPrefixRegex = regexp.MustCompile(`^(?:sudo\s+|env\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+`)
+
+	// head / tail rewrite regexes — compiled once at package init
+	headNumericRe = regexp.MustCompile(`^head\s+-(\d+)\s+(.+)$`)
+	headLinesRe   = regexp.MustCompile(`^head\s+--lines=(\d+)\s+(.+)$`)
+	tailNumericRe = regexp.MustCompile(`^tail\s+-(\d+)\s+(.+)$`)
+	tailNRe       = regexp.MustCompile(`^tail\s+-n\s+(\d+)\s+(.+)$`)
+	tailLinesRe   = regexp.MustCompile(`^tail\s+--lines=(\d+)\s+(.+)$`)
 )
 
 // ClassifyCommand classifies a single command
@@ -347,17 +354,12 @@ func rewriteCompound(cmd string, excluded []string) (string, bool) {
 // rewriteHeadNumeric handles head -N file → tokman read file --max-lines N
 // Returns (rewritten, true) if matched, or ("", false) to fall through to generic logic
 func rewriteHeadNumeric(envPrefix, cmdClean string) (string, bool) {
-	// Match: head -<digits> <file>
-	headNumeric := regexp.MustCompile(`^head\s+-(\d+)\s+(.+)$`)
-	// Match: head --lines=<digits> <file>
-	headLines := regexp.MustCompile(`^head\s+--lines=(\d+)\s+(.+)$`)
-
-	if matches := headNumeric.FindStringSubmatch(cmdClean); len(matches) == 3 {
+	if matches := headNumericRe.FindStringSubmatch(cmdClean); len(matches) == 3 {
 		n := matches[1]
 		file := matches[2]
 		return fmt.Sprintf("%stokman read %s --max-lines %s", envPrefix, file, n), true
 	}
-	if matches := headLines.FindStringSubmatch(cmdClean); len(matches) == 3 {
+	if matches := headLinesRe.FindStringSubmatch(cmdClean); len(matches) == 3 {
 		n := matches[1]
 		file := matches[2]
 		return fmt.Sprintf("%stokman read %s --max-lines %s", envPrefix, file, n), true
@@ -372,24 +374,17 @@ func rewriteHeadNumeric(envPrefix, cmdClean string) (string, bool) {
 // rewriteTailNumeric handles tail -N file → tokman read file --tail-lines N
 // Returns (rewritten, true) if matched, or ("", false) to fall through to generic logic
 func rewriteTailNumeric(envPrefix, cmdClean string) (string, bool) {
-	// Match: tail -<digits> <file>
-	tailNumeric := regexp.MustCompile(`^tail\s+-(\d+)\s+(.+)$`)
-	// Match: tail -n <digits> <file>
-	tailN := regexp.MustCompile(`^tail\s+-n\s+(\d+)\s+(.+)$`)
-	// Match: tail --lines=<digits> <file>
-	tailLines := regexp.MustCompile(`^tail\s+--lines=(\d+)\s+(.+)$`)
-
-	if matches := tailNumeric.FindStringSubmatch(cmdClean); len(matches) == 3 {
+	if matches := tailNumericRe.FindStringSubmatch(cmdClean); len(matches) == 3 {
 		n := matches[1]
 		file := matches[2]
 		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true
 	}
-	if matches := tailN.FindStringSubmatch(cmdClean); len(matches) == 3 {
+	if matches := tailNRe.FindStringSubmatch(cmdClean); len(matches) == 3 {
 		n := matches[1]
 		file := matches[2]
 		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true
 	}
-	if matches := tailLines.FindStringSubmatch(cmdClean); len(matches) == 3 {
+	if matches := tailLinesRe.FindStringSubmatch(cmdClean); len(matches) == 3 {
 		n := matches[1]
 		file := matches[2]
 		return fmt.Sprintf("%stokman read %s --tail-lines %s", envPrefix, file, n), true

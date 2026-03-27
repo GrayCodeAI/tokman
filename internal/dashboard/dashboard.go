@@ -97,38 +97,40 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 	}
 	defer tracker.Close()
 
+	mux := http.NewServeMux()
+
 	// API handlers
-	http.Handle("/api/stats", corsMiddleware(statsHandler(tracker)))
-	http.Handle("/api/daily", corsMiddleware(dailyHandler(tracker)))
-	http.Handle("/api/weekly", corsMiddleware(weeklyHandler(tracker)))
-	http.Handle("/api/monthly", corsMiddleware(monthlyHandler(tracker)))
-	http.Handle("/api/commands", corsMiddleware(commandsHandler(tracker)))
-	http.Handle("/api/recent", corsMiddleware(recentHandler(tracker)))
-	http.Handle("/api/economics", corsMiddleware(economicsHandler(tracker)))
-	http.Handle("/api/performance", corsMiddleware(performanceHandler(tracker)))
-	http.Handle("/api/failures", corsMiddleware(failuresHandler(tracker)))
-	http.Handle("/api/top-commands", corsMiddleware(topCommandsHandler(tracker)))
-	http.Handle("/api/hourly", corsMiddleware(hourlyHandler(tracker)))
-	http.Handle("/api/export/csv", corsMiddleware(exportCSVHandler(tracker)))
+	mux.Handle("/api/stats", corsMiddleware(statsHandler(tracker)))
+	mux.Handle("/api/daily", corsMiddleware(dailyHandler(tracker)))
+	mux.Handle("/api/weekly", corsMiddleware(weeklyHandler(tracker)))
+	mux.Handle("/api/monthly", corsMiddleware(monthlyHandler(tracker)))
+	mux.Handle("/api/commands", corsMiddleware(commandsHandler(tracker)))
+	mux.Handle("/api/recent", corsMiddleware(recentHandler(tracker)))
+	mux.Handle("/api/economics", corsMiddleware(economicsHandler(tracker)))
+	mux.Handle("/api/performance", corsMiddleware(performanceHandler(tracker)))
+	mux.Handle("/api/failures", corsMiddleware(failuresHandler(tracker)))
+	mux.Handle("/api/top-commands", corsMiddleware(topCommandsHandler(tracker)))
+	mux.Handle("/api/hourly", corsMiddleware(hourlyHandler(tracker)))
+	mux.Handle("/api/export/csv", corsMiddleware(exportCSVHandler(tracker)))
 	// New endpoints for enhanced dashboard
-	http.Handle("/api/llm-status", corsMiddleware(llmStatusHandler(tracker)))
-	http.Handle("/api/daily-breakdown", corsMiddleware(dailyBreakdownHandler(tracker)))
-	http.Handle("/api/project-stats", corsMiddleware(projectStatsHandler(tracker)))
-	http.Handle("/api/session-stats", corsMiddleware(sessionStatsHandler(tracker)))
-	http.Handle("/api/savings-trend", corsMiddleware(savingsTrendHandler(tracker)))
+	mux.Handle("/api/llm-status", corsMiddleware(llmStatusHandler(tracker)))
+	mux.Handle("/api/daily-breakdown", corsMiddleware(dailyBreakdownHandler(tracker)))
+	mux.Handle("/api/project-stats", corsMiddleware(projectStatsHandler(tracker)))
+	mux.Handle("/api/session-stats", corsMiddleware(sessionStatsHandler(tracker)))
+	mux.Handle("/api/savings-trend", corsMiddleware(savingsTrendHandler(tracker)))
 	// New enhanced endpoints
-	http.Handle("/api/alerts", corsMiddleware(alertsHandler(tracker)))
-	http.Handle("/api/export/json", corsMiddleware(exportJSONHandler(tracker)))
-	http.Handle("/api/model-breakdown", corsMiddleware(modelBreakdownHandler(tracker)))
-	http.Handle("/api/config", corsMiddleware(configHandler(tracker)))
-	http.Handle("/api/report", corsMiddleware(reportHandler(tracker)))
-	http.Handle("/api/cache-metrics", corsMiddleware(cacheMetricsHandler(tracker)))
-	http.HandleFunc("/logo", logoHandler)
-	http.HandleFunc("/", dashboardIndexHandler)
+	mux.Handle("/api/alerts", corsMiddleware(alertsHandler(tracker)))
+	mux.Handle("/api/export/json", corsMiddleware(exportJSONHandler(tracker)))
+	mux.Handle("/api/model-breakdown", corsMiddleware(modelBreakdownHandler(tracker)))
+	mux.Handle("/api/config", corsMiddleware(configHandler(tracker)))
+	mux.Handle("/api/report", corsMiddleware(reportHandler(tracker)))
+	mux.Handle("/api/cache-metrics", corsMiddleware(cacheMetricsHandler(tracker)))
+	mux.HandleFunc("/logo", logoHandler)
+	mux.HandleFunc("/", dashboardIndexHandler)
 
 	rl := httpmw.NewDefault()
 
-	var handler http.Handler = http.DefaultServeMux
+	var handler http.Handler = mux
 	if APIKey != "" {
 		handler = authMiddleware(APIKey, handler)
 	}
@@ -174,17 +176,9 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if APIKey == "" {
-				// Only allow localhost origins when no API key is set
-				origin := r.Header.Get("Origin")
-				if origin != "" && (strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1")) {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-				}
-			} else {
-				origin := r.Header.Get("Origin")
-				if origin != "" {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-				}
+			origin := r.Header.Get("Origin")
+			if origin != "" && (strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1")) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")

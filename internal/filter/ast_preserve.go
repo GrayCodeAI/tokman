@@ -2,6 +2,7 @@ package filter
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -527,13 +528,7 @@ func (f *ASTPreserveFilter) applyBudgetPruning(chunks []CodeChunk, mode Mode) []
 	// Sort by score (descending)
 	sorted := make([]CodeChunk, len(chunks))
 	copy(sorted, chunks)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].Score > sorted[i].Score {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Score > sorted[j].Score })
 
 	// Determine budget based on mode
 	budget := f.functionBudget
@@ -617,13 +612,7 @@ func (f *ASTPreserveFilter) reconstructOutput(chunks []CodeChunk) string {
 	// Sort chunks by start line to preserve order
 	sorted := make([]CodeChunk, len(chunks))
 	copy(sorted, chunks)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].StartLine < sorted[i].StartLine {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].StartLine < sorted[j].StartLine })
 
 	var result strings.Builder
 	for _, chunk := range sorted {

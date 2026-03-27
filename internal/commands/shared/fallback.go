@@ -127,7 +127,7 @@ func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
 	output, exitCode, err := h.executeCommand(args)
 
 	if h.tracker != nil && len(args) > 0 {
-		h.tracker.RecordParseFailure(strings.Join(args, " "), getProjectPath(), false)
+		h.tracker.RecordParseFailure(strings.Join(args, " "), "no filter matched", err == nil)
 	}
 
 	if exitCode != 0 && h.teeEnabled && len(output) > 500 {

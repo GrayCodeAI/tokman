@@ -192,14 +192,14 @@ func (l *CrossSessionLearner) Save() error {
 		return nil
 	}
 
-	os.MkdirAll(filepath.Dir(l.dataPath), 0755)
+	os.MkdirAll(filepath.Dir(l.dataPath), 0700)
 
 	data, err := json.MarshalIndent(l.data, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(l.dataPath, data, 0644)
+	return os.WriteFile(l.dataPath, data, 0600)
 }
 
 // load reads persisted data from disk

@@ -129,7 +129,7 @@ func (t *Tee) Write(raw string, commandSlug string, exitCode int) string {
 	// Generate filename with epoch timestamp
 	epoch := time.Now().Unix()
 	filename := fmt.Sprintf("%d_%s.log", epoch, slug)
-	filepath := filepath.Join(dir, filename)
+	outPath := filepath.Join(dir, filename)
 
 	// Truncate if needed
 	content := raw
@@ -139,14 +139,14 @@ func (t *Tee) Write(raw string, commandSlug string, exitCode int) string {
 	}
 
 	// Write file
-	if err := os.WriteFile(filepath, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(outPath, []byte(content), 0600); err != nil {
 		return ""
 	}
 
 	// Rotate old files
 	t.cleanupOldFiles(dir)
 
-	return filepath
+	return outPath
 }
 
 // WriteAndHint writes the raw output and returns a formatted hint.

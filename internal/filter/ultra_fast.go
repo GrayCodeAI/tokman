@@ -3,7 +3,6 @@ package filter
 import (
 	"runtime"
 	"sync"
-	"unsafe"
 )
 
 // UltraFastPipeline achieves sub-millisecond compression through:
@@ -87,7 +86,7 @@ func (u *UltraFastPipeline) Process(input string, budget int) string {
 		}
 	}
 
-	return *(*string)(unsafe.Pointer(&buf))
+	return string(buf)
 }
 
 // splitLinesZeroCopy splits input into lines without allocating new strings

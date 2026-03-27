@@ -56,6 +56,7 @@ func LoadWasmPlugin(path string) (*WasmPlugin, error) {
 		rt.Close(ctx)
 		return nil, fmt.Errorf("failed to compile WASM: %w", err)
 	}
+	defer compiled.Close(ctx) // compiled module no longer needed after instantiation
 
 	module, err := rt.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 	if err != nil {
@@ -301,6 +302,9 @@ func (f *wasmFilter) Apply(input string, mode filter.Mode) (string, int) {
 	}
 
 	// Read output (result is pointer to output string)
+	if len(result) == 0 {
+		return input, 0
+	}
 	output := f.plugin.readString(result[0])
 
 	// Calculate tokens saved

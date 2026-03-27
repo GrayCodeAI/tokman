@@ -1,6 +1,7 @@
 package system
 
 import (
+	"os"
 	"bytes"
 	"fmt"
 	"os/exec"
@@ -25,9 +26,12 @@ var lsCmd = &cobra.Command{
 - Shows human-readable sizes`,
 	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	Run: func(cmd *cobra.Command, args []string) {
-		shared.ExecuteAndRecord("ls", func() (string, string, error) {
+		if err := shared.ExecuteAndRecord("ls", func() (string, string, error) {
 			return runLS(args)
-		})
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 

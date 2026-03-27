@@ -3,6 +3,7 @@ package filter
 import (
 	"container/list"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,9 +14,9 @@ type LRUCache struct {
 	ttl     time.Duration
 	entries map[string]*list.Element
 	order   *list.List
-	mu      sync.RWMutex
-	hits    int64
-	misses  int64
+	mu     sync.RWMutex
+	hits   atomic.Int64
+	misses atomic.Int64
 }
 
 type lruEntry struct {
@@ -48,7 +49,7 @@ func (c *LRUCache) Get(key string) *CachedResult {
 
 	elem, ok := c.entries[key]
 	if !ok {
-		c.misses++
+		c.misses.Add(1)
 		return nil
 	}
 
@@ -57,13 +58,13 @@ func (c *LRUCache) Get(key string) *CachedResult {
 	// Check TTL
 	if time.Since(entry.createdAt) > c.ttl {
 		c.removeElement(elem)
-		c.misses++
+		c.misses.Add(1)
 		return nil
 	}
 
 	// Move to front (most recently used)
 	c.order.MoveToFront(elem)
-	c.hits++
+	c.hits.Add(1)
 	return entry.result
 }
 
@@ -104,20 +105,18 @@ func (c *LRUCache) Size() int {
 
 // Stats returns cache hit/miss statistics.
 func (c *LRUCache) Stats() (hits, misses int64) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.hits, c.misses
+	return c.hits.Load(), c.misses.Load()
 }
 
 // HitRate returns the cache hit rate as a percentage.
 func (c *LRUCache) HitRate() float64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	total := c.hits + c.misses
+	hits := c.hits.Load()
+	misses := c.misses.Load()
+	total := hits + misses
 	if total == 0 {
 		return 0
 	}
-	return float64(c.hits) / float64(total) * 100
+	return float64(hits) / float64(total) * 100
 }
 
 // Clear removes all entries.

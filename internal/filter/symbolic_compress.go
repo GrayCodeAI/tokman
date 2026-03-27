@@ -16,6 +16,12 @@ import (
 type SymbolicCompressFilter struct {
 	config   SymbolicConfig
 	patterns []symbolicPattern
+	
+	// Pre-compiled patterns for compressInstructionPatterns (Phase 1 optimization)
+	followingPattern    *regexp.Regexp
+	thisFuncPattern     *regexp.Regexp
+	returnsPattern      *regexp.Regexp
+	paramPattern        *regexp.Regexp
 }
 
 // SymbolicConfig holds configuration for symbolic compression
@@ -50,6 +56,11 @@ func DefaultSymbolicConfig() SymbolicConfig {
 func NewSymbolicCompressFilter() *SymbolicCompressFilter {
 	f := &SymbolicCompressFilter{
 		config: DefaultSymbolicConfig(),
+		// Pre-compile patterns used in compressInstructionPatterns
+		followingPattern: regexp.MustCompile(`(?i)the\s+following\s+(\w+)\s+are\s+(\w+):`),
+		thisFuncPattern:  regexp.MustCompile(`(?i)This\s+(?:function|method|command|tool)\s+(?:is\s+used\s+to|will|allows\s+you\s+to)\s+`),
+		returnsPattern:   regexp.MustCompile(`(?i)(?:returns?|outputs?|produces?|yields?)\s+(?:a\s+|an\s+|the\s+)?`),
+		paramPattern:     regexp.MustCompile(`(?i)@(?:param|parameter)\s+(\w+)\s*[-:]\s*`),
 	}
 	f.patterns = f.initPatterns()
 	return f
@@ -140,20 +151,20 @@ func (f *SymbolicCompressFilter) initPatterns() []symbolicPattern {
 func (f *SymbolicCompressFilter) compressInstructionPatterns(input string, mode Mode) string {
 	output := input
 
-	// Compress list item patterns
+	// Compress list item patterns (using pre-compiled pattern)
 	if mode == ModeAggressive {
 		// "The following X are Y:" → "X: Y"
-		output = regexp.MustCompile(`(?i)the\s+following\s+(\w+)\s+are\s+(\w+):`).ReplaceAllString(output, "$1($2):")
+		output = f.followingPattern.ReplaceAllString(output, "$1($2):")
 	}
 
-	// Compress verbose descriptions
-	output = regexp.MustCompile(`(?i)This\s+(?:function|method|command|tool)\s+(?:is\s+used\s+to|will|allows\s+you\s+to)\s+`).ReplaceAllString(output, "⟹ ")
+	// Compress verbose descriptions (using pre-compiled patterns)
+	output = f.thisFuncPattern.ReplaceAllString(output, "⟹ ")
 
 	// Compress return value descriptions
-	output = regexp.MustCompile(`(?i)(?:returns?|outputs?|produces?|yields?)\s+(?:a\s+|an\s+|the\s+)?`).ReplaceAllString(output, "→ ")
+	output = f.returnsPattern.ReplaceAllString(output, "→ ")
 
 	// Compress parameter descriptions
-	output = regexp.MustCompile(`(?i)@(?:param|parameter)\s+(\w+)\s*[-:]\s*`).ReplaceAllString(output, "⊤$1: ")
+	output = f.paramPattern.ReplaceAllString(output, "⊤$1: ")
 
 	return output
 }

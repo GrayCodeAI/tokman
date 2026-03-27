@@ -164,6 +164,11 @@ func (m *Manager) loadGoPlugin(path string) error {
 
 // loadWasmPlugin loads a WASM plugin (delegates to wasm.go)
 func (m *Manager) loadWasmPlugin(path string) error {
+	// Verify plugin checksum before loading
+	if err := m.verifyPlugin(path); err != nil {
+		return err
+	}
+
 	wasmPlugin, err := LoadWasmPlugin(path)
 	if err != nil {
 		return err
@@ -268,16 +273,27 @@ func (m *Manager) Unload(name string) error {
 
 // UnloadAll unloads all plugins
 func (m *Manager) UnloadAll() error {
+	// Collect plugins under lock, then release before calling Cleanup
+	// to avoid deadlock if Cleanup tries to acquire the same mutex.
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	type entry struct {
+		name string
+		p    Plugin
+	}
+	items := make([]entry, 0, len(m.plugins))
+	for name, p := range m.plugins {
+		items = append(items, entry{name, p})
+	}
+	// Clear maps while holding lock
+	m.plugins = make(map[string]Plugin)
+	m.handles = make(map[string]*plugin.Plugin)
+	m.mu.Unlock()
 
 	var errs []error
-	for name, p := range m.plugins {
-		if err := p.Cleanup(); err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", name, err))
+	for _, item := range items {
+		if err := item.p.Cleanup(); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", item.name, err))
 		}
-		delete(m.plugins, name)
-		delete(m.handles, name)
 	}
 
 	if len(errs) > 0 {

@@ -1,6 +1,6 @@
 # TokMan Practical Improvements Plan
 **Date:** 2026-03-24
-**Goal:** Make TokMan practical like RTK while preserving advanced capabilities
+**Goal:** Make TokMan practical and fast while preserving advanced capabilities
 
 ## Overview
 
@@ -184,7 +184,7 @@ Reorganize 31 layers into **context-aware tiers** that run automatically based o
 
 1. **Quick Start Guide** - 5-minute setup
 2. **Tier System Docs** - Explain auto-activation
-3. **Migration Guide** - From RTK or other tools
+3. **Migration Guide** - From other tools
 4. **Examples** - Common use cases
 
 ---

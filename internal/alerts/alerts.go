@@ -294,8 +294,8 @@ func (m *Manager) createAlert(alertType AlertType, severity AlertSeverity, title
 	return &alert
 }
 
-// GetActive returns all active (unacknowledged) alerts
-func (m *Manager) GetActive() []Alert {
+// getActiveLocked returns active alerts. Caller must hold at least m.mu.RLock.
+func (m *Manager) getActiveLocked() []Alert {
 	var active []Alert
 	for _, a := range m.alerts {
 		if !a.Acknowledged && !a.Resolved {
@@ -305,17 +305,21 @@ func (m *Manager) GetActive() []Alert {
 	return active
 }
 
+// GetActive returns all active (unacknowledged) alerts.
+func (m *Manager) GetActive() []Alert {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.getActiveLocked()
+}
+
 // GetAll returns all alerts
 func (m *Manager) GetAll(limit int) []Alert {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if limit > 0 && len(m.alerts) > limit {
 		return m.alerts[len(m.alerts)-limit:]
 	}
 	return m.alerts
-}
-
-// GetActiveLocked returns active alerts (caller must hold lock)
-func (m *Manager) GetActiveLocked() []Alert {
-	return m.GetActive()
 }
 
 // Acknowledge marks an alert as acknowledged
@@ -433,7 +437,7 @@ func (m *Manager) Stats() map[string]any {
 
 	stats := map[string]any{
 		"total_alerts":       len(m.alerts),
-		"active_alerts":      len(m.GetActive()),
+		"active_alerts":      len(m.getActiveLocked()),
 		"alerts_by_type":     make(map[AlertType]int),
 		"alerts_by_severity": make(map[AlertSeverity]int),
 	}

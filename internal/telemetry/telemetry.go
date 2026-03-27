@@ -18,7 +18,8 @@ import (
 
 // Configuration
 const (
-	PingIntervalSecs = 23 * 3600 // 23 hours between pings
+	PingIntervalSecs = 23 * 3600  // 23 hours between pings
+	pingTimeout      = 5 * time.Second // uniform timeout for all telemetry HTTP calls
 )
 
 // TelemetryURL and Token can be set at build time via ldflags.
@@ -143,8 +144,8 @@ func (c *Client) sendPing() {
 	}
 	payload := string(payloadBytes)
 
-	// Send HTTP POST (with 2-second timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Send HTTP POST using the configured ping timeout
+	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, strings.NewReader(payload))
 	if err != nil {
@@ -152,7 +153,7 @@ func (c *Client) sendPing() {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-TokMan-Token", c.token)
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: pingTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return

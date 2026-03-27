@@ -25,15 +25,19 @@ type PerplexityFilter struct {
 
 	// Context window for perplexity calculation
 	contextWindow int
+	
+	// Convergence threshold for early exit (Phase 1 optimization)
+	convergenceThreshold float64
 }
 
 // NewPerplexityFilter creates a new perplexity-based filter
 func NewPerplexityFilter() *PerplexityFilter {
 	return &PerplexityFilter{
-		targetRatio:    0.3, // Keep 30% of tokens
-		iterationSteps: 3,   // Number of pruning iterations
-		pruneRatio:     0.7, // Prune 30% each iteration
-		contextWindow:  10,  // Words to consider for context
+		targetRatio:          0.3,  // Keep 30% of tokens
+		iterationSteps:       2,    // Reduced from 3 for performance (Phase 1)
+		pruneRatio:           0.7,  // Prune 30% each iteration
+		contextWindow:        10,   // Words to consider for context
+		convergenceThreshold: 0.05, // 5% change threshold for early exit
 	}
 }
 
@@ -42,7 +46,7 @@ func (f *PerplexityFilter) Name() string {
 	return "perplexity"
 }
 
-// Apply applies perplexity-based iterative pruning
+// Apply applies perplexity-based iterative pruning with early exit (Phase 1 optimization)
 func (f *PerplexityFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
@@ -50,10 +54,19 @@ func (f *PerplexityFilter) Apply(input string, mode Mode) (string, int) {
 
 	original := len(input)
 	output := input
+	prevLen := original
 
-	// Iterative pruning
+	// Iterative pruning with convergence check
 	for i := 0; i < f.iterationSteps; i++ {
 		output = f.pruneIteration(output, mode)
+		
+		// Early exit if convergence detected (Phase 1 optimization)
+		currentLen := len(output)
+		changeRatio := float64(prevLen-currentLen) / float64(prevLen)
+		if changeRatio < f.convergenceThreshold && i > 0 {
+			break // Converged - no significant improvement
+		}
+		prevLen = currentLen
 	}
 
 	saved := (original - len(output)) / 4

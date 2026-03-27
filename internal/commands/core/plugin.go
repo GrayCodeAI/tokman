@@ -165,7 +165,7 @@ func runPluginCreate(cmd *cobra.Command, args []string) error {
 	name := sanitizePluginName(args[0])
 	pluginsDir := getPluginsDir()
 
-	if err := os.MkdirAll(pluginsDir, 0755); err != nil {
+	if err := os.MkdirAll(pluginsDir, 0700); err != nil {
 		return fmt.Errorf("failed to create plugins directory: %w", err)
 	}
 

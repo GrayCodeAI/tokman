@@ -83,6 +83,9 @@ func newMockCommandRunner() *MockCommandRunner {
 
 // Run returns a pre-configured output for testing.
 func (m *MockCommandRunner) Run(ctx context.Context, args []string) (string, int, error) {
+	if len(args) == 0 {
+		return "", 1, fmt.Errorf("no command provided")
+	}
 	key := args[0]
 	m.Calls = append(m.Calls, MockCall{Args: args})
 	return m.Outputs[key], m.ExitCodes[key], m.Errors[key]

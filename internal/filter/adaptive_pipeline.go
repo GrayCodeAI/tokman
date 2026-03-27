@@ -372,13 +372,13 @@ func (p *AdaptivePipeline) runFull(input string) (string, *PipelineStats) {
 		}
 		stats.LayerStats["19_scope"] = LayerStat{TokensSaved: s}
 	}
-	// Layer 20: DynaKV (token-wise adaptive)
-	if p.c.dynamicRatioFilter != nil {
-		o, s := p.c.dynamicRatioFilter.Apply(out, p.cfg.Mode)
+	// Layer 20: Agent Memory (Focus-inspired)
+	if p.c.agentMemoryFilter != nil {
+		o, s := p.c.agentMemoryFilter.Apply(out, p.cfg.Mode)
 		if s > 0 {
 			out = o
 		}
-		stats.LayerStats["20_dynakv"] = LayerStat{TokensSaved: s}
+		stats.LayerStats["20_agent_memory"] = LayerStat{TokensSaved: s}
 	}
 
 	// Layer 7: Budget (always last)

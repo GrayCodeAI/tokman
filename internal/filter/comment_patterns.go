@@ -61,16 +61,22 @@ func commentPatternsForLang(lang Language) CommentPatterns {
 	}
 }
 
+// cStyleCommentRe matches C/C++/Go/Java/Rust/JS/TS style comments.
+var cStyleCommentRe = regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`)
+
+// commentFallbackRe is used when no language-specific pattern is found.
+var commentFallbackRe = regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/|^#.*$`)
+
 // CommentPatternsMap maps languages to their comment regex patterns
 var CommentPatternsMap = map[Language]*regexp.Regexp{
-	LangGo:         regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
-	LangRust:       regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
+	LangGo:         cStyleCommentRe,
+	LangRust:       cStyleCommentRe,
 	LangPython:     regexp.MustCompile(`(?m)^#.*$|"""[\s\S]*?"""|'''[\s\S]*?'''`),
-	LangJavaScript: regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
-	LangTypeScript: regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
-	LangJava:       regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
-	LangC:          regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
-	LangCpp:        regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/`),
+	LangJavaScript: cStyleCommentRe,
+	LangTypeScript: cStyleCommentRe,
+	LangJava:       cStyleCommentRe,
+	LangC:          cStyleCommentRe,
+	LangCpp:        cStyleCommentRe,
 	LangShell:      regexp.MustCompile(`(?m)^#.*$`),
 	LangRuby:       regexp.MustCompile(`(?m)^#.*$|=begin[\s\S]*?=end`),
 	LangSQL:        regexp.MustCompile(`(?m)^--.*$`),
@@ -126,12 +132,10 @@ var TestResultPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(\d+) passed`),
 	regexp.MustCompile(`(\d+) failed`),
 	regexp.MustCompile(`(\d+) ignored`),
+	regexp.MustCompile(`(\d+) skipped`),
 	regexp.MustCompile(`PASS`),
 	regexp.MustCompile(`FAIL`),
 	regexp.MustCompile(`ok\s+\S+\s+[\d.]+s`),
-	regexp.MustCompile(`(\d+) passed`),
-	regexp.MustCompile(`(\d+) failed`),
-	regexp.MustCompile(`(\d+) skipped`),
 }
 
 // DiffHunkPattern
@@ -167,7 +171,7 @@ func (f *CommentFilter) Apply(input string, mode Mode) (string, int) {
 
 	pattern, ok := f.patterns[lang]
 	if !ok {
-		pattern = regexp.MustCompile(`(?m)^//.*$|/\*[\s\S]*?\*/|^#.*$`)
+		pattern = commentFallbackRe
 	}
 
 	original := len(input)

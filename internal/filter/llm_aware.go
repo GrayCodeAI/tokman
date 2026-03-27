@@ -1,6 +1,8 @@
 package filter
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -159,12 +161,8 @@ func (f *LLMAwareFilter) getFromCache(content string) string {
 	f.cacheMutex.RLock()
 	defer f.cacheMutex.RUnlock()
 
-	// Use first 100 chars as key (simple caching)
-	key := content
-	if len(key) > 100 {
-		key = key[:100]
-	}
-
+	h := sha256.Sum256([]byte(content))
+	key := fmt.Sprintf("%x", h)
 	return f.cache[key]
 }
 
@@ -177,12 +175,8 @@ func (f *LLMAwareFilter) addToCache(content, summary string) {
 	f.cacheMutex.Lock()
 	defer f.cacheMutex.Unlock()
 
-	// Use first 100 chars as key
-	key := content
-	if len(key) > 100 {
-		key = key[:100]
-	}
-
+	h := sha256.Sum256([]byte(content))
+	key := fmt.Sprintf("%x", h)
 	f.cache[key] = summary
 }
 

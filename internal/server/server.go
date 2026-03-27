@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,13 +26,12 @@ const (
 
 // Server provides REST API for token compression
 type Server struct {
-	port        int
-	apiKey      string
-	version     string
-	coordinator *filter.PipelineCoordinator
-	selector    *filter.AdaptiveLayerSelector
-	metrics     *Metrics
-	logger      *Logger
+	port     int
+	apiKey   string
+	version  string
+	selector *filter.AdaptiveLayerSelector
+	metrics  *Metrics
+	logger   *Logger
 
 	// Rate limiting
 	rateLimiter *rateLimiter
@@ -198,10 +198,11 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Get client IP (check X-Forwarded-For header first)
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip = r.RemoteAddr
+		// Use RemoteAddr only to prevent X-Forwarded-For spoofing
+		ip := r.RemoteAddr
+		// Strip port if present
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			ip = host
 		}
 
 		if !s.rateLimiter.Allow(ip) {

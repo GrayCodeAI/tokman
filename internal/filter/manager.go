@@ -108,8 +108,13 @@ func (m *PipelineManager) Process(input string, mode Mode, ctx CommandContext) (
 	tokens := EstimateTokens(input)
 	result.OriginalTokens = tokens
 
-	if tokens > m.config.MaxContextTokens {
-		return nil, fmt.Errorf("input exceeds max context tokens (%d > %d)", tokens, m.config.MaxContextTokens)
+	m.mu.RLock()
+	maxCtx := m.config.MaxContextTokens
+	streamThreshold := m.config.StreamThreshold
+	m.mu.RUnlock()
+
+	if tokens > maxCtx {
+		return nil, fmt.Errorf("input exceeds max context tokens (%d > %d)", tokens, maxCtx)
 	}
 
 	// Check cache (T101: LRU cache with TTL)
@@ -138,7 +143,7 @@ func (m *PipelineManager) Process(input string, mode Mode, ctx CommandContext) (
 	}
 
 	// Choose processing strategy based on size
-	if tokens > m.config.StreamThreshold {
+	if tokens > streamThreshold {
 		return m.processStreaming(input, mode, ctx, result)
 	}
 
@@ -147,19 +152,26 @@ func (m *PipelineManager) Process(input string, mode Mode, ctx CommandContext) (
 
 // processSingle processes input in a single pass
 func (m *PipelineManager) processSingle(input string, mode Mode, ctx CommandContext, result *ProcessResult) (*ProcessResult, error) {
-	// Set query intent if provided
+	// Set query intent and process under write lock to prevent races on
+	// coordinator.config between concurrent goroutines.
+	m.mu.Lock()
 	if ctx.Intent != "" {
 		m.coordinator.config.QueryIntent = ctx.Intent
 	}
-
-	// Process through pipeline
 	output, stats := m.coordinator.Process(input)
+	m.mu.Unlock()
+
+	m.mu.RLock()
+	validateOutput := m.config.ValidateOutput
+	failSafeMode := m.config.FailSafeMode
+	teeOnFailure := m.config.TeeOnFailure
+	m.mu.RUnlock()
 
 	// Validate output
-	if m.config.ValidateOutput {
+	if validateOutput {
 		if !m.validateOutput(output, input, ctx) {
 			// Output validation failed
-			if m.config.FailSafeMode {
+			if failSafeMode {
 				result.Output = input
 				result.Warning = "output validation failed, returning original"
 			} else {
@@ -176,13 +188,13 @@ func (m *PipelineManager) processSingle(input string, mode Mode, ctx CommandCont
 
 	// Check for empty output (failure)
 	if result.Output == "" && input != "" {
-		if m.config.TeeOnFailure {
+		if teeOnFailure {
 			teeFile := m.saveTee(input, ctx, "empty_output")
 			result.TeeFile = teeFile
 			result.Warning = "pipeline produced empty output, original saved to tee file"
 		}
 
-		if m.config.FailSafeMode {
+		if failSafeMode {
 			result.Output = input
 		}
 	}
@@ -213,8 +225,15 @@ func (m *PipelineManager) processSingle(input string, mode Mode, ctx CommandCont
 
 // processStreaming processes large input in chunks
 func (m *PipelineManager) processStreaming(input string, mode Mode, ctx CommandContext, result *ProcessResult) (*ProcessResult, error) {
+	m.mu.RLock()
+	chunkSize := m.config.ChunkSize
+	failSafeMode := m.config.FailSafeMode
+	shortCircuit := m.config.ShortCircuitBudget
+	budget := m.coordinator.config.Budget
+	m.mu.RUnlock()
+
 	// Split into processable chunks
-	chunks := m.chunkInput(input, m.config.ChunkSize)
+	chunks := m.chunkInput(input, chunkSize)
 	result.Chunks = len(chunks)
 
 	var processedChunks []string
@@ -226,7 +245,7 @@ func (m *PipelineManager) processStreaming(input string, mode Mode, ctx CommandC
 		})
 		if err != nil {
 			// Handle chunk failure
-			if m.config.FailSafeMode {
+			if failSafeMode {
 				processedChunks = append(processedChunks, chunk)
 				continue
 			}
@@ -237,9 +256,9 @@ func (m *PipelineManager) processStreaming(input string, mode Mode, ctx CommandC
 		totalSaved += chunkResult.SavedTokens
 
 		// Short-circuit if budget met
-		if m.config.ShortCircuitBudget && m.coordinator.config.Budget > 0 {
+		if shortCircuit && budget > 0 {
 			currentTokens := EstimateTokens(strings.Join(processedChunks, "\n"))
-			if currentTokens <= m.coordinator.config.Budget {
+			if currentTokens <= budget {
 				break
 			}
 		}
@@ -549,12 +568,17 @@ func (m *PipelineManager) ProcessFile(path string, mode Mode, ctx CommandContext
 	// Estimate tokens from file size (rough: 1 token ≈ 4 bytes)
 	estimatedTokens := int(stat.Size() / 4)
 
-	if estimatedTokens > m.config.MaxContextTokens {
-		return nil, fmt.Errorf("file exceeds max context tokens (%d > %d)", estimatedTokens, m.config.MaxContextTokens)
+	m.mu.RLock()
+	maxCtx := m.config.MaxContextTokens
+	streamThreshold := m.config.StreamThreshold
+	m.mu.RUnlock()
+
+	if estimatedTokens > maxCtx {
+		return nil, fmt.Errorf("file exceeds max context tokens (%d > %d)", estimatedTokens, maxCtx)
 	}
 
 	// Read file
-	if estimatedTokens > m.config.StreamThreshold {
+	if estimatedTokens > streamThreshold {
 		// Stream processing for large files
 		return m.processFileStream(f, mode, ctx)
 	}
@@ -574,8 +598,12 @@ func (m *PipelineManager) processFileStream(r io.Reader, mode Mode, ctx CommandC
 		LayerStats: make(map[string]LayerStat),
 	}
 
+	m.mu.RLock()
+	chunkSize := m.config.ChunkSize
+	m.mu.RUnlock()
+
 	// Read in chunks
-	buf := make([]byte, m.config.ChunkSize*4) // Convert tokens to bytes
+	buf := make([]byte, chunkSize*4) // Convert tokens to bytes
 	var chunks []string
 	totalOriginal := 0
 	totalFinal := 0

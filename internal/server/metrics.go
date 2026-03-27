@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -190,11 +191,26 @@ func (m *Metrics) PrometheusFormat() string {
 		output += fmt.Sprintf("\n# HELP tokman_content_type_total Requests by content type\n")
 		output += fmt.Sprintf("# TYPE tokman_content_type_total counter\n")
 		for ct, count := range snap.ContentTypeCounts {
-			output += fmt.Sprintf("tokman_content_type_total{type=\"%s\"} %d\n", ct, count)
+			sanitizedCt := sanitizePrometheusLabel(ct)
+			output += fmt.Sprintf("tokman_content_type_total{type=\"%s\"} %d\n", sanitizedCt, count)
 		}
 	}
 
 	return output
+}
+
+// labelSanitizer replaces any character not in [a-zA-Z0-9_] with an underscore.
+var labelSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_]`)
+
+// sanitizePrometheusLabel replaces characters not allowed in Prometheus label
+// names ([a-zA-Z0-9_]) with underscores and limits the result length.
+func sanitizePrometheusLabel(s string) string {
+	const maxLabelLen = 128
+	clean := labelSanitizer.ReplaceAllString(s, "_")
+	if len(clean) > maxLabelLen {
+		clean = clean[:maxLabelLen]
+	}
+	return clean
 }
 
 // Logger provides structured logging

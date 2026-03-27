@@ -8,6 +8,11 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
+var (
+	kvzipSignatureRe = regexp.MustCompile(`^(func|function|def|class|struct|interface|type|impl)\s+`)
+	kvzipImportRe    = regexp.MustCompile(`^(import|use|require|include|from|package)\s+`)
+)
+
 // KVzipFilter implements KVzip-style query-agnostic compression with context reconstruction.
 // Research Source: "KVzip: Query-Agnostic KV Cache Compression with Context Reconstruction" (2025)
 // Key Innovation: Build a compressed representation that can reconstruct context
@@ -155,12 +160,12 @@ func (f *KVzipFilter) detectBlockType(line string) string {
 	trimmed := strings.TrimSpace(line)
 
 	// Signatures
-	if regexp.MustCompile(`^(func|function|def|class|struct|interface|type|impl)\s+`).MatchString(trimmed) {
+	if kvzipSignatureRe.MatchString(trimmed) {
 		return "signature"
 	}
 
 	// Imports
-	if regexp.MustCompile(`^(import|use|require|include|from|package)\s+`).MatchString(trimmed) {
+	if kvzipImportRe.MatchString(trimmed) {
 		return "import"
 	}
 

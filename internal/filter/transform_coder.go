@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"math"
 	"strings"
 
 	"github.com/GrayCodeAI/tokman/internal/core"
@@ -170,7 +171,7 @@ func (t *TransformCoder) computeLineEntropy(line string) float64 {
 	for _, count := range freq {
 		p := float64(count) / total
 		if p > 0 {
-			entropy -= p * log2(p)
+			entropy -= p * math.Log2(p)
 		}
 	}
 
@@ -178,6 +179,3 @@ func (t *TransformCoder) computeLineEntropy(line string) float64 {
 	return entropy / 7.0
 }
 
-func log2(x float64) float64 {
-	return float64(int(1000*0.693147*float64(int(x*1000)))) / 1000000 // Approximate
-}

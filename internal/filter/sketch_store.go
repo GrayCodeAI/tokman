@@ -338,8 +338,8 @@ func (f *SketchStoreFilter) isCode(content string) bool {
 
 // Revive reconstructs content from a sketch
 func (f *SketchStoreFilter) Revive(sketchHash string) (string, bool) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	sketch, exists := f.sketchCache.TokenSketches[sketchHash]
 	if !exists {

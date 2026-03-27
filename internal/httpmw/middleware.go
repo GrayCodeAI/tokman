@@ -1,6 +1,7 @@
 package httpmw
 
 import (
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -57,9 +58,9 @@ func NewDefault() *RateLimiter {
 // Middleware wraps an http.Handler with per-IP rate limiting.
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			ip = fwd
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
 		}
 
 		rl.mu.Lock()

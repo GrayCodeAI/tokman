@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,7 +117,7 @@ func (ps *WASMPluginSystem) loadPlugins() {
 	}
 
 	// Create plugin directory if it doesn't exist
-	os.MkdirAll(ps.pluginDir, 0755)
+	os.MkdirAll(ps.pluginDir, 0700)
 
 	// Scan for .wasm files
 	entries, err := os.ReadDir(ps.pluginDir)
@@ -147,6 +148,12 @@ func (ps *WASMPluginSystem) loadPlugins() {
 
 // loadPlugin loads a single WASM plugin
 func (ps *WASMPluginSystem) loadPlugin(path string) (*WASMPlugin, error) {
+	// Warn if no signature sidecar is present (unsigned plugin)
+	sigPath := path + ".sig"
+	if _, err := os.Stat(sigPath); os.IsNotExist(err) {
+		log.Printf("warning: loading unsigned plugin %s", path)
+	}
+
 	wasmBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin %s: %w", path, err)
@@ -327,24 +334,35 @@ func (b *PluginBuilder) SaveToDir(dir string) error {
 		return err
 	}
 
-	os.MkdirAll(dir, 0755)
+	os.MkdirAll(dir, 0700)
 	path := filepath.Join(dir, b.manifest.Name+".json")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 // PluginRuntime manages WASM plugin execution
 type PluginRuntime struct {
-	ctx     context.Context
+	ctx    context.Context
+	cancel context.CancelFunc // cancels ctx on Close to release resources
 	plugins map[string]*WASMPlugin
 	mu      sync.RWMutex
 }
 
 // newPluginRuntime creates a new WASM runtime manager
 func newPluginRuntime() *PluginRuntime {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &PluginRuntime{
-		ctx:     context.Background(),
+		ctx:     ctx,
+		cancel:  cancel,
 		plugins: make(map[string]*WASMPlugin),
 	}
+}
+
+// Close releases all resources held by the runtime.
+func (r *PluginRuntime) Close() {
+	r.cancel()
+	r.mu.Lock()
+	r.plugins = make(map[string]*WASMPlugin)
+	r.mu.Unlock()
 }
 
 // ExecutePlugin executes a WASM plugin with the given input
@@ -357,8 +375,15 @@ func (r *PluginRuntime) ExecutePlugin(name string, input string, mode Mode) (str
 		return input, 0, fmt.Errorf("plugin %s not found", name)
 	}
 
-	if !plugin.Enabled {
+	if plugin == nil || !plugin.Enabled {
 		return input, 0, nil
+	}
+
+	// Check if runtime context is still active
+	select {
+	case <-r.ctx.Done():
+		return input, 0, fmt.Errorf("plugin runtime closed")
+	default:
 	}
 
 	// TODO: Execute via wazero WASM runtime

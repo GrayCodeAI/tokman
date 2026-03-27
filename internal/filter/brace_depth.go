@@ -145,12 +145,33 @@ func (f *BodyFilter) stripRustBodies(input string) string {
 
 		// Track depth in function body
 		if inFunc {
-			depth += strings.Count(line, "{")
-			depth -= strings.Count(line, "}")
+			opens := strings.Count(line, "{")
+			closes := strings.Count(line, "}")
 
-			// Also track braces in string contexts (simplified)
-			depth += strings.Count(line, "(")
-			depth -= strings.Count(line, ")")
+			if depth == 0 && opens > 0 {
+				// This line is the opening brace of the function body
+				// (signature had no { — emit placeholder immediately).
+				depth += opens - closes
+				if depth > 0 {
+					result = append(result, "{ /* body stripped */ }")
+					depth = 0
+					inFunc = false
+				}
+				// if depth == 0 the braces balanced on this line: still emit placeholder
+				if !inFunc {
+					// already handled above
+				} else {
+					// depth <= 0: unusual, just emit the line
+					result = append(result, line)
+					inFunc = false
+					depth = 0
+				}
+				continue
+			}
+
+			depth += opens - closes
+
+			// Note: only curly braces determine Rust block depth
 
 			if depth <= 0 {
 				inFunc = false

@@ -40,6 +40,9 @@ func (s *BM25Scorer) Fit(docs []string) {
 	if s.docCount > 0 {
 		s.avgDocLength = float64(totalLen) / float64(s.docCount)
 	}
+	if s.avgDocLength == 0 {
+		s.avgDocLength = 1
+	}
 }
 
 // Score computes BM25 relevance of a document to a query.

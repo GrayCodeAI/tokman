@@ -205,30 +205,47 @@ func (p *ParallelPipeline) Process(input string) (string, *PipelineStats) {
 		return output, p.finalizeStats(stats, output, startTime)
 	}
 
-	// Group 7: Parallel NEW Phase 1 layers
-	output = p.processParallelGroup([]filterLayer{
-		{p.coordinator.reasoningTraceFilter, "21_reasoning_trace"},
-		{p.coordinator.symbolicCompressFilter, "22_symbolic_compress"},
-		{p.coordinator.phraseGroupingFilter, "23_phrase_grouping"},
-		{p.coordinator.numericalQuantizer, "24_numerical_quant"},
-		{p.coordinator.dynamicRatioFilter, "25_dynamic_ratio"},
-	}, output, stats, func(f Filter) bool {
-		return f == nil
-	})
-
-	if p.coordinator.shouldEarlyExit(stats) {
-		return output, p.finalizeStats(stats, output, startTime)
+	// Group 7: Parallel NEW Phase 1 layers (skip if not initialized)
+	var group7Layers []filterLayer
+	if p.coordinator.reasoningTraceFilter != nil {
+		group7Layers = append(group7Layers, filterLayer{p.coordinator.reasoningTraceFilter, "21_reasoning_trace"})
+	}
+	if p.coordinator.symbolicCompressFilter != nil {
+		group7Layers = append(group7Layers, filterLayer{p.coordinator.symbolicCompressFilter, "22_symbolic_compress"})
+	}
+	if p.coordinator.phraseGroupingFilter != nil {
+		group7Layers = append(group7Layers, filterLayer{p.coordinator.phraseGroupingFilter, "23_phrase_grouping"})
+	}
+	if p.coordinator.numericalQuantizer != nil {
+		group7Layers = append(group7Layers, filterLayer{p.coordinator.numericalQuantizer, "24_numerical_quant"})
+	}
+	if p.coordinator.dynamicRatioFilter != nil {
+		group7Layers = append(group7Layers, filterLayer{p.coordinator.dynamicRatioFilter, "25_dynamic_ratio"})
+	}
+	if len(group7Layers) > 0 {
+		output = p.processParallelGroup(group7Layers, output, stats, func(f Filter) bool { return false })
+		if p.coordinator.shouldEarlyExit(stats) {
+			return output, p.finalizeStats(stats, output, startTime)
+		}
 	}
 
-	// Group 8: Parallel Phase 2 layers
-	output = p.processParallelGroup([]filterLayer{
-		{p.coordinator.hypernymCompressor, "26_hypernym"},
-		{p.coordinator.semanticCacheFilter, "27_semantic_cache"},
-		{p.coordinator.scopeFilter, "28_scope"},
-		{p.coordinator.kvzipFilter, "29_kvzip"},
-	}, output, stats, func(f Filter) bool {
-		return f == nil
-	})
+	// Group 8: Parallel Phase 2 layers (skip if not initialized)
+	var group8Layers []filterLayer
+	if p.coordinator.hypernymCompressor != nil {
+		group8Layers = append(group8Layers, filterLayer{p.coordinator.hypernymCompressor, "26_hypernym"})
+	}
+	if p.coordinator.semanticCacheFilter != nil {
+		group8Layers = append(group8Layers, filterLayer{p.coordinator.semanticCacheFilter, "27_semantic_cache"})
+	}
+	if p.coordinator.scopeFilter != nil {
+		group8Layers = append(group8Layers, filterLayer{p.coordinator.scopeFilter, "28_scope"})
+	}
+	if p.coordinator.kvzipFilter != nil {
+		group8Layers = append(group8Layers, filterLayer{p.coordinator.kvzipFilter, "29_kvzip"})
+	}
+	if len(group8Layers) > 0 {
+		output = p.processParallelGroup(group8Layers, output, stats, func(f Filter) bool { return false })
+	}
 
 	if p.coordinator.shouldEarlyExit(stats) {
 		return output, p.finalizeStats(stats, output, startTime)

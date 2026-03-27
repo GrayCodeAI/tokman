@@ -369,7 +369,7 @@ func (l *LLMCompressor) callOllama(ctx context.Context, prompt string) (string, 
 
 	baseURL := l.BaseURL
 	if baseURL == "" {
-		baseURL = "https://localhost:11434"
+		baseURL = "http://localhost:11434"
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/generate", strings.NewReader(string(reqJSON)))

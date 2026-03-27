@@ -319,7 +319,7 @@ func (t *AutoTuner) Save() error {
 
 	// Create directory if needed
 	dir := filepath.Dir(t.dataPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -328,7 +328,7 @@ func (t *AutoTuner) Save() error {
 		return err
 	}
 
-	return os.WriteFile(t.dataPath, bytes, 0644)
+	return os.WriteFile(t.dataPath, bytes, 0600)
 }
 
 // loadWeights loads persisted weights from disk
@@ -382,7 +382,7 @@ func DetectContentTypeForTuner(input string) string {
 			switch {
 			case prefix == "func" || prefix == "def " || prefix == "clas" || prefix == "impo":
 				codeScore++
-			case prefix == "2026" || prefix == "2025" || prefix == "ERRO" || prefix == "WARN":
+			case (len(prefix) == 4 && prefix[0] == '2' && prefix[1] == '0' && prefix[2] >= '0' && prefix[2] <= '9' && prefix[3] >= '0' && prefix[3] <= '9') || prefix == "ERRO" || prefix == "WARN":
 				logScore++
 			case prefix == "diff" || prefix == "comm" || prefix == "Auth" || prefix == "inde":
 				gitScore++

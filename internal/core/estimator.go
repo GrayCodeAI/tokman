@@ -2,6 +2,7 @@ package core
 
 import (
 	"sync"
+	"sync/atomic"
 
 	tiktoken "github.com/tiktoken-go/tokenizer"
 )
@@ -123,19 +124,23 @@ func (b *BPETokenizer) Count(text string) int {
 }
 
 // useBPE controls whether to use BPE or heuristic estimation.
-// Set to true by default for accuracy; can be toggled for performance.
-var useBPE = true
+// Set to 1 (true) by default for accuracy; can be toggled for performance.
+var useBPE atomic.Bool
+
+func init() {
+	useBPE.Store(true)
+}
 
 // setBPEEnabled enables or disables BPE token counting.
 func setBPEEnabled(enabled bool) {
-	useBPE = enabled
+	useBPE.Store(enabled)
 }
 
 // EstimateTokens is the single source of truth for token estimation.
 // P1.1: Uses BPE tokenization when available, falls back to heuristic.
 // Phase 2.8: Results are cached to avoid repeated encoding.
 func EstimateTokens(text string) int {
-	if useBPE {
+	if useBPE.Load() {
 		if tok, err := getBPETokenizer(); err == nil {
 			return tok.Count(text)
 		}

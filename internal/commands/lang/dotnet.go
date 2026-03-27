@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"os"
 	"bytes"
 	"fmt"
 	"os/exec"
@@ -65,7 +66,7 @@ func init() {
 }
 
 func runDotnetCommand(subCmd string, args []string) {
-	shared.ExecuteAndRecord("dotnet "+subCmd, func() (string, string, error) {
+	if err := shared.ExecuteAndRecord("dotnet "+subCmd, func() (string, string, error) {
 		dotnetArgs := append([]string{subCmd}, args...)
 		c := exec.Command("dotnet", dotnetArgs...)
 
@@ -78,7 +79,10 @@ func runDotnetCommand(subCmd string, args []string) {
 		filtered := filterDotnetOutput(output)
 
 		return output, filtered, err
-	})
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func filterDotnetOutput(output string) string {

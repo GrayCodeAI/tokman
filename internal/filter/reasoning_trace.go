@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -280,7 +281,7 @@ func (f *ReasoningTraceFilter) compressLoops(blocks []reasoningBlock, loopStarts
 	}
 	if totalCompressed > 0 {
 		result.WriteString("\n[")
-		result.WriteString(string(rune(totalCompressed + '0')))
+		result.WriteString(fmt.Sprintf("%d", totalCompressed))
 		result.WriteString(" reasoning steps compressed]")
 	}
 

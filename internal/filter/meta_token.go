@@ -83,8 +83,11 @@ func (f *MetaTokenFilter) Apply(input string, mode Mode) (string, int) {
 		return input, 0
 	}
 
-	// Tokenize input into words (simple whitespace tokenization for speed)
-	tokens := tokenize(input)
+	// Tokenize input into space-separated tokens. Using strings.Split on " "
+	// (not strings.Fields) so that non-space whitespace such as newlines is
+	// preserved inside tokens and strings.Join(compressed, " ") faithfully
+	// reconstructs the original content without inserting extra spaces.
+	tokens := strings.Split(input, " ")
 	if len(tokens) < f.config.MinPattern {
 		return input, 0
 	}

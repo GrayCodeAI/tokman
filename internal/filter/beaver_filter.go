@@ -7,6 +7,8 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
+var beaverFuncRe = regexp.MustCompile(`(func|function|def|class|struct)\s+`)
+
 // BeaverFilter implements BEAVER-style hierarchical page-level compression.
 // Research: "BEAVER: Training-Free Hierarchical Prompt Compression" (arXiv 2603.19635, Mar 2026)
 // Key Innovation: Maps variable-length contexts into dense page-level representations.
@@ -129,8 +131,7 @@ func (b *BeaverFilter) scorePages(pages []beaverPage, mode Mode) {
 		}
 
 		// Code structure
-		funcPattern := regexp.MustCompile(`(func|function|def|class|struct)\s+`)
-		if funcPattern.MatchString(content) {
+		if beaverFuncRe.MatchString(content) {
 			score += 0.3
 		}
 

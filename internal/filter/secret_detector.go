@@ -69,6 +69,10 @@ func (s *SecretDetector) Apply(input string, mode Mode) (string, int) {
 		matches := p.pattern.FindAllString(output, -1)
 		if len(matches) > 0 {
 			for _, match := range matches {
+				// Skip base64 matches that are too short to be real secrets
+				if p.name == "BASE64_SECRET" && len(match) < 20 {
+					continue
+				}
 				replacement := s.redact(match, p.name)
 				output = strings.Replace(output, match, replacement, 1)
 				redacted++
@@ -153,7 +157,8 @@ func initSecretPatterns() []secretPattern {
 		// .env style secrets
 		{"ENV_SECRET", regexp.MustCompile(`(?m)^[A-Z_]+(_KEY|_SECRET|_TOKEN|_PASSWORD)=.{8,}`), "[ENV_SECRET:REDACTED]"},
 
-		// Base64 encoded secrets (long strings)
-		{"BASE64_SECRET", regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`), "[BASE64_SECRET:REDACTED]"},
+		// Base64 encoded secrets: require at least one + or / to avoid matching
+		// hex hashes, long identifiers, and other alphanumeric-only strings.
+		{"BASE64_SECRET", regexp.MustCompile(`[A-Za-z0-9+/]{20,}[+/][A-Za-z0-9+/]{19,}={0,2}`), "[BASE64_SECRET:REDACTED]"},
 	}
 }

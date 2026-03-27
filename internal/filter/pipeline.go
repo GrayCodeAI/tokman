@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GrayCodeAI/tokman/internal/cache"
 	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
@@ -161,6 +162,12 @@ type PipelineCoordinator struct {
 
 	// Phase 2: KVzip Query-Agnostic Reconstruction (2025)
 	kvzipFilter *KVzipFilter
+
+	// Phase 2: Pipeline result cache for repeated inputs
+	resultCache    *cache.FingerprintCache
+	cacheEnabled   bool
+	cacheHitCount  int64
+	cacheMissCount int64
 }
 
 // PipelineConfig holds configuration for the compression pipeline
@@ -306,7 +313,9 @@ type PipelineConfig struct {
 // NewPipelineCoordinator creates a new 10-layer pipeline coordinator.
 func NewPipelineCoordinator(cfg PipelineConfig) *PipelineCoordinator {
 	p := &PipelineCoordinator{
-		config: cfg,
+		config:       cfg,
+		resultCache:  cache.GetGlobalCache(), // Phase 2: Enable result caching
+		cacheEnabled: true,                   // Phase 2: Cache on by default
 	}
 
 	// Set defaults - all layers enabled by default when using zero-config.
@@ -1112,6 +1121,7 @@ type PipelineStats struct {
 	ReductionPercent float64
 	LayerStats       map[string]LayerStat
 	runningSaved     int // O(1) accumulator to avoid O(n) recomputation in early exit
+	CacheHit         bool // Phase 2: Indicates if result was served from cache
 }
 
 // LayerStat holds statistics for a single layer
@@ -1213,3 +1223,108 @@ func QuickProcess(input string, mode Mode, opts ...QuickProcessOpt) (string, int
 	output, stats := p.Process(input)
 	return output, stats.TotalSaved
 }
+
+// ============================================================================
+// Accessor Methods for Layer Profiling
+// ============================================================================
+
+// GetTFIDFFilter returns the TF-IDF filter
+func (c *PipelineCoordinator) GetTFIDFFilter() *TFIDFFilter {
+	return c.tfidfFilter
+}
+
+// GetEntropyFilter returns the entropy filter
+func (c *PipelineCoordinator) GetEntropyFilter() *EntropyFilter {
+	return c.entropyFilter
+}
+
+// GetPerplexityFilter returns the perplexity filter
+func (c *PipelineCoordinator) GetPerplexityFilter() *PerplexityFilter {
+	return c.perplexityFilter
+}
+
+// GetGoalDrivenFilter returns the goal-driven filter
+func (c *PipelineCoordinator) GetGoalDrivenFilter() *GoalDrivenFilter {
+	return c.goalDrivenFilter
+}
+
+// GetASTPreserveFilter returns the AST preservation filter
+func (c *PipelineCoordinator) GetASTPreserveFilter() *ASTPreserveFilter {
+	return c.astPreserveFilter
+}
+
+// GetContrastiveFilter returns the contrastive filter
+func (c *PipelineCoordinator) GetContrastiveFilter() *ContrastiveFilter {
+	return c.contrastiveFilter
+}
+
+// GetNgramAbbreviator returns the N-gram abbreviator
+func (c *PipelineCoordinator) GetNgramAbbreviator() *NgramAbbreviator {
+	return c.ngramAbbreviator
+}
+
+// GetEvaluatorHeadsFilter returns the evaluator heads filter
+func (c *PipelineCoordinator) GetEvaluatorHeadsFilter() *EvaluatorHeadsFilter {
+	return c.evaluatorHeadsFilter
+}
+
+// GetGistFilter returns the gist filter
+func (c *PipelineCoordinator) GetGistFilter() *GistFilter {
+	return c.gistFilter
+}
+
+// GetHierarchicalSummaryFilter returns the hierarchical summary filter
+func (c *PipelineCoordinator) GetHierarchicalSummaryFilter() *HierarchicalSummaryFilter {
+	return c.hierarchicalSummaryFilter
+}
+
+// GetCompactionLayer returns the compaction layer
+func (c *PipelineCoordinator) GetCompactionLayer() *CompactionLayer {
+	return c.compactionLayer
+}
+
+// GetAttributionFilter returns the attribution filter
+func (c *PipelineCoordinator) GetAttributionFilter() *AttributionFilter {
+	return c.attributionFilter
+}
+
+// GetH2OFilter returns the H2O filter
+func (c *PipelineCoordinator) GetH2OFilter() *H2OFilter {
+	return c.h2oFilter
+}
+
+// GetAttentionSinkFilter returns the attention sink filter
+func (c *PipelineCoordinator) GetAttentionSinkFilter() *AttentionSinkFilter {
+	return c.attentionSinkFilter
+}
+
+// GetMetaTokenFilter returns the meta-token filter
+func (c *PipelineCoordinator) GetMetaTokenFilter() *MetaTokenFilter {
+	return c.metaTokenFilter
+}
+
+// GetSemanticChunkFilter returns the semantic chunk filter
+func (c *PipelineCoordinator) GetSemanticChunkFilter() *SemanticChunkFilter {
+	return c.semanticChunkFilter
+}
+
+// GetSketchStoreFilter returns the sketch store filter
+func (c *PipelineCoordinator) GetSketchStoreFilter() *SketchStoreFilter {
+	return c.sketchStoreFilter
+}
+
+// GetLazyPrunerFilter returns the lazy pruner filter
+func (c *PipelineCoordinator) GetLazyPrunerFilter() *LazyPrunerFilter {
+	return c.lazyPrunerFilter
+}
+
+// GetSemanticAnchorFilter returns the semantic anchor filter
+func (c *PipelineCoordinator) GetSemanticAnchorFilter() *SemanticAnchorFilter {
+	return c.semanticAnchorFilter
+}
+
+// GetAgentMemoryFilter returns the agent memory filter
+func (c *PipelineCoordinator) GetAgentMemoryFilter() *AgentMemoryFilter {
+	return c.agentMemoryFilter
+}
+

@@ -1,6 +1,8 @@
 package session
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -399,10 +401,11 @@ func generateSessionID() string {
 }
 
 func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().Nanosecond()%len(letters)]
+	b := make([]byte, (n+1)/2)
+	if _, err := cryptorand.Read(b); err != nil {
+		for i := range b {
+			b[i] = byte(time.Now().UnixNano() >> uint(i%8))
+		}
 	}
-	return string(b)
+	return hex.EncodeToString(b)[:n]
 }

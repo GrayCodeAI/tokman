@@ -31,6 +31,12 @@ var (
 	apiProxyAPIKey   string
 )
 
+// sharedPipeline is created once and reused across all API response compressions.
+var sharedPipeline = filter.NewPipelineCoordinator(filter.PipelineConfig{
+	Mode: filter.ModeMinimal, NgramEnabled: true,
+	EnableCompaction: true, EnableAttribution: true,
+})
+
 var apiProxyCmd = &cobra.Command{
 	Use:   "api-proxy",
 	Short: "HTTP reverse proxy that compresses LLM API responses",
@@ -150,11 +156,7 @@ func compressAPIData(data any) any {
 		result := make(map[string]any)
 		for k, val := range v {
 			if s, ok := val.(string); ok && len(s) > 500 {
-				p := filter.NewPipelineCoordinator(filter.PipelineConfig{
-					Mode: filter.ModeMinimal, NgramEnabled: true,
-					EnableCompaction: true, EnableAttribution: true,
-				})
-				c, _ := p.Process(s)
+				c, _ := sharedPipeline.Process(s)
 				result[k] = c
 			} else {
 				result[k] = compressAPIData(val)

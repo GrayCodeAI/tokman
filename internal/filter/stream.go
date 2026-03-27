@@ -23,10 +23,14 @@ type StreamingProcessor struct {
 
 // newStreamingProcessor creates a streaming processor for incremental compression
 func newStreamingProcessor(config PipelineConfig) *StreamingProcessor {
+	chunkSize := config.Budget * 4 // ~4 chars per token
+	if chunkSize <= 0 {
+		chunkSize = 4096
+	}
 	return &StreamingProcessor{
 		config:      config,
 		coordinator: NewPipelineCoordinator(config),
-		chunkSize:   config.Budget * 4, // ~4 chars per token
+		chunkSize:   chunkSize,
 		lineChan:    make(chan string, 100),
 	}
 }

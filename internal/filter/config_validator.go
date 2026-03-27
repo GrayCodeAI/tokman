@@ -169,6 +169,93 @@ func (v *ConfigValidator) result() ValidationResult {
 	}
 }
 
+// ValidatePipelineConfig validates a PipelineConfig struct and returns any
+// errors or warnings. Checks for: unknown modes, out-of-range thresholds,
+// conflicting settings, and unreachable budget values.
+func ValidatePipelineConfig(cfg PipelineConfig) ValidationResult {
+	v := &ConfigValidator{}
+
+	// Validate mode
+	switch cfg.Mode {
+	case ModeNone, ModeMinimal, ModeAggressive:
+	default:
+		v.errors = append(v.errors,
+			fmt.Sprintf("invalid mode %q — must be one of: none, minimal, aggressive", cfg.Mode))
+	}
+
+	// Budget range
+	if cfg.Budget < 0 {
+		v.errors = append(v.errors, "budget must be ≥ 0 (0 = unlimited)")
+	}
+	if cfg.Budget > 0 && cfg.Budget < 50 {
+		v.warnings = append(v.warnings,
+			fmt.Sprintf("budget %d is very small — content may be over-compressed", cfg.Budget))
+	}
+
+	// Threshold ranges: 0.0–1.0
+	thresholds := map[string]float64{
+		"AttributionThreshold":   cfg.AttributionThreshold,
+		"SketchBudgetRatio":      cfg.SketchBudgetRatio,
+		"LazyDecayRate":          cfg.LazyDecayRate,
+		"SemanticAnchorRatio":    cfg.SemanticAnchorRatio,
+		"AgentKnowledgeRetention": cfg.AgentKnowledgeRetention,
+		"AgentHistoryPrune":      cfg.AgentHistoryPrune,
+		"QuestionAwareThreshold": cfg.QuestionAwareThreshold,
+		"DensityTargetRatio":     cfg.DensityTargetRatio,
+		"DensityThreshold":       cfg.DensityThreshold,
+		"TFIDFThreshold":         cfg.TFIDFThreshold,
+		"DynamicRatioBase":       cfg.DynamicRatioBase,
+		"SemanticChunkThreshold": cfg.SemanticChunkThreshold,
+		"SketchHeavyHitter":      cfg.SketchHeavyHitter,
+	}
+	for name, val := range thresholds {
+		if val != 0 && (val < 0.0 || val > 1.0) {
+			v.errors = append(v.errors,
+				fmt.Sprintf("%s = %.3f is out of range [0.0, 1.0]", name, val))
+		}
+	}
+
+	// Positive-only sizes
+	sizes := map[string]int{
+		"H2OSinkSize":             cfg.H2OSinkSize,
+		"H2ORecentSize":           cfg.H2ORecentSize,
+		"H2OHeavyHitterSize":      cfg.H2OHeavyHitterSize,
+		"AttentionSinkCount":      cfg.AttentionSinkCount,
+		"AttentionRecentCount":    cfg.AttentionRecentCount,
+		"MetaTokenWindow":         cfg.MetaTokenWindow,
+		"MetaTokenMinSize":        cfg.MetaTokenMinSize,
+		"SketchMaxSize":           cfg.SketchMaxSize,
+		"LazyBaseBudget":          cfg.LazyBaseBudget,
+		"LazyRevivalBudget":       cfg.LazyRevivalBudget,
+		"SemanticAnchorSpacing":   cfg.SemanticAnchorSpacing,
+		"AgentConsolidationMax":   cfg.AgentConsolidationMax,
+		"MaxReflectionLoops":      cfg.MaxReflectionLoops,
+		"CompactionThreshold":     cfg.CompactionThreshold,
+		"CompactionMaxTokens":     cfg.CompactionMaxTokens,
+	}
+	for name, val := range sizes {
+		if val < 0 {
+			v.errors = append(v.errors, fmt.Sprintf("%s = %d must be ≥ 0", name, val))
+		}
+	}
+
+	// SemanticChunkMethod: must be one of known values when set
+	switch cfg.SemanticChunkMethod {
+	case "", "auto", "code", "text", "mixed":
+	default:
+		v.errors = append(v.errors,
+			fmt.Sprintf("SemanticChunkMethod %q is unknown — use: auto, code, text, mixed", cfg.SemanticChunkMethod))
+	}
+
+	// Conflicting settings
+	if cfg.EnableAgentMemory && cfg.AgentKnowledgeRetention == 0 && cfg.AgentHistoryPrune == 0 {
+		v.warnings = append(v.warnings,
+			"EnableAgentMemory is true but AgentKnowledgeRetention and AgentHistoryPrune are both 0 — defaults will be used")
+	}
+
+	return v.result()
+}
+
 // String returns a formatted validation report
 func (r ValidationResult) String() string {
 	var sb strings.Builder

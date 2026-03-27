@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/GrayCodeAI/tokman/internal/core"
@@ -138,7 +139,7 @@ func (f *LoPaceCompressor) compressPatterns(input string) string {
 	idx := 0
 	for pattern, count := range dict {
 		if count >= 3 {
-			placeholder := "\x00" + string(rune('A'+idx%26)) + string(rune('0'+count)) + "\x00"
+			placeholder := fmt.Sprintf("__LOPACE_%c_%d__", rune('A'+idx%26), count)
 			replDict[pattern] = placeholder
 			idx++
 		}

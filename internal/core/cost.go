@@ -48,7 +48,7 @@ func CalculateSavings(tokensSaved int, model string) float64 {
 func formatSavings(tokensSaved int, model string) string {
 	savings := CalculateSavings(tokensSaved, model)
 	if savings < 0.01 {
-		return ">$0.01"
+		return "<$0.01"
 	}
 	return fmt.Sprintf("$%.4f", savings)
 }

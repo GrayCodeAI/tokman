@@ -3,8 +3,6 @@ package filter
 import (
 	"math"
 	"strings"
-
-	"github.com/GrayCodeAI/tokman/internal/core"
 )
 
 // PhaseTransitionDetector implements critical compression threshold detection.
@@ -65,9 +63,6 @@ func (p *PhaseTransitionDetector) CheckQuality(original, compressed string) Phas
 		return PhaseQualityMetrics{IsCollapsed: true}
 	}
 
-	origTokens := core.EstimateTokens(original)
-	compTokens := core.EstimateTokens(compressed)
-
 	metrics := PhaseQualityMetrics{}
 
 	// 1. Entropy ratio
@@ -88,9 +83,6 @@ func (p *PhaseTransitionDetector) CheckQuality(original, compressed string) Phas
 	metrics.IsCollapsed = metrics.EntropyRatio < p.config.EntropyThreshold ||
 		metrics.StructureRatio < p.config.StructureThreshold ||
 		metrics.KeyTermRatio < p.config.KeyTermThreshold
-
-	_ = origTokens
-	_ = compTokens
 
 	return metrics
 }

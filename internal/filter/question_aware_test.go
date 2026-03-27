@@ -134,18 +134,3 @@ func containsSubstringHelper(s, substr string) bool {
 	return false
 }
 
-func splitLines(s string) []string {
-	if s == "" {
-		return nil
-	}
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	lines = append(lines, s[start:])
-	return lines
-}

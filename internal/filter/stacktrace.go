@@ -5,15 +5,15 @@ import (
 	"strings"
 )
 
-// StackTraceFilter preserves stack traces as atomic units during compression.
+// StackTracePreserveFilter preserves stack traces as atomic units during compression.
 // R61: Stack traces should never be split — they're atomic error information.
-type StackTraceFilter struct {
+type StackTracePreserveFilter struct {
 	stackPatterns []*regexp.Regexp
 }
 
-// newStackTraceFilter creates a stack trace preservation filter.
-func newStackTraceFilter() *StackTraceFilter {
-	return &StackTraceFilter{
+// newStackTracePreserveFilter creates a stack trace preservation filter.
+func newStackTracePreserveFilter() *StackTracePreserveFilter {
+	return &StackTracePreserveFilter{
 		stackPatterns: []*regexp.Regexp{
 			regexp.MustCompile(`^\s+at .+\(.+:\d+:\d+\)`),             // JavaScript
 			regexp.MustCompile(`^\s+File ".+", line \d+`),             // Python
@@ -27,12 +27,12 @@ func newStackTraceFilter() *StackTraceFilter {
 }
 
 // Name returns the filter name.
-func (f *StackTraceFilter) Name() string {
-	return "stack_trace"
+func (f *StackTracePreserveFilter) Name() string {
+	return "stack_trace_preserve"
 }
 
 // Apply preserves stack traces as atomic blocks.
-func (f *StackTraceFilter) Apply(input string, mode Mode) (string, int) {
+func (f *StackTracePreserveFilter) Apply(input string, mode Mode) (string, int) {
 	lines := strings.Split(input, "\n")
 	originalTokens := EstimateTokens(input)
 
@@ -72,7 +72,7 @@ func (f *StackTraceFilter) Apply(input string, mode Mode) (string, int) {
 }
 
 // isStackLine checks if a line is part of a stack trace.
-func (f *StackTraceFilter) isStackLine(line string) bool {
+func (f *StackTracePreserveFilter) isStackLine(line string) bool {
 	for _, pattern := range f.stackPatterns {
 		if pattern.MatchString(line) {
 			return true
@@ -88,7 +88,7 @@ func isStackTraceBlock(text string) bool {
 		return false
 	}
 
-	f := newStackTraceFilter()
+	f := newStackTracePreserveFilter()
 	stackLines := 0
 	for _, line := range lines {
 		if f.isStackLine(line) {
