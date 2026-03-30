@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/BurntSushi/toml"
 )
 
 // TestFilterCompilation tests regex compilation for filters
@@ -158,7 +160,7 @@ func TestFilterApply(t *testing.T) {
 				TruncateLinesAt: 10,
 			},
 			input: "short\nthis is a very long line that should be truncated\nalso short",
-			want:  "short\nthis is a\nalso short",
+			want:  "short\nthis is a \nalso short", // 10 chars includes trailing space
 		},
 		{
 			name: "combined_filters",
@@ -209,7 +211,7 @@ func TestReplaceRules(t *testing.T) {
 func TestMatchOutputRules(t *testing.T) {
 	filter := TomlFilter{
 		MatchOutput: []MatchRule{
-			{Pattern: "already up to date", Message: "ok: up-to-date"},
+			{Pattern: "(?i)already up to date", Message: "ok: up-to-date"},
 			{Pattern: "nothing to commit", Message: "ok: clean"},
 		},
 	}
@@ -370,7 +372,7 @@ expected = ""
 `
 
 	var filterFile TomlFilterFile
-	if _, err := tomlDecode(filterContent, &filterFile); err != nil {
+	if _, err := toml.Decode(filterContent, &filterFile); err != nil {
 		t.Fatal(err)
 	}
 
@@ -391,12 +393,6 @@ expected = ""
 			t.Errorf("Test %q: Apply() = %q, want %q", test.Name, got, test.Expected)
 		}
 	}
-}
-
-// Helper to decode TOML (avoids import cycle in tests)
-func tomlDecode(content string, v interface{}) (interface{}, error) {
-	// Use the same library as the main code
-	return nil, nil // placeholder - actual decoding uses BurntSushi/toml
 }
 
 // BenchmarkFilterApply benchmarks filter application

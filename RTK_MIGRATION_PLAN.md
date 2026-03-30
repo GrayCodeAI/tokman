@@ -170,8 +170,8 @@ This plan migrates high-value features from RTK (Rust Token Killer) to TokMan, f
 
 ## Phase 9: Testing & Documentation (Tasks 93-100)
 
-- [ ] **Task 93**: Add unit tests for TOML filter system (coverage >80%)
-- [ ] **Task 94**: Add unit tests for session discovery (coverage >80%)
+- [x] **Task 93**: Add unit tests for TOML filter system (coverage >80%)
+- [x] **Task 94**: Add unit tests for session discovery (coverage >80%)
 - [ ] **Task 95**: Add integration tests for new commands
 - [ ] **Task 96**: Update README.md with new features
 - [ ] **Task 97**: Update AGENTS.md with Ruby support
@@ -189,12 +189,12 @@ This plan migrates high-value features from RTK (Rust Token Killer) to TokMan, f
 | 2. Session Discovery | 21-35 | 0 | Pending |
 | 3. Discover Command | 36-45 | 0 | Pending |
 | 4. Session Command | 46-55 | 0 | Pending |
-| 5. Ruby Support | 56-65 | 0 | Pending |
-| 6. AI Integrations | 66-72 | 0 | Pending |
-| 7. Extended Commands | 73-85 | 0 | Pending |
-| 8. Configuration & UX | 86-92 | 0 | Pending |
-| 9. Testing & Docs | 93-100 | 0 | Pending |
-| **Total** | **100** | **0** | **0%** |
+| 5. Ruby Support | 56-65 | 10 | ✅ Complete |
+| 6. AI Integrations | 66-72 | 7 | ✅ Complete |
+| 7. Extended Commands | 73-85 | 13 | ✅ Complete |
+| 8. Configuration & UX | 86-92 | 7 | ✅ Complete |
+| 9. Testing & Docs | 93-100 | 2 | In Progress |
+| **Total** | **100** | **39** | **39%** |
 
 ---
 

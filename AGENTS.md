@@ -97,7 +97,10 @@ if shared.UltraCompact { ... }
 | `cloud/` | aws | Cloud commands |
 | `pkgmgr/` | cargo, npm, npx, pip, pnpm | Package managers |
 | `lang/` | go, dotnet | Language runtimes |
+| `ruby/` | rake, rspec, rubocop, bundle, rails | Ruby ecosystem |
 | `build/` | golangci, next, prisma, tsc | Build tools |
+| `infra/` | terraform, helm, ansible | Infrastructure tools |
+| `buildtools/` | gradle, mvn, make, mix | Build systems |
 | `test/` | jest, pytest, vitest, playwright | Test runners |
 | `core/` | doctor, completion, alias, enable, status, plugin, mcp, marketplace, trust, verify, undo, changelog | Core CLI |
 | `analysis/` | audit, benchmark, compare, cost, budget, economics, count, freq, gain, stats, top, smart, suggest, report, learn | Analytics |

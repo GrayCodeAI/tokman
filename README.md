@@ -335,10 +335,44 @@ func main() {
 | Command | Description |
 |---------|-------------|
 | `tokman discover` | Find missed savings in Claude Code history |
+| `tokman session` | Show TokMan adoption across Claude Code sessions |
 | `tokman learn` | Generate CLI correction rules from errors |
 | `tokman err <cmd>` | Run command, show only errors/warnings |
 | `tokman proxy <cmd>` | Run without filtering (still tracked) |
 | `tokman hook-audit` | Show hook rewrite metrics |
+
+### Ruby Ecosystem
+
+| Command | Description |
+|---------|-------------|
+| `tokman rake` | Rake tasks with compact output |
+| `tokman rspec` | RSpec tests with compact output |
+| `tokman rubocop` | Ruby linter with compact output |
+| `tokman bundle` | Bundler with filtered output |
+| `tokman rails` | Rails commands with filtering |
+
+### Infrastructure & Build Tools
+
+| Command | Description |
+|---------|-------------|
+| `tokman terraform` | Terraform plan with compact output |
+| `tokman helm` | Helm commands with filtered output |
+| `tokman ansible` | Ansible playbook with compact output |
+| `tokman gradle` | Gradle build with filtered output |
+| `tokman mvn` | Maven build with filtered output |
+| `tokman make` | Make output with noise filtering |
+| `tokman mix` | Elixir Mix with compact output |
+| `tokman markdownlint` | Markdown linter compact |
+| `tokman mise` | Mise task runner compact |
+| `tokman just` | Just task runner compact |
+
+### System Utilities
+
+| Command | Description |
+|---------|-------------|
+| `tokman df` | Disk usage with human-readable format |
+| `tokman du` | Directory sizes with compact output |
+| `tokman jq` | JSON processing with compact output |
 
 ### Rewriting
 
@@ -431,6 +465,55 @@ tokman plugin enable myfilter # Enable a plugin
 tokman plugin disable myfilter # Disable a plugin
 tokman plugin examples       # Generate example plugins
 ```
+
+## TOML Filter System
+
+Define custom output filters in TOML format for declarative compression:
+
+```bash
+# Create custom filter
+mkdir -p ~/.config/tokman/filters
+```
+
+```toml
+# ~/.config/tokman/filters/mycmd.toml
+[filters.mycmd]
+description = "Compact mycmd output"
+match_command = "^mycmd\\b"
+strip_lines_matching = ["^DEBUG:", "^\\s*$"]
+max_lines = 50
+on_empty = "ok"
+
+# Short-circuit rules
+[[filters.mycmd.match_output]]
+pattern = "already up to date"
+message = "ok: current"
+
+# Inline tests
+[[tests.mycmd]]
+name = "strips debug"
+input = "DEBUG: starting\nERROR: failed"
+expected = "ERROR: failed"
+```
+
+See [docs/TOML_FILTERS.md](docs/TOML_FILTERS.md) for full documentation.
+
+## Session Discovery
+
+Analyze Claude Code session history to track TokMan adoption:
+
+```bash
+# Show adoption metrics
+tokman session
+
+# Find missed opportunities
+tokman discover
+
+# Export for reporting
+tokman session --format json
+```
+
+See [docs/SESSION_DISCOVERY.md](docs/SESSION_DISCOVERY.md) for details.
 
 ## Web Dashboard
 
@@ -699,6 +782,13 @@ Prometheus metrics available at `/metrics` endpoint:
 - [x] gRPC services
 - [x] Service discovery & load balancing
 - [x] Prometheus metrics
+- [x] TOML declarative filters
+- [x] Session discovery & analytics
+- [x] Ruby ecosystem (rake, rspec, rubocop, bundle, rails)
+- [x] GitHub Copilot integration
+- [x] Infrastructure tools (terraform, helm, ansible)
+- [x] Build tools (gradle, maven, make, mix)
+- [x] Additional AI agent integrations
 
 ## License
 
