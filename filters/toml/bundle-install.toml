@@ -1,0 +1,36 @@
+# Bundle install filter (Ruby)
+# Strips "Using..." and "Installing..." progress lines
+
+[filters.bundle-install]
+description = "Compact bundle install output — strip Using/Installing lines"
+match_command = "^bundle\\s+install"
+strip_ansi = true
+strip_lines_matching = [
+  "^\\s*$",
+  "^Using ",
+  "^Installing ",
+  "^Bundle complete!",
+  "^Post-install message",
+]
+max_lines = 30
+on_empty = "bundle: ok"
+
+[[tests.bundle-install]]
+name = "strips using lines"
+input = """
+Using rake 13.0.6
+Using concurrent-ruby 1.2.2
+Using i18n 1.14.1
+Using minitest 5.20.0
+Bundle complete! 4 Gemfile dependencies, 8 gems now installed.
+"""
+expected = "bundle: ok"
+
+[[tests.bundle-install]]
+name = "keeps errors"
+input = """
+Using rake 13.0.6
+Gem::InstallError: ERROR: Failed to build gem native extension.
+An error occurred while installing pg (1.5.4)
+"""
+expected = "Gem::InstallError: ERROR: Failed to build gem native extension.\nAn error occurred while installing pg (1.5.4)"

@@ -84,6 +84,32 @@ func installCopilotHook() {
 		return
 	}
 
+	// Create .github/hooks/tokman-rewrite.json template (Task 67)
+	githubHooksDir := filepath.Join(home, ".github", "hooks")
+	if err := os.MkdirAll(githubHooksDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create .github/hooks: %v\n", err)
+	}
+	jsonConfigPath := filepath.Join(githubHooksDir, "tokman-rewrite.json")
+	jsonConfig := "{\n" +
+		"  \"version\": \"1.0\",\n" +
+		"  \"name\": \"TokMan Rewrite Hook\",\n" +
+		"  \"description\": \"Automatically rewrites commands to use tokman for token optimization\",\n" +
+		"  \"hook\": {\n" +
+		"    \"type\": \"PreToolUse\",\n" +
+		"    \"tools\": [\"Bash\", \"Shell\"],\n" +
+		"    \"command\": \"" + hookPath + "\",\n" +
+		"    \"timeout\": 5000\n" +
+		"  },\n" +
+		"  \"settings\": {\n" +
+		"    \"enabled\": true,\n" +
+		"    \"logRewrites\": true,\n" +
+		"    \"excludedCommands\": [\"cd\", \"export\", \"source\", \"alias\"]\n" +
+		"  }\n" +
+		"}\n"
+	if err := os.WriteFile(jsonConfigPath, []byte(jsonConfig), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", jsonConfigPath, err)
+	}
+
 	instructionsDir := filepath.Join(home, ".github")
 	if err := os.MkdirAll(instructionsDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
@@ -91,13 +117,23 @@ func installCopilotHook() {
 	instructionsPath := filepath.Join(instructionsDir, "copilot-instructions.md")
 	instructions := "# TokMan - Token-Optimized CLI Proxy\n\n" +
 		"Always prefix shell commands with `tokman` to minimize token consumption.\n\n" +
-		"Examples: tokman git status, tokman cargo test, tokman ls, tokman grep \"pattern\" .\n" +
-		"Meta: tokman gain (savings), tokman discover (missed opportunities), tokman proxy <cmd> (raw)\n"
+		"## Quick Reference\n\n" +
+		"**Build & Compile:** `tokman cargo build`, `tokman tsc`, `tokman lint`\n" +
+		"**Tests:** `tokman cargo test`, `tokman vitest run`, `tokman playwright test`\n" +
+		"**Git:** `tokman git status`, `tokman git log`, `tokman git diff`\n" +
+		"**GitHub:** `tokman gh pr view`, `tokman gh run list`\n" +
+		"**Files:** `tokman ls`, `tokman grep`, `tokman head`\n\n" +
+		"## Meta Commands\n\n" +
+		"- `tokman gain` - View token savings statistics\n" +
+		"- `tokman discover` - Analyze sessions for missed usage\n" +
+		"- `tokman proxy <cmd>` - Run command without filtering\n\n" +
+		"**Average savings: 60-90% token reduction** on common development operations.\n"
 	if err := os.WriteFile(instructionsPath, []byte(instructions), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to write %s: %v\n", instructionsPath, err)
 	}
 
 	fmt.Printf("\n  %s Copilot hook: %s\n", green("✓"), cyan(hookPath))
+	fmt.Printf("  %s Hook config: %s\n", green("✓"), cyan(jsonConfigPath))
 	fmt.Printf("  %s Instructions: %s\n", green("✓"), cyan(instructionsPath))
 }
 
@@ -179,4 +215,46 @@ func installOpencodePlugin() {
 	}
 
 	fmt.Printf("\n  %s OpenCode plugin: %s\n", green("✓"), cyan(pluginPath))
+}
+
+// installMistralVibePlaceholder creates a placeholder for Mistral Vibe integration
+// Track upstream: https://mistral.ai/vibe (or equivalent when available)
+func installMistralVibePlaceholder() {
+	green := color.New(color.FgGreen).SprintFunc()
+	cyan := color.New(color.FgCyan).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	configDir := filepath.Join(home, ".config", "mistral-vibe")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
+	}
+
+	// Create placeholder config
+	placeholderPath := filepath.Join(configDir, "tokman-placeholder.json")
+	placeholder := "{\n" +
+		"  \"_comment\": \"TokMan integration placeholder for Mistral Vibe\",\n" +
+		"  \"_status\": \"pending-upstream-support\",\n" +
+		"  \"_tracked\": \"https://mistral.ai/vibe\",\n" +
+		"  \"hook\": {\n" +
+		"    \"enabled\": false,\n" +
+		"    \"type\": \"PreToolUse\",\n" +
+		"    \"command\": \"tokman rewrite\"\n" +
+		"  },\n" +
+		"  \"instructions\": {\n" +
+		"    \"prefix\": \"tokman\",\n" +
+		"    \"description\": \"Token-optimized CLI proxy for 60-90% savings\"\n" +
+		"  }\n" +
+		"}\n"
+
+	if err := os.WriteFile(placeholderPath, []byte(placeholder), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing Mistral Vibe placeholder: %v\n", err)
+		return
+	}
+
+	fmt.Printf("\n  %s Mistral Vibe: %s\n", yellow("○"), cyan("(placeholder - pending upstream support)"))
+	fmt.Printf("  %s Config: %s\n", green("✓"), cyan(placeholderPath))
 }

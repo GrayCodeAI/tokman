@@ -1,0 +1,21 @@
+# Docker ps filter
+# Compact container listing
+
+[filters.docker-ps]
+description = "Compact docker ps output"
+match_command = "^docker\\s+ps"
+strip_ansi = true
+keep_lines_matching = ["^[a-f0-9]{12}"]
+replace = [
+  { pattern = "([a-f0-9]{12}).*?([\\w/]+:[\\w.-]+).*?([\\w-]+).*?(Up|Exited).*?((?:\\d+[smh]|\\d+\\.\\d+.\\d+.\\d+:\\d+|\\d+/tcp|\\d+/udp))", replacement = "$1 $2 → $3 ($4) $5" },
+]
+max_lines = 50
+
+[[tests.docker-ps]]
+name = "compacts container list"
+input = """
+CONTAINER ID   IMAGE          COMMAND                  CREATED       STATUS       PORTS                    NAMES
+abc123def456   nginx:latest   "/docker-entrypoint.…"   2 hours ago   Up 2 hours   0.0.0.0:80->80/tcp       web-server
+def789ghi012   redis:alpine   "docker-entrypoint.s…"   3 hours ago   Up 3 hours   0.0.0.0:6379->6379/tcp   cache-server
+"""
+expected = "abc123def456 nginx:latest → web-server (Up) 0.0.0.0:80\ndef789ghi012 redis:alpine → cache-server (Up) 0.0.0.0:6379"

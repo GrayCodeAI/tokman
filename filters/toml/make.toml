@@ -1,0 +1,35 @@
+# Make output filter
+# Strips make[1]/make[2] progress lines
+
+[filters.make]
+description = "Compact make output — strip enter/leave messages"
+match_command = "^make\\b"
+strip_ansi = true
+strip_lines_matching = [
+  "^\\s*$",
+  "^make\\[\\d+\\]: Entering directory",
+  "^make\\[\\d+\\]: Leaving directory",
+  "^make\\[\\d+\\]:",
+]
+max_lines = 100
+on_empty = "make: ok"
+
+[[tests.make]]
+name = "strips directory messages"
+input = """
+make[1]: Entering directory '/home/user/project/src'
+cc -c main.c -o main.o
+make[1]: Leaving directory '/home/user/project/src'
+"""
+expected = "cc -c main.c -o main.o"
+
+[[tests.make]]
+name = "keeps errors"
+input = """
+make[1]: Entering directory '/build'
+cc main.c
+main.c:5: error: undefined reference
+make[1]: Leaving directory '/build'
+make: *** [Makefile:10: all] Error 1
+"""
+expected = "cc main.c\nmain.c:5: error: undefined reference\nmake: *** [Makefile:10: all] Error 1"

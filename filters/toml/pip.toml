@@ -1,0 +1,39 @@
+# Pip install filter (Python)
+# Strips progress and "Requirement already satisfied" lines
+
+[filters.pip-install]
+description = "Compact pip install output — strip progress and satisfied lines"
+match_command = "^pip\\s+install"
+strip_ansi = true
+strip_lines_matching = [
+  "^\\s*$",
+  "^Collecting ",
+  "^  Using cached ",
+  "^Requirement already satisfied:",
+  "^Installing collected packages:",
+  "^Successfully installed ",
+]
+max_lines = 30
+on_empty = "pip: ok"
+
+[[tests.pip-install]]
+name = "strips progress lines"
+input = """
+Collecting requests
+  Using cached requests-2.31.0-py3-none-any.whl (62 kB)
+Collecting urllib3
+  Using cached urllib3-2.1.0-py3-none-any.whl (104 kB)
+Installing collected packages: urllib3, requests
+Successfully installed requests-2.31.0 urllib3-2.1.0
+"""
+expected = "pip: ok"
+
+[[tests.pip-install]]
+name = "keeps errors"
+input = """
+Collecting psycopg2
+  Using cached psycopg2-2.9.9.tar.gz
+Building wheel for psycopg2: finished with status 'error'
+ERROR: Failed building wheel for psycopg2
+"""
+expected = "Building wheel for psycopg2: finished with status 'error'\nERROR: Failed building wheel for psycopg2"

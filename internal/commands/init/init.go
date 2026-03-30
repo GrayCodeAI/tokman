@@ -38,6 +38,7 @@ var (
 	initReplit   bool
 	initAider    bool
 	initContinue bool
+	initMistral  bool
 )
 
 // Embedded hook script
@@ -314,6 +315,9 @@ Examples:
 		if initContinue {
 			runContinueInit(initGlobal)
 		}
+		if initMistral {
+			installMistralVibePlaceholder()
+		}
 
 		// --all flag: detect and setup all installed agents
 		if initAll {
@@ -345,6 +349,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initReplit, "replit", false, "Install Replit Agent integration")
 	initCmd.Flags().BoolVar(&initAider, "aider", false, "Install Aider native integration")
 	initCmd.Flags().BoolVar(&initContinue, "continue", false, "Install Continue integration")
+	initCmd.Flags().BoolVar(&initMistral, "mistral", false, "Install Mistral Vibe placeholder")
 }
 
 func runLocalInit() error {
