@@ -32,6 +32,7 @@ import (
 	_ "github.com/GrayCodeAI/tokman/internal/commands/sessioncmd"
 	_ "github.com/GrayCodeAI/tokman/internal/commands/system"
 	_ "github.com/GrayCodeAI/tokman/internal/commands/test"
+	_ "github.com/GrayCodeAI/tokman/internal/commands/tui"
 	_ "github.com/GrayCodeAI/tokman/internal/commands/vcs"
 	_ "github.com/GrayCodeAI/tokman/internal/commands/web"
 )

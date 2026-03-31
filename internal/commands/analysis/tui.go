@@ -10,18 +10,18 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
-var tuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "Interactive TUI for token analytics",
-	Long:  `Interactive terminal UI for monitoring token usage.`,
-	RunE:  runTUI,
+var tuiLegacyCmd = &cobra.Command{
+	Use:   "tui-legacy",
+	Short: "Legacy TUI for token analytics",
+	Long:  `Legacy terminal UI for monitoring token usage. Use "tokman tui" for the new interactive TUI.`,
+	RunE:  runTUILegacy,
 }
 
 func init() {
-	registry.Add(func() { registry.Register(tuiCmd) })
+	registry.Add(func() { registry.Register(tuiLegacyCmd) })
 }
 
-func runTUI(cmd *cobra.Command, args []string) error {
+func runTUILegacy(cmd *cobra.Command, args []string) error {
 	tracker := tracking.GetGlobalTracker()
 	if tracker == nil {
 		return fmt.Errorf("tracker not initialized")

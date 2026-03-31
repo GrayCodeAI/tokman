@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -16,8 +18,8 @@ import (
 
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
-	Short: "Interactive terminal UI",
-	Long:  `Launch an interactive terminal dashboard for TokMan.`,
+	Short: "Interactive terminal UI dashboard",
+	Long:  `Launch an interactive terminal dashboard for TokMan with real-time analytics.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runTUI()
 	},
@@ -27,24 +29,32 @@ func init() {
 	registry.Add(func() { registry.Register(tuiCmd) })
 }
 
+const refreshInterval = 2 * time.Second
+
 type tab int
 
 const (
-	tabDashboard tab = iota
+	tabOverview tab = iota
 	tabCommands
 	tabLayers
-	tabConfig
+	tabTimeline
 )
 
 type model struct {
-	activeTab  tab
-	tabs       []string
-	summary    *Summary
-	cmdTable   table.Model
+	width     int
+	height    int
+	activeTab tab
+	tracker   *tracking.Tracker
+	ready     bool
+
+	summary   *Summary
+	cmdTable  table.Model
 	layerTable table.Model
-	width      int
-	height     int
-	quitting   bool
+	viewport  viewport.Model
+
+	quitting bool
+	showHelp bool
+	lastTick time.Time
 }
 
 type Summary struct {
@@ -54,161 +64,303 @@ type Summary struct {
 	TotalSaved    int
 	AvgSavings    float64
 	Period        string
+	LastUpdated   time.Time
+}
+
+type DayData struct {
+	Date  string
+	Saved int
+	Count int
+}
+
+type tickMsg time.Time
+type dataUpdatedMsg struct {
+	summary   *Summary
+	cmdRows   []table.Row
+	layerRows []table.Row
+	dailyData []DayData
 }
 
 func runTUI() error {
 	dbPath := tracking.DatabasePath()
 	tracker, err := tracking.NewTracker(dbPath)
 	if err != nil {
-		return fmt.Errorf("tracking error: %w", err)
+		tracker = nil
 	}
-	defer tracker.Close()
-
-	summary := getSummary(tracker)
-	cmdRows := getCommandRows(tracker)
-	layerRows := getLayerRows()
-
-	p := tea.NewProgram(initialModel(summary, cmdRows, layerRows), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(tracker), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err
 }
 
-func initialModel(summary *Summary, cmdRows []table.Row, layerRows []table.Row) model {
+func initialModel(tracker *tracking.Tracker) model {
 	t := table.New(
 		table.WithColumns([]table.Column{
-			{Title: "Command", Width: 28},
-			{Title: "Count", Width: 8},
+			{Title: "Command", Width: 26},
+			{Title: "Count", Width: 7},
 			{Title: "Saved", Width: 12},
 			{Title: "Avg%", Width: 8},
 			{Title: "Last Seen", Width: 14},
 		}),
-		table.WithRows(cmdRows),
 		table.WithFocused(true),
-		table.WithHeight(12),
+		table.WithHeight(10),
 	)
 
 	l := table.New(
 		table.WithColumns([]table.Column{
-			{Title: "Layer", Width: 24},
-			{Title: "Paper", Width: 22},
+			{Title: "Layer", Width: 22},
+			{Title: "Paper", Width: 24},
 			{Title: "Status", Width: 12},
 		}),
-		table.WithRows(layerRows),
 		table.WithFocused(false),
-		table.WithHeight(12),
+		table.WithHeight(10),
 	)
 
-	s := table.DefaultStyles()
-	s.Header = s.Header.
+	ts := table.DefaultStyles()
+	ts.Header = ts.Header.
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		BorderBottom(true).
 		Bold(false)
-	s.Selected = s.Selected.
+	ts.Selected = ts.Selected.
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
-	t.SetStyles(s)
-	l.SetStyles(s)
+	t.SetStyles(ts)
+	l.SetStyles(ts)
+
+	v := viewport.New(80, 20)
 
 	return model{
-		tabs:       []string{"Dashboard", "Commands", "Layers", "Config"},
-		summary:    summary,
+		tracker:    tracker,
 		cmdTable:   t,
 		layerTable: l,
+		viewport:   v,
+		lastTick:   time.Now(),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return tea.Batch(
+		tea.Tick(refreshInterval, func(t time.Time) tea.Msg { return tickMsg(t) }),
+		fetchData(m.tracker),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.cmdTable.SetWidth(msg.Width - 4)
-		m.layerTable.SetWidth(msg.Width - 4)
+		if !m.ready {
+			m.ready = true
+			m.cmdTable.SetWidth(msg.Width - 4)
+			m.layerTable.SetWidth(msg.Width - 4)
+			m.viewport.Width = msg.Width - 4
+			m.viewport.Height = msg.Height - 12
+		}
+		return m, nil
+
+	case tickMsg:
+		m.lastTick = time.Now()
+		cmds = append(cmds, tea.Tick(refreshInterval, func(t time.Time) tea.Msg { return tickMsg(t) }))
+		cmds = append(cmds, fetchData(m.tracker))
+		return m, tea.Batch(cmds...)
+
+	case dataUpdatedMsg:
+		m.summary = msg.summary
+		m.cmdTable.SetRows(msg.cmdRows)
+		m.layerTable.SetRows(msg.layerRows)
+		m.viewport.SetContent(m.renderTimeline(msg.dailyData))
 		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
-		case "tab", "right":
-			m.activeTab = (m.activeTab + 1) % tab(len(m.tabs))
-		case "left":
-			m.activeTab = (m.activeTab - 1 + tab(len(m.tabs))) % tab(len(m.tabs))
+		case "?":
+			m.showHelp = !m.showHelp
+			return m, nil
+		case "tab", "right", "l":
+			m.activeTab = (m.activeTab + 1) % 4
+		case "left", "h":
+			m.activeTab = (m.activeTab - 1 + 4) % 4
 		case "1":
-			m.activeTab = tabDashboard
+			m.activeTab = tabOverview
 		case "2":
 			m.activeTab = tabCommands
 		case "3":
 			m.activeTab = tabLayers
 		case "4":
-			m.activeTab = tabConfig
-		}
-
-		if m.activeTab == tabCommands {
-			m.cmdTable, cmd = m.cmdTable.Update(msg)
-		} else if m.activeTab == tabLayers {
-			m.layerTable, cmd = m.layerTable.Update(msg)
+			m.activeTab = tabTimeline
+		case "r":
+			cmds = append(cmds, fetchData(m.tracker))
 		}
 	}
 
-	return m, cmd
+	var cmd tea.Cmd
+	switch m.activeTab {
+	case tabCommands:
+		m.cmdTable, cmd = m.cmdTable.Update(msg)
+	case tabLayers:
+		m.layerTable, cmd = m.layerTable.Update(msg)
+	case tabTimeline:
+		m.viewport, cmd = m.viewport.Update(msg)
+	}
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
 	if m.quitting {
-		return "TokMan TUI closed.\n"
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("TokMan TUI closed. Goodbye!\n")
+	}
+	if m.showHelp {
+		return m.helpView()
+	}
+	if !m.ready {
+		return "\n  Initializing..."
 	}
 
 	var content string
 	switch m.activeTab {
-	case tabDashboard:
-		content = m.dashboardView()
+	case tabOverview:
+		content = m.overviewView()
 	case tabCommands:
 		content = m.commandsView()
 	case tabLayers:
 		content = m.layersView()
-	case tabConfig:
-		content = m.configView()
+	case tabTimeline:
+		content = m.viewport.View()
 	}
 
-	return m.tabBar() + "\n\n" + content
+	return lipgloss.JoinVertical(lipgloss.Left,
+		m.statusBar(),
+		m.tabBar(),
+		"",
+		content,
+		"",
+		m.helpBar(),
+	)
+}
+
+func (m model) statusBar() string {
+	left := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(true).
+		Padding(0, 1).
+		Render(" TokMan ")
+
+	var center string
+	if m.summary != nil {
+		center = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("255")).
+			Padding(0, 1).
+			Render(fmt.Sprintf(" %d commands · %s saved · %.1f%% avg ",
+				m.summary.TotalCommands,
+				formatTokens(m.summary.TotalSaved),
+				m.summary.AvgSavings))
+	} else {
+		center = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" Loading... ")
+	}
+
+	right := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Padding(0, 1).
+		Render(fmt.Sprintf(" %s ", time.Now().Format("15:04:05")))
+
+	return lipgloss.JoinHorizontal(lipgloss.Top,
+		left,
+		center,
+		lipgloss.NewStyle().Width(m.width-len(left)-len(center)-len(right)).Render(""),
+		right,
+	)
 }
 
 func (m model) tabBar() string {
-	var tabs []string
-	for i, t := range m.tabs {
+	tabs := []string{"Overview", "Commands", "Layers", "Timeline"}
+	var rendered []string
+	for i, t := range tabs {
+		style := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Padding(0, 2)
 		if tab(i) == m.activeTab {
-			tabs = append(tabs, lipgloss.NewStyle().
+			style = style.
 				Foreground(lipgloss.Color("229")).
 				Background(lipgloss.Color("57")).
-				Padding(0, 2).
-				Render(" "+t+" "))
-		} else {
-			tabs = append(tabs, lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240")).
-				Padding(0, 2).
-				Render(" "+t+" "))
+				Bold(true)
+			t = "▸ " + t
 		}
+		rendered = append(rendered, style.Render(t))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
 }
 
-func (m model) dashboardView() string {
+func (m model) helpBar() string {
+	keys := []string{"1-4 tabs", "←→ nav", "↑↓ scroll", "r refresh", "? help", "q quit"}
+	var styled []string
+	for _, k := range keys {
+		styled = append(styled, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Render(k))
+	}
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderTop(true).
+		Padding(0, 1).
+		Render(strings.Join(styled, "  "))
+}
+
+func (m model) helpView() string {
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(true).
+		Padding(0, 2).
+		Render(" Keyboard Shortcuts ")
+
+	help := strings.Join([]string{
+		"",
+		"  Navigation:",
+		"    1-4 / Tab / ←→    Switch tabs",
+		"    ↑↓ / j/k          Scroll list",
+		"    g / G             Go to top / bottom",
+		"",
+		"  Actions:",
+		"    r                 Refresh data",
+		"    ?                 Toggle this help",
+		"    q / Ctrl+C        Quit",
+		"",
+		"  Tabs:",
+		"    1 Overview        Dashboard with KPIs + sparkline",
+		"    2 Commands        Command history with timestamps",
+		"    3 Layers          Compression layer status",
+		"    4 Timeline        Daily savings trend",
+		"",
+	}, "\n")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		help,
+		lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  Press ? to close"),
+	)
+}
+
+func (m model) overviewView() string {
+	if m.summary == nil {
+		return "  Loading data..."
+	}
+
 	green := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	cyan := lipgloss.NewStyle().Foreground(lipgloss.Color("51")).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-
-	title := green.Render("TokMan Dashboard")
-	divider := dim.Render(strings.Repeat("─", 60))
 
 	kpis := []string{
 		fmt.Sprintf("  Commands:  %s", cyan.Render(fmt.Sprintf("%d", m.summary.TotalCommands))),
@@ -216,20 +368,18 @@ func (m model) dashboardView() string {
 		fmt.Sprintf("  Output:    %s", cyan.Render(formatTokens(m.summary.TotalOutput))),
 		fmt.Sprintf("  Saved:     %s", green.Render(fmt.Sprintf("%s (%.1f%%)", formatTokens(m.summary.TotalSaved), m.summary.AvgSavings))),
 		fmt.Sprintf("  Period:    %s", dim.Render(m.summary.Period)),
-		fmt.Sprintf("  Generated: %s", dim.Render(time.Now().Format("2006-01-02 15:04:05"))),
+		fmt.Sprintf("  Updated:   %s", dim.Render(m.summary.LastUpdated.Format("15:04:05"))),
 	}
 
 	meter := buildEfficiencyMeter(m.summary.AvgSavings)
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		title,
-		divider,
+	left := lipgloss.JoinVertical(lipgloss.Left,
 		strings.Join(kpis, "\n"),
 		"",
 		"  Efficiency: "+meter,
-		"",
-		dim.Render("  [1] Dashboard  [2] Commands  [3] Layers  [4] Config  [q] Quit"),
 	)
+
+	return left
 }
 
 func (m model) commandsView() string {
@@ -237,14 +387,12 @@ func (m model) commandsView() string {
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	title := cyan.Render("Command History")
-	divider := dim.Render(strings.Repeat("─", 60))
+	divider := dim.Render(strings.Repeat("─", m.width-4))
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		divider,
 		m.cmdTable.View(),
-		"",
-		dim.Render("  ↑↓ navigate  [1] Dashboard  [2] Commands  [3] Layers  [4] Config  [q] Quit"),
 	)
 }
 
@@ -253,41 +401,111 @@ func (m model) layersView() string {
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	title := cyan.Render("Compression Layers (37 total)")
-	divider := dim.Render(strings.Repeat("─", 60))
+	divider := dim.Render(strings.Repeat("─", m.width-4))
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		divider,
 		m.layerTable.View(),
-		"",
-		dim.Render("  ↑↓ navigate  [1] Dashboard  [2] Commands  [3] Layers  [4] Config  [q] Quit"),
 	)
 }
 
-func (m model) configView() string {
-	cyan := lipgloss.NewStyle().Foreground(lipgloss.Color("51")).Bold(true)
-	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-
-	title := cyan.Render("Configuration")
-	divider := dim.Render(strings.Repeat("─", 60))
-
-	configs := []string{
-		"  Tier:           trim (12 layers)",
-		"  Mode:           minimal",
-		"  Budget:         unlimited",
-		"  LLM:            disabled",
-		"  Cache:          enabled",
-		"  Session:        enabled",
-		"  Database:       ~/.local/share/tokman/tracking.db",
+func (m model) renderTimeline(data []DayData) string {
+	if len(data) == 0 {
+		return "  No timeline data available."
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		title,
-		divider,
-		strings.Join(configs, "\n"),
-		"",
-		dim.Render("  [1] Dashboard  [2] Commands  [3] Layers  [4] Config  [q] Quit"),
-	)
+	var lines []string
+	maxSaved := 1
+	for _, d := range data {
+		if d.Saved > maxSaved {
+			maxSaved = d.Saved
+		}
+	}
+
+	for _, d := range data {
+		barLen := int(math.Round(float64(d.Saved) / float64(maxSaved) * 40))
+		bar := strings.Repeat("█", barLen)
+		var color string
+		if d.Saved > 100000 {
+			color = "42"
+		} else if d.Saved > 10000 {
+			color = "220"
+		} else {
+			color = "240"
+		}
+		coloredBar := lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(bar)
+		dateShort := d.Date
+		if len(dateShort) > 10 {
+			dateShort = dateShort[5:10]
+		}
+		lines = append(lines, fmt.Sprintf("  %s  %6s  %s  %s",
+			dateShort,
+			formatTokens(d.Saved),
+			coloredBar,
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("%d cmds", d.Count))))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func fetchData(tracker *tracking.Tracker) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		if tracker == nil {
+			return dataUpdatedMsg{}
+		}
+
+		summary := &Summary{LastUpdated: time.Now()}
+		savings, err := tracker.GetSavings("")
+		if err == nil {
+			summary.TotalCommands = savings.TotalCommands
+			summary.TotalSaved = savings.TotalSaved
+			summary.TotalInput = savings.TotalOriginal
+			summary.TotalOutput = savings.TotalFiltered
+			if savings.TotalOriginal > 0 {
+				summary.AvgSavings = float64(savings.TotalSaved) / float64(savings.TotalOriginal) * 100
+			}
+		}
+
+		daily, _ := tracker.GetDailySavings("", 30)
+		if len(daily) > 0 {
+			summary.Period = daily[len(daily)-1].Date + " → " + daily[0].Date
+		}
+
+		var dayData []DayData
+		for _, d := range daily {
+			dayData = append(dayData, DayData{Date: d.Date, Saved: d.Saved, Count: d.Commands})
+		}
+
+		stats, _ := tracker.GetCommandStats("")
+		recent, _ := tracker.GetRecentCommands("", 100)
+		tsMap := make(map[string]string)
+		for _, r := range recent {
+			if _, exists := tsMap[r.Command]; !exists {
+				tsMap[r.Command] = r.Timestamp.Format("01-02 15:04")
+			}
+		}
+
+		var cmdRows []table.Row
+		for _, cs := range stats {
+			cmdRows = append(cmdRows, table.Row{
+				cs.Command,
+				fmt.Sprintf("%d", cs.ExecutionCount),
+				formatTokens(cs.TotalSaved),
+				fmt.Sprintf("%.1f%%", cs.ReductionPct),
+				tsMap[cs.Command],
+			})
+		}
+
+		layerRows := getLayerRows()
+
+		return dataUpdatedMsg{
+			summary:   summary,
+			cmdRows:   cmdRows,
+			layerRows: layerRows,
+			dailyData: dayData,
+		}
+	})
 }
 
 func buildEfficiencyMeter(pct float64) string {
@@ -318,75 +536,27 @@ func formatTokens(n int) string {
 	return fmt.Sprintf("%d", n)
 }
 
-func getSummary(tracker *tracking.Tracker) *Summary {
-	s := &Summary{}
-	savings, err := tracker.GetSavings("")
-	if err == nil {
-		s.TotalCommands = savings.TotalCommands
-		s.TotalSaved = savings.TotalSaved
-		s.TotalInput = savings.TotalOriginal
-		s.TotalOutput = savings.TotalFiltered
-		if savings.TotalOriginal > 0 {
-			s.AvgSavings = float64(savings.TotalSaved) / float64(savings.TotalOriginal) * 100
-		}
-	}
-
-	daily, err := tracker.GetDailySavings("", 30)
-	if err == nil && len(daily) > 0 {
-		s.Period = daily[len(daily)-1].Date + " → " + daily[0].Date
-	}
-
-	return s
-}
-
-func getCommandRows(tracker *tracking.Tracker) []table.Row {
-	stats, err := tracker.GetCommandStats("")
-	if err != nil {
-		return nil
-	}
-
-	recent, _ := tracker.GetRecentCommands("", 100)
-	tsMap := make(map[string]string)
-	for _, r := range recent {
-		if _, exists := tsMap[r.Command]; !exists {
-			tsMap[r.Command] = r.Timestamp.Format("01-02 15:04")
-		}
-	}
-
-	var rows []table.Row
-	for _, cs := range stats {
-		rows = append(rows, table.Row{
-			cs.Command,
-			fmt.Sprintf("%d", cs.ExecutionCount),
-			formatTokens(cs.TotalSaved),
-			fmt.Sprintf("%.1f%%", cs.ReductionPct),
-			tsMap[cs.Command],
-		})
-	}
-	return rows
-}
-
 func getLayerRows() []table.Row {
 	return []table.Row{
-		{"1_entropy", "Selective Context", "enabled"},
-		{"2_perplexity", "LLMLingua", "enabled"},
-		{"3_goal_driven", "SWE-Pruner", "query-only"},
-		{"4_ast_preserve", "LongCodeZip", "enabled"},
-		{"5_contrastive", "LongLLMLingua", "query-only"},
+		{"1_entropy", "Selective Context (Mila)", "enabled"},
+		{"2_perplexity", "LLMLingua (Microsoft)", "enabled"},
+		{"3_goal_driven", "SWE-Pruner (SJTU)", "query-only"},
+		{"4_ast_preserve", "LongCodeZip (NUS)", "enabled"},
+		{"5_contrastive", "LongLLMLingua (MS)", "query-only"},
 		{"6_ngram", "CompactPrompt", "enabled"},
-		{"7_evaluator", "EHPC", "enabled"},
-		{"8_gist", "Gisting", "enabled"},
-		{"9_hierarchical", "AutoCompressor", "enabled"},
-		{"11_compaction", "MemGPT", "optional"},
+		{"7_evaluator", "EHPC (Tsinghua)", "enabled"},
+		{"8_gist", "Gisting (Stanford)", "enabled"},
+		{"9_hierarchical", "AutoCompressor (Princeton)", "enabled"},
+		{"11_compaction", "MemGPT (Berkeley)", "optional"},
 		{"13_h2o", "Heavy-Hitter Oracle", "enabled"},
-		{"14_attention_sink", "StreamingLLM", "enabled"},
-		{"15_meta_token", "Meta-Tokens", "enabled"},
-		{"23_swezze", "SWEzze (2026)", "optional"},
+		{"14_attention_sink", "StreamingLLM (MIT)", "enabled"},
+		{"15_meta_token", "Meta-Tokens (arXiv)", "enabled"},
+		{"23_swezze", "SWEzze (PKU/UCL 2026)", "optional"},
 		{"24_mixed_dim", "MixedDimKV (2026)", "optional"},
 		{"25_beaver", "BEAVER (2026)", "optional"},
 		{"26_poc", "PoC (2026)", "optional"},
-		{"27_token_quant", "TurboQuant (2026)", "optional"},
-		{"28_token_retention", "Token Retention (2026)", "optional"},
+		{"27_token_quant", "TurboQuant (Google)", "optional"},
+		{"28_token_retention", "Token Retention (Yale)", "optional"},
 		{"29_acon", "ACON (ICLR 2026)", "optional"},
 	}
 }
