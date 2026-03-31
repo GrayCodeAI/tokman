@@ -141,7 +141,7 @@ func runGain(verbose bool) error {
 
 	// Default view
 	if !gainDaily && !gainWeekly && !gainMonthly && !gainAll {
-		printDefaultView(summary, projectPath, verbose)
+		printDefaultView(tracker, summary, projectPath, verbose)
 		return nil
 	}
 
@@ -202,7 +202,7 @@ func getSummary(tracker *tracking.Tracker, projectPath string) *GainSummary {
 	return summary
 }
 
-func printDefaultView(summary *GainSummary, projectPath string, verbose bool) {
+func printDefaultView(tracker *tracking.Tracker, summary *GainSummary, projectPath string, verbose bool) {
 	green := color.New(color.FgGreen, color.Bold).SprintFunc()
 	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
 
@@ -216,6 +216,14 @@ func printDefaultView(summary *GainSummary, projectPath string, verbose bool) {
 	if projectPath != "" {
 		fmt.Printf("Scope: %s\n", shared.ShortenPath(projectPath))
 	}
+
+	// Get time range from recent commands
+	if len(summary.ByDay) > 0 {
+		firstDay := summary.ByDay[len(summary.ByDay)-1]
+		lastDay := summary.ByDay[0]
+		fmt.Printf("Period: %s → %s\n", firstDay.Date, lastDay.Date)
+	}
+	fmt.Printf("Generated: %s\n", time.Now().Format("2006-01-02 15:04:05 MST"))
 	fmt.Println()
 
 	// KPIs
@@ -231,8 +239,11 @@ func printDefaultView(summary *GainSummary, projectPath string, verbose bool) {
 	if len(summary.ByCommand) > 0 {
 		fmt.Printf("%s\n", cyan("By Command"))
 		fmt.Println(strings.Repeat("─", 60))
-		fmt.Printf("%-24s  %8s  %10s  %8s\n", "Command", "Count", "Saved", "Avg%")
+		fmt.Printf("%-24s  %8s  %10s  %8s  %s\n", "Command", "Count", "Saved", "Avg%", "Last Seen")
 		fmt.Println(strings.Repeat("─", 60))
+
+		// Get recent commands for timestamps
+		recentCmds := getRecentCommandTimestamps(tracker, projectPath)
 
 		// Sort by saved tokens
 		sorted := summary.ByCommand
@@ -248,7 +259,11 @@ func printDefaultView(summary *GainSummary, projectPath string, verbose bool) {
 			} else if cb.AvgPct >= 40 {
 				pctCell = color.New(color.FgYellow, color.Bold).Sprintf("%7.1f%%", cb.AvgPct)
 			}
-			fmt.Printf("%-24s  %8d  %10s  %s\n", cmdName, cb.Count, utils.FormatTokens(cb.Saved), pctCell)
+			lastSeen := ""
+			if ts, ok := recentCmds[cb.Command]; ok {
+				lastSeen = ts.Format("01-02 15:04")
+			}
+			fmt.Printf("%-24s  %8d  %10s  %s  %s\n", cmdName, cb.Count, utils.FormatTokens(cb.Saved), pctCell, lastSeen)
 		}
 		fmt.Println(strings.Repeat("─", 60))
 		fmt.Println()
@@ -525,3 +540,18 @@ func exportCSV(tracker *tracking.Tracker, projectPath string) {
 		fmt.Println()
 	}
 }
+
+func getRecentCommandTimestamps(tracker *tracking.Tracker, projectPath string) map[string]time.Time {
+	result := make(map[string]time.Time)
+	recent, err := tracker.GetRecentCommands(projectPath, 100)
+	if err != nil {
+		return result
+	}
+	for _, r := range recent {
+		if _, exists := result[r.Command]; !exists {
+			result[r.Command] = r.Timestamp
+		}
+	}
+	return result
+}
+
