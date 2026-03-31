@@ -11,7 +11,6 @@ import (
 )
 
 // CommunityFilterRegistry manages community filter sharing and publishing.
-// Inspired by tokf's community filter registry.
 type CommunityFilterRegistry struct {
 	mu        sync.RWMutex
 	localPath string
@@ -35,11 +34,12 @@ type RegistryEntry struct {
 	SHA256      string    `json:"sha256"`
 }
 
-// NewCommunityFilterRegistry creates a new filter registry.
+// NewCommunityFilterRegistry creates a new community filter registry.
 func NewCommunityFilterRegistry(localPath, remoteURL string) *CommunityFilterRegistry {
 	r := &CommunityFilterRegistry{
 		localPath: localPath,
 		remoteURL: remoteURL,
+		filters:   []RegistryEntry{},
 	}
 	r.loadLocal()
 	return r
@@ -49,16 +49,12 @@ func NewCommunityFilterRegistry(localPath, remoteURL string) *CommunityFilterReg
 func (r *CommunityFilterRegistry) Publish(entry RegistryEntry) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	entry.CreatedAt = time.Now()
 	entry.UpdatedAt = time.Now()
-
-	// Validate
 	safety := CheckFilterSafety(entry.Content)
 	if !safety.Passed {
 		return fmt.Errorf("filter failed safety checks: %v", safety.Issues)
 	}
-
 	r.filters = append(r.filters, entry)
 	return r.saveLocal()
 }
@@ -67,11 +63,9 @@ func (r *CommunityFilterRegistry) Publish(entry RegistryEntry) error {
 func (r *CommunityFilterRegistry) List(category string) []RegistryEntry {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
 	if category == "" {
 		return r.filters
 	}
-
 	var filtered []RegistryEntry
 	for _, f := range r.filters {
 		if strings.EqualFold(f.Category, category) {
@@ -85,7 +79,6 @@ func (r *CommunityFilterRegistry) List(category string) []RegistryEntry {
 func (r *CommunityFilterRegistry) Search(query string) []RegistryEntry {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
 	query = strings.ToLower(query)
 	var results []RegistryEntry
 	for _, f := range r.filters {
@@ -115,15 +108,11 @@ func (r *CommunityFilterRegistry) Install(name string) error {
 		}
 	}
 	r.mu.RUnlock()
-
 	if entry == nil {
 		return fmt.Errorf("filter %q not found", name)
 	}
-
-	// Install to local filters directory
 	dir := filepath.Dir(r.localPath)
 	os.MkdirAll(dir, 0755)
-
 	destPath := filepath.Join(dir, name+".toml")
 	return os.WriteFile(destPath, []byte(entry.Content), 0644)
 }
@@ -139,26 +128,21 @@ func (r *CommunityFilterRegistry) Eject(name string, destDir string) error {
 		}
 	}
 	r.mu.RUnlock()
-
 	if content == "" {
 		return fmt.Errorf("filter %q not found", name)
 	}
-
 	os.MkdirAll(destDir, 0755)
-	destPath := filepath.Join(destDir, name+".toml")
-	return os.WriteFile(destPath, []byte(content), 0644)
+	return os.WriteFile(filepath.Join(destDir, name+".toml"), []byte(content), 0644)
 }
 
 // Stats returns registry statistics.
 func (r *CommunityFilterRegistry) Stats() map[string]any {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
 	byCategory := make(map[string]int)
 	for _, f := range r.filters {
 		byCategory[f.Category]++
 	}
-
 	return map[string]any{
 		"total_filters": len(r.filters),
 		"by_category":   byCategory,
