@@ -27,7 +27,7 @@ const (
 // Proxy handles HTTP proxying for LLM API calls.
 type Proxy struct {
 	mu           sync.RWMutex
-	compressor   *filter.PipelineCoordinator
+	compressor   filter.Pipeline
 	stats        *ProxyStats
 	targetURL    string
 	listenAddr   string

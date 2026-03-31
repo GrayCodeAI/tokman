@@ -2,6 +2,12 @@ package filter
 
 import "github.com/GrayCodeAI/tokman/internal/cache"
 
+// Pipeline defines the interface for compression pipelines.
+// This allows mock testing and future pipeline implementations.
+type Pipeline interface {
+	Process(input string) (string, *PipelineStats)
+}
+
 // filterLayer pairs a compression filter with its stats key.
 type filterLayer struct {
 	filter Filter
