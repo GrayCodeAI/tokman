@@ -257,8 +257,12 @@ test utils::test_format ... ok               test_overflow: panic at utils.rs:18
 
 ## Compression Pipeline
 
-| Layer | Technique | Research Paper | Savings |
-|-------|-----------|----------------|---------|
+TokMan runs a **31-layer compression pipeline** with stage gates, early-exit, and adaptive selection.
+
+| # | Layer | Technique | Research Paper | Savings |
+|---|-------|-----------|----------------|---------|
+| L0 | TOML Filter | Declarative custom filters | — | — |
+| L0 | TF-IDF Coarse | DSPC (Sep 2025) | — | — |
 | L1 | Entropy Filtering | [Selective Context](https://arxiv.org/abs/2310.06201) — Li et al. | 2–3× |
 | L2 | Perplexity Pruning | [LLMLingua](https://arxiv.org/abs/2310.05736) — Microsoft/Tsinghua | 20× |
 | L3 | Goal-Driven Selection | [SWE-Pruner](https://arxiv.org/abs/2601.16746) — Shanghai Jiao Tong | 14.8× |
@@ -268,7 +272,7 @@ test utils::test_format ... ok               test_overflow: panic at utils.rs:18
 | L7 | Evaluator Heads | EHPC — Tsinghua/Huawei | — |
 | L8 | Gist Compression | [Gist Tokens](https://arxiv.org/abs/2304.08467) — Stanford/Berkeley | — |
 | L9 | Hierarchical Summary | [AutoCompressor](https://arxiv.org/abs/2305.14788) — Princeton/MIT | — |
-| L10 | Budget Enforcement | Industry standard | — |
+| — | Neural Layer | LLM-aware summarization | — | — |
 | L11 | Compaction | [MemGPT](https://arxiv.org/abs/2310.08560) — UC Berkeley | — |
 | L12 | Attribution Filter | [ProCut](https://aclanthology.org/2025.emnlp-industry.20/) — LinkedIn | 78% |
 | L13 | H2O Filter | [H₂O](https://arxiv.org/abs/2306.14048) — NeurIPS 2023 | 30×+ |
@@ -279,8 +283,25 @@ test utils::test_format ... ok               test_overflow: panic at utils.rs:18
 | L18 | Lazy Pruner | LazyLLM | 2.34× speedup |
 | L19 | Semantic Anchor | SAC | — |
 | L20 | Agent Memory | Focus-inspired | — |
-| T12 | Question-Aware | [LongLLMLingua](https://aclanthology.org/2024.acl-long.91/) — ACL 2024 | — |
-| T17 | Density-Adaptive | DAST | — |
+| L21 | Question-Aware | [LongLLMLingua](https://aclanthology.org/2024.acl-long.91/) — ACL 2024 | — |
+| L22 | Density-Adaptive | DAST — Chen et al. | — |
+| L23 | Symbolic Compress | MetaGlyph (Jan 2026) | — |
+| L24 | Phrase Grouping | CompactPrompt (2025) | — |
+| L25 | Numerical Quant | CompactPrompt (2025) | — |
+| L26 | Dynamic Ratio | PruneSID (Mar 2026) | — |
+| L27 | Hypernym Compress | Mercury | — |
+| L28 | Semantic Cache | SemantiCache | — |
+| L29 | Scope Filter | SCOPE (ACL 2025) | — |
+| L30 | SmallKV Compensation | SmallKV (2025) | — |
+| L31 | KVzip Reconstruction | KVzip (2025) | — |
+
+### Pipeline Features
+
+- **Stage gates** — skip layers when not applicable (zero cost)
+- **Early exit** — stop pipeline when budget already met
+- **Inter-layer feedback** — quality estimation between layers
+- **Result caching** — O(1) LRU with SHA-256 fingerprinting
+- **Parallel execution** — SIMD-accelerized where possible
 
 ## HTTP Proxy Mode
 
@@ -442,7 +463,7 @@ port = 8080
 | Tokenizer | BPE (tiktoken cl100k_base) |
 | Cache | O(1) LRU with fingerprinting |
 | SIMD | Go 1.26+ vectorized |
-| Pipeline | 31 layers, parallel execution |
+| Pipeline | 31 layers, stage gates, early exit |
 
 ## Documentation
 
