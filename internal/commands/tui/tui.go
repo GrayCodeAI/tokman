@@ -40,15 +40,13 @@ type model struct {
 	tab     int
 	updated time.Time
 
-	// Data
 	sum      *Summary
 	dayData  []DayData
 	cmdData  []CmdStat
 	teeData  []TeeFile
 	discData []DiscItem
 
-	// Viewports
-	mainVP viewport.Model
+	vp viewport.Model
 }
 
 type Summary struct {
@@ -110,7 +108,7 @@ func initialModel(tracker *tracking.Tracker) model {
 	return model{
 		tracker: tracker,
 		updated: time.Now(),
-		mainVP:  viewport.New(80, 20),
+		vp:      viewport.New(80, 20),
 	}
 }
 
@@ -129,8 +127,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if !m.ready {
 			m.ready = true
-			m.mainVP.Width = msg.Width
-			m.mainVP.Height = msg.Height - 4
+			m.vp.Width = msg.Width
+			m.vp.Height = msg.Height - 2
 		}
 		return m, nil
 	case tickMsg:
@@ -172,13 +170,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tab = 4
 			m.render()
 		case "up", "k":
-			m.mainVP.LineUp(1)
+			m.vp.LineUp(1)
 		case "down", "j":
-			m.mainVP.LineDown(1)
+			m.vp.LineDown(1)
 		case "g":
-			m.mainVP.GotoTop()
+			m.vp.GotoTop()
 		case "G":
-			m.mainVP.GotoBottom()
+			m.vp.GotoBottom()
 		case "r":
 			cmds = append(cmds, fetchData(m.tracker))
 		}
@@ -190,71 +188,31 @@ func (m model) View() string {
 	if !m.ready {
 		return "\n  loading..."
 	}
-
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.header(),
-		m.tabBar(),
-		m.mainVP.View(),
+		m.vp.View(),
 		m.footer(),
 	)
 }
 
 func (m model) header() string {
 	if m.sum == nil {
-		return lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			Render(" tokman  ·  loading...")
+		return "tokman  loading..."
 	}
-
-	s := m.sum
-	left := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")).Render("tokman")
-	mid := fmt.Sprintf("  %d commands  ·  %s saved  ·  %.0f%%",
-		s.TotalCommands, fmtTok(s.TotalSaved), s.AvgSavings)
-	right := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(time.Now().Format("15:04:05"))
-
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(0, 1).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top,
-			left, mid,
-			lipgloss.NewStyle().Width(m.width-len(left)-len(mid)-len(right)).Render(""),
-			right))
-}
-
-func (m model) tabBar() string {
 	tabs := []string{"overview", "commands", "timeline", "discover", "tee"}
-	var parts []string
+	var tabStrs []string
 	for i, t := range tabs {
-		style := lipgloss.NewStyle().Padding(0, 2)
 		if i == m.tab {
-			style = style.Bold(true).Foreground(lipgloss.Color("42"))
-			parts = append(parts, style.Render("▸ "+t))
+			tabStrs = append(tabStrs, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")).Render(t))
 		} else {
-			style = style.Foreground(lipgloss.Color("240"))
-			parts = append(parts, style.Render(t))
+			tabStrs = append(tabStrs, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(t))
 		}
 	}
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(0, 1).
-		Render(strings.Join(parts, ""))
+	return fmt.Sprintf("tokman  %s", strings.Join(tabStrs, "  "))
 }
 
 func (m model) footer() string {
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderTop(true).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(0, 1).
-		Foreground(lipgloss.Color("240")).
-		Render("  1-5: tabs  ↑↓: scroll  r: refresh  q: quit")
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  1-5:tabs  ↑↓:scroll  r:refresh  q:quit")
 }
 
 func (m *model) render() {
@@ -271,7 +229,18 @@ func (m *model) render() {
 	case 4:
 		s = m.viewTee()
 	}
-	m.mainVP.SetContent(s)
+	m.vp.SetContent(s)
+}
+
+func panel(title string, content string, w int) string {
+	border := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Width(w).
+		Padding(0, 1)
+	return border.Render(lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")).Render(" "+title),
+		content))
 }
 
 func (m model) viewOverview() string {
@@ -279,109 +248,100 @@ func (m model) viewOverview() string {
 		return "\n  loading..."
 	}
 	s := m.sum
+	w := m.width / 2 - 2
 
-	// Build efficiency meter
-	w := 40
-	f := int(s.AvgSavings / 100.0 * float64(w))
-	if f > w {
-		f = w
-	}
-	bar := strings.Repeat("█", f) + strings.Repeat("░", w-f)
-	meterColor := "240"
-	if s.AvgSavings >= 70 {
-		meterColor = "42"
-	} else if s.AvgSavings >= 40 {
-		meterColor = "220"
-	}
-	meter := lipgloss.NewStyle().Foreground(lipgloss.Color(meterColor)).Render(bar) + " " + fmt.Sprintf("%.0f%%", s.AvgSavings)
-
-	// Build sparkline for daily data
-	spark := m.sparkline()
-
-	content := strings.Join([]string{
-		"",
-		"  ┌─ summary ──────────────────────────────────────────────────┐",
-		fmt.Sprintf("  │  commands    %-48d │", s.TotalCommands),
-		fmt.Sprintf("  │  input       %-48s │", fmtTok(s.TotalInput)),
-		fmt.Sprintf("  │  output      %-48s │", fmtTok(s.TotalOutput)),
-		fmt.Sprintf("  │  saved       %-48s │", fmtTok(s.TotalSaved)+" ("+fmt.Sprintf("%.1f%%", s.AvgSavings)+")"),
-		fmt.Sprintf("  │  period      %-48s │", s.Period),
-		fmt.Sprintf("  │  updated     %-48s │", m.updated.Format("15:04:05")),
-		"  └────────────────────────────────────────────────────────────┘",
-		"",
-		"  ┌─ efficiency ───────────────────────────────────────────────┐",
-		fmt.Sprintf("  │  %s │", meter),
-		"  └────────────────────────────────────────────────────────────┘",
+	// Summary panel
+	sumContent := strings.Join([]string{
+		fmt.Sprintf("commands   %d", s.TotalCommands),
+		fmt.Sprintf("input      %s", fmtTok(s.TotalInput)),
+		fmt.Sprintf("output     %s", fmtTok(s.TotalOutput)),
+		fmt.Sprintf("saved      %s", fmtTok(s.TotalSaved)),
+		fmt.Sprintf("period     %s", s.Period),
 	}, "\n")
 
-	if spark != "" {
-		content += "\n\n  ┌─ daily savings ──────────────────────────────────────────────┐\n"
-		content += spark
-		content += "\n  └────────────────────────────────────────────────────────────┘"
+	// Efficiency panel
+	w2 := 40
+	f := int(s.AvgSavings / 100.0 * float64(w2))
+	if f > w2 {
+		f = w2
+	}
+	bar := strings.Repeat("█", f) + strings.Repeat("░", w2-f)
+	c := "240"
+	if s.AvgSavings >= 70 {
+		c = "42"
+	} else if s.AvgSavings >= 40 {
+		c = "220"
+	}
+	effContent := lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(bar) + "\n" + fmt.Sprintf("%.0f%%", s.AvgSavings)
+
+	// Daily sparkline
+	var sparkLines []string
+	if len(m.dayData) > 0 {
+		maxS := 1
+		for _, d := range m.dayData {
+			if d.Saved > maxS {
+				maxS = d.Saved
+			}
+		}
+		for _, d := range m.dayData {
+			bl := int(math.Round(float64(d.Saved) / float64(maxS) * 30))
+			bar := strings.Repeat("▸", bl)
+			dc := "240"
+			if d.Saved > 100000 {
+				dc = "42"
+			} else if d.Saved > 10000 {
+				dc = "220"
+			}
+			dt := d.Date
+			if len(dt) > 10 {
+				dt = dt[5:10]
+			}
+			sparkLines = append(sparkLines, fmt.Sprintf("%s  %6s  %s  %d",
+				dt, fmtTok(d.Saved),
+				lipgloss.NewStyle().Foreground(lipgloss.Color(dc)).Render(bar),
+				d.Count))
+		}
 	}
 
-	return content
-}
+	left := lipgloss.JoinVertical(lipgloss.Left,
+		panel("summary", sumContent, w),
+		"",
+		panel("efficiency", effContent, w),
+	)
 
-func (m model) sparkline() string {
-	if len(m.dayData) == 0 {
-		return ""
-	}
-	maxS := 1
-	for _, d := range m.dayData {
-		if d.Saved > maxS {
-			maxS = d.Saved
-		}
-	}
-	var lines []string
-	for _, d := range m.dayData {
-		bl := int(math.Round(float64(d.Saved) / float64(maxS) * 48))
-		bar := strings.Repeat("▸", bl)
-		c := "240"
-		if d.Saved > 100000 {
-			c = "42"
-		} else if d.Saved > 10000 {
-			c = "220"
-		}
-		dt := d.Date
-		if len(dt) > 10 {
-			dt = dt[5:10]
-		}
-		lines = append(lines, fmt.Sprintf("  │  %s  %6s  %s  %s │",
-			dt, fmtTok(d.Saved),
-			lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(bar),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("%d cmds", d.Count))))
-	}
-	return strings.Join(lines, "\n")
+	right := panel("daily savings", strings.Join(sparkLines, "\n"), w)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right)
 }
 
 func (m model) viewCommands() string {
 	lines := []string{
-		"",
-		"  ┌─ command history ──────────────────────────────────────────┐",
-		"  │  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("%-22s %6s %10s %6s", "command", "count", "saved", "avg%")) + " │",
-		"  │  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", 52)) + " │",
+		fmt.Sprintf("  %-24s %6s %10s %6s",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("command"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("count"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("saved"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("avg%")),
+		"  " + strings.Repeat("─", 52),
 	}
 	for _, c := range m.cmdData {
 		n := c.Command
-		if len(n) > 20 {
-			n = n[:18] + ".."
+		if len(n) > 22 {
+			n = n[:20] + ".."
 		}
-		pctColor := "240"
+		pctC := "240"
 		if c.AvgPct >= 70 {
-			pctColor = "42"
+			pctC = "42"
 		} else if c.AvgPct >= 40 {
-			pctColor = "220"
+			pctC = "220"
 		}
-		lines = append(lines, fmt.Sprintf("  │  %-22s %6d %10s %s │",
+		lines = append(lines, fmt.Sprintf("  %-24s %6d %10s %s",
 			n, c.Count, fmtTok(c.Saved),
-			lipgloss.NewStyle().Foreground(lipgloss.Color(pctColor)).Render(fmt.Sprintf("%5.0f%%", c.AvgPct))))
-		if len(lines) > 25 {
-			lines = append(lines, "  │  "+lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("...")+" │")
+			lipgloss.NewStyle().Foreground(lipgloss.Color(pctC)).Render(fmt.Sprintf("%5.0f%%", c.AvgPct))))
+		if len(lines) > 30 {
+			lines = append(lines, "  "+lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("..."))
 			break
 		}
 	}
-	lines = append(lines, "  └────────────────────────────────────────────────────────────┘")
 	return strings.Join(lines, "\n")
 }
 
@@ -395,29 +355,25 @@ func (m model) viewTimeline() string {
 			maxS = d.Saved
 		}
 	}
-	lines := []string{
-		"",
-		"  ┌─ daily savings trend ──────────────────────────────────────┐",
-	}
+	var lines []string
 	for _, d := range m.dayData {
-		bl := int(math.Round(float64(d.Saved) / float64(maxS) * 46))
+		bl := int(math.Round(float64(d.Saved) / float64(maxS) * 44))
 		bar := strings.Repeat("▸", bl)
-		c := "240"
+		dc := "240"
 		if d.Saved > 100000 {
-			c = "42"
+			dc = "42"
 		} else if d.Saved > 10000 {
-			c = "220"
+			dc = "220"
 		}
 		dt := d.Date
 		if len(dt) > 10 {
 			dt = dt[5:10]
 		}
-		lines = append(lines, fmt.Sprintf("  │  %s  %6s  %s  %s │",
+		lines = append(lines, fmt.Sprintf("  %s  %6s  %s  %d",
 			dt, fmtTok(d.Saved),
-			lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(bar),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("%d cmds", d.Count))))
+			lipgloss.NewStyle().Foreground(lipgloss.Color(dc)).Render(bar),
+			d.Count))
 	}
-	lines = append(lines, "  └────────────────────────────────────────────────────────────┘")
 	return strings.Join(lines, "\n")
 }
 
@@ -428,40 +384,36 @@ func (m model) viewDiscover() string {
 		"kubectl get pods", "curl http://api", "env", "npm test",
 	})
 	lines := []string{
-		"",
-		"  ┌─ missed savings opportunities ─────────────────────────────┐",
-		"  │  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("%-18s %8s  %s", "command", "saving", "suggestion")) + " │",
-		"  │  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", 52)) + " │",
+		fmt.Sprintf("  %-20s %8s  %s",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("command"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("saving"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("suggestion")),
+		"  " + strings.Repeat("─", 56),
 	}
 	for _, r := range res {
-		lines = append(lines, fmt.Sprintf("  │  %-18s %s  %s │",
+		lines = append(lines, fmt.Sprintf("  %-20s %s  %s",
 			r.Command,
 			lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(fmt.Sprintf("+%d", r.EstSavings)),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(r.Suggestion)))
 	}
-	lines = append(lines, "  └────────────────────────────────────────────────────────────┘")
 	return strings.Join(lines, "\n")
 }
 
 func (m model) viewTee() string {
 	entries, _ := tee.List(tee.DefaultConfig())
-	lines := []string{
-		"",
-		"  ┌─ full output recovery (tee) ───────────────────────────────┐",
-	}
+	lines := []string{""}
 	if len(entries) == 0 {
-		lines = append(lines, "  │  no saved outputs                                         │")
-		lines = append(lines, "  │                                                           │")
-		lines = append(lines, "  │  tee saves full command output on failure.                │")
-		lines = append(lines, "  │  use 'tokman tee list' to see files.                      │")
+		lines = append(lines, "  no saved outputs")
+		lines = append(lines, "")
+		lines = append(lines, "  tee saves full command output on failure.")
+		lines = append(lines, "  use 'tokman tee list' to see files.")
 	} else {
 		for _, e := range entries {
-			lines = append(lines, fmt.Sprintf("  │  %s  %s │",
+			lines = append(lines, fmt.Sprintf("  %s  %s",
 				lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(e.Timestamp.Format("01-02 15:04")),
 				lipgloss.NewStyle().Bold(true).Render(e.Command)))
 		}
 	}
-	lines = append(lines, "  └────────────────────────────────────────────────────────────┘")
 	return strings.Join(lines, "\n")
 }
 
