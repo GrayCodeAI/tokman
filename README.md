@@ -5,9 +5,9 @@
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-42%20packages-green)](#)
-[![Features](https://img.shields.io/badge/Features-200%2B%20from%2010%20repos-orange)](#)
+[![Discord](https://img.shields.io/discord/1470188214710046894?label=Discord&logo=discord)](https://discord.gg/HrVA7ePyV)
 
-[Website](https://tokman.dev) · [Install](#installation) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Contributing](#contributing)
+[Website](https://tokman.dev) · [Install](#installation) · [Quick Start](#quick-start) · [Discord](https://discord.gg/HrVA7ePyV) · [Architecture](#architecture) · [Contributing](#contributing)
 
 ---
 
