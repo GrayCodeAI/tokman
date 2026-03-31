@@ -31,7 +31,7 @@ type PipelineManager struct {
 	config      ManagerConfig
 	coordinator *PipelineCoordinator
 	cache       *CompressionCache
-	lruCache    *LRUCache // T101: LRU cache for better eviction
+	lruCache    *LRUCache // LRU cache for better eviction
 	teeDir      string
 	mu          sync.RWMutex
 }

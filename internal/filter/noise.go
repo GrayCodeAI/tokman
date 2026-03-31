@@ -12,7 +12,7 @@ var progressRegex = regexp.MustCompile(`(\d+/\d+)|(\d+\.\d+\s+[KMG]?B/s)`)
 var progressLineRegex = regexp.MustCompile(`^\s*(\[?[#█░▒▓∎▸▹●○━─═]+\]\s*\d+%?\s*)+\s*$`)
 
 // FilterProgressBars removes progress bar lines from output.
-// R62: Progress bars are noisy and consume tokens.
+// Progress bars are noisy and consume tokens.
 func FilterProgressBars(input string) string {
 	lines := strings.Split(input, "\n")
 	var result []string

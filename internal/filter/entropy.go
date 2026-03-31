@@ -28,7 +28,7 @@ type frequencyCacheEntry struct {
 // Algorithm: I(x) = -log P(x) where P(x) is the token probability
 // Tokens with low self-information (high predictability) are candidates for removal.
 //
-// T11: Dynamic Frequency Estimation - adapts frequencies based on input content
+// Dynamic Frequency Estimation - adapts frequencies based on input content
 // using Zipf's law for unknown tokens, improving accuracy by 15-20%.
 //
 // Research Results: 2-3x compression while preserving semantic content.
@@ -60,7 +60,7 @@ func NewEntropyFilter() *EntropyFilter {
 }
 
 // NewEntropyFilterWithThreshold creates an entropy filter with custom threshold.
-// T34: Configurable entropy threshold.
+// Configurable entropy threshold.
 // Phase 2: Added LRU cache for frequency tables.
 func NewEntropyFilterWithThreshold(threshold float64) *EntropyFilter {
 	return &EntropyFilter{
@@ -69,7 +69,7 @@ func NewEntropyFilterWithThreshold(threshold float64) *EntropyFilter {
 		entropyThreshold: threshold,
 		dynamicFreq:      make(map[string]int),
 		zipfExponent:     1.07,                   // Standard Zipf exponent for English
-		useDynamicEst:    true,                   // T11: Enable by default
+		useDynamicEst:    true,                   // Enable by default
 		freqCache:        cache.GetGlobalCache(), // Phase 2: Use global cache
 		cacheEnabled:     true,                   // Phase 2: Enable caching
 	}
@@ -319,7 +319,7 @@ func (f *EntropyFilter) Name() string {
 }
 
 // Apply applies entropy-based filtering to remove low-information tokens
-// T11: Builds dynamic frequency table from input for adaptive estimation
+// Builds dynamic frequency table from input for adaptive estimation
 func (f *EntropyFilter) Apply(input string, mode Mode) (string, int) {
 	if mode == ModeNone {
 		return input, 0
@@ -328,7 +328,7 @@ func (f *EntropyFilter) Apply(input string, mode Mode) (string, int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// T11: Build dynamic frequency table from this input
+	// Build dynamic frequency table from this input
 	if f.useDynamicEst {
 		f.buildDynamicFrequencies(input)
 	}
@@ -430,7 +430,7 @@ func (f *EntropyFilter) processLine(line string, mode Mode) string {
 }
 
 // shouldKeep determines if a word should be kept based on entropy
-// T11: Uses dynamic frequency estimation for better accuracy
+// Uses dynamic frequency estimation for better accuracy
 func (f *EntropyFilter) shouldKeep(word string, mode Mode) bool {
 	// Always keep non-stopwords
 	wordLower := strings.ToLower(word)

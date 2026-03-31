@@ -424,7 +424,7 @@ func (h *H2OFilter) tokenize(content string) []h2oToken {
 // isWordChar is defined in ngram.go
 
 // calculateImportance calculates importance scores for each token
-// T13: Improved attention score simulation using:
+// Improved attention score simulation using:
 // 1. TF-IDF style weighting
 // 2. Local attention patterns (nearby tokens influence each other)
 // 3. Positional attention decay

@@ -8,7 +8,7 @@ import (
 // Research basis: "LongLLMLingua: Accelerating and Enhancing LLMs in Long Context Scenarios"
 // (Jiang et al., ACL 2024) - preserves query-relevant subsequences during compression.
 //
-// T12: Key insight - compression should be aware of the question/query and preserve
+// Key insight - compression should be aware of the question/query and preserve
 // subsequences that are likely relevant to answering it.
 //
 // This filter:

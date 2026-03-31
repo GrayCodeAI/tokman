@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// T7: Stage Gates Tests
+// Stage Gates Tests
 
 func TestStageGates_ShortContent(t *testing.T) {
 	p := NewPipelineCoordinator(PipelineConfig{

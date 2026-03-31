@@ -6,7 +6,7 @@ import (
 )
 
 // BM25Scorer implements Okapi BM25 scoring for relevance ranking.
-// R8: Better relevance ranking than TF-IDF (used in IR systems for decades).
+// Better relevance ranking than TF-IDF (used in IR systems for decades).
 type BM25Scorer struct {
 	avgDocLength float64
 	k1           float64
@@ -116,7 +116,7 @@ func uniqueWords(text string) []string {
 }
 
 // QuestionAwareRecovery restores query-relevant subsequences after compression.
-// R7: LongLLMLingua insight — question-aware post-compression recovery.
+// LongLLMLingua insight — question-aware post-compression recovery.
 type QuestionAwareRecovery struct {
 	scorer *BM25Scorer
 }

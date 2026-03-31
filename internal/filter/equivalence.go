@@ -5,7 +5,7 @@ import (
 )
 
 // SemanticEquivalence checks if compressed output preserves meaning.
-// R16: Verify no critical information was lost during compression.
+// Verify no critical information was lost during compression.
 type SemanticEquivalence struct{}
 
 // NewSemanticEquivalence creates a checker.

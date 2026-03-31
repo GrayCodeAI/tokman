@@ -3,8 +3,8 @@ package filter
 import "github.com/GrayCodeAI/tokman/internal/core"
 
 // Process runs the full compression pipeline with early-exit support.
-// T7: Stage gates skip layers when not applicable (zero cost).
-// T81: Skip remaining layers if budget already met.
+// Stage gates skip layers when not applicable (zero cost).
+// Skip remaining layers if budget already met.
 func (p *PipelineCoordinator) Process(input string) (string, *PipelineStats) {
 	stats := &PipelineStats{
 		OriginalTokens: core.EstimateTokens(input),

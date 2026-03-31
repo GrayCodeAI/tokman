@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// T17: Density-Adaptive Filter Tests
+// Density-Adaptive Filter Tests
 
 func TestDensityAdaptiveFilter_Basic(t *testing.T) {
 	filter := NewDensityAdaptiveFilter()

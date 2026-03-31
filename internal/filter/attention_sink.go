@@ -69,7 +69,7 @@ func NewAttentionSinkFilter() *AttentionSinkFilter {
 }
 
 // NewAdaptiveAttentionSinkFilter creates a filter with adaptive sink count.
-// R5: StreamingLLM insight — sink count scales with output length.
+// StreamingLLM insight — sink count scales with output length.
 func NewAdaptiveAttentionSinkFilter(outputLines int) *AttentionSinkFilter {
 	cfg := DefaultSinkConfig()
 

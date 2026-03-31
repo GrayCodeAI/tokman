@@ -8,7 +8,7 @@ import (
 // Research basis: "DAST: Context-Aware Compression via Dynamic Allocation of Soft Tokens"
 // (Chen et al., 2025) - allocate compression capacity based on information density.
 //
-// T17: Key insight - dense content sections (code, data) need more tokens,
+// Key insight - dense content sections (code, data) need more tokens,
 // while sparse sections (whitespace, repetition) can be heavily compressed.
 //
 // This filter:

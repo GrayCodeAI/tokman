@@ -80,10 +80,10 @@ type PipelineCoordinator struct {
 	// Layer 20: Agent Memory Mode (Focus-inspired)
 	agentMemoryFilter *AgentMemoryFilter
 
-	// T12: Question-Aware Filter (LongLLMLingua-style)
+	// Question-Aware Filter (LongLLMLingua-style)
 	questionAwareFilter *QuestionAwareFilter
 
-	// T17: Density-Adaptive Filter (DAST-style)
+	// Density-Adaptive Filter (DAST-style)
 	densityAdaptiveFilter *DensityAdaptiveFilter
 
 	// NEW: TF-IDF Coarse Filter (DSPC, Sep 2025)

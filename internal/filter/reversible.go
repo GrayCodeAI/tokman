@@ -12,7 +12,7 @@ import (
 )
 
 // ReversibleStore stores original outputs indexed by content hash.
-// R1: Claw-compactor style reversible compression.
+// Claw-compactor style reversible compression.
 // Users can restore any compressed output to its original form.
 type ReversibleStore struct {
 	baseDir string

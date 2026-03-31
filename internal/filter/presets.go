@@ -1,7 +1,7 @@
 package filter
 
 // PipelinePreset defines a compression pipeline mode with specific layers enabled.
-// T90: Provide fast/balanced/full presets for different use cases.
+// Provide fast/balanced/full presets for different use cases.
 // Maps to the adaptive tier system for automatic layer selection.
 type PipelinePreset string
 

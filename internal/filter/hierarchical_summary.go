@@ -326,7 +326,7 @@ func (f *HierarchicalSummaryFilter) createHierarchicalSummary(summaries []sectio
 }
 
 // hasErrors checks if content contains errors or stack traces.
-// T62: Enhanced error/stack trace detection for preservation.
+// Enhanced error/stack trace detection for preservation.
 func (f *HierarchicalSummaryFilter) hasErrors(content string) bool {
 	lower := strings.ToLower(content)
 
