@@ -141,7 +141,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.Header()[k] = v
 			}
 			w.WriteHeader(cached.status)
-			w.Write(cached.body)
+			_, _ = w.Write(cached.body)
 			return
 		}
 	}
@@ -191,7 +191,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header()[k] = v
 	}
 	w.WriteHeader(resp.StatusCode)
-	w.Write(respBody)
+	_, _ = w.Write(respBody)
 
 	// Cache response
 	if resp.StatusCode == http.StatusOK {
@@ -248,7 +248,10 @@ func (p *Proxy) compressOpenAI(body []byte) ([]byte, int, int) {
 		totalOutput += origTokens - stats.TotalSaved
 	}
 
-	newBody, _ := json.Marshal(req)
+	newBody, err := json.Marshal(req)
+	if err != nil {
+		return body, totalInput, totalOutput
+	}
 	return newBody, totalInput, totalOutput
 }
 
@@ -290,7 +293,10 @@ func (p *Proxy) compressAnthropic(body []byte) ([]byte, int, int) {
 		totalOutput += origTokens - stats.TotalSaved
 	}
 
-	newBody, _ := json.Marshal(req)
+	newBody, err := json.Marshal(req)
+	if err != nil {
+		return body, totalInput, totalOutput
+	}
 	return newBody, totalInput, totalOutput
 }
 
@@ -327,7 +333,10 @@ func (p *Proxy) compressGemini(body []byte) ([]byte, int, int) {
 		}
 	}
 
-	newBody, _ := json.Marshal(req)
+	newBody, err := json.Marshal(req)
+	if err != nil {
+		return body, totalInput, totalOutput
+	}
 	return newBody, totalInput, totalOutput
 }
 
@@ -349,7 +358,10 @@ func (p *Proxy) applyModelAlias(req *http.Request) *http.Request {
 	if model, ok := body["model"].(string); ok {
 		if alias, exists := p.modelAliases[model]; exists {
 			body["model"] = alias
-			newBody, _ := json.Marshal(body)
+			newBody, err := json.Marshal(body)
+			if err != nil {
+				return req
+			}
 			req.Body = io.NopCloser(bytes.NewReader(newBody))
 			req.ContentLength = int64(len(newBody))
 		}
@@ -452,13 +464,13 @@ func extractModelName(body []byte, format APIFormat) string {
 		var req struct {
 			Model string `json:"model"`
 		}
-		json.Unmarshal(body, &req)
+		_ = json.Unmarshal(body, &req)
 		return req.Model
 	case APIFormatAnthropic:
 		var req struct {
 			Model string `json:"model"`
 		}
-		json.Unmarshal(body, &req)
+		_ = json.Unmarshal(body, &req)
 		return req.Model
 	default:
 		return ""

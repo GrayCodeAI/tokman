@@ -97,44 +97,6 @@ func (t *TimedExecution) Track(command, tokmanCmd string, originalTokens, filter
 	})
 }
 
-// TrackWithAgent records execution with AI agent attribution.
-// Environment variables:
-//   - TOKMAN_AGENT: AI agent name (e.g., "Claude Code", "OpenCode", "Cursor")
-//   - TOKMAN_MODEL: Model name (e.g., "claude-3-opus", "gpt-4")
-//   - TOKMAN_PROVIDER: Provider name (e.g., "Anthropic", "OpenAI")
-func (t *TimedExecution) TrackWithAgent(command, tokmanCmd string, originalTokens, filteredTokens int) {
-	t.once.Do(func() {
-		execTime := time.Since(t.startTime)
-		saved := originalTokens - filteredTokens
-		if saved < 0 {
-			saved = 0
-		}
-
-		// Get or create global tracker
-		tracker := getGlobalTracker()
-		if tracker == nil {
-			return
-		}
-
-		cwd, _ := os.Getwd()
-		tracker.Record(&CommandRecord{
-			Command:        command,
-			OriginalTokens: originalTokens,
-			FilteredTokens: filteredTokens,
-			SavedTokens:    saved,
-			ProjectPath:    cwd,
-			ExecTimeMs:     execTime.Milliseconds(),
-			Timestamp:      time.Now(),
-			ParseSuccess:   true,
-			// AI Agent attribution from environment
-			AgentName:   os.Getenv("TOKMAN_AGENT"),
-			ModelName:   os.Getenv("TOKMAN_MODEL"),
-			Provider:    os.Getenv("TOKMAN_PROVIDER"),
-			ModelFamily: utils.GetModelFamily(os.Getenv("TOKMAN_MODEL")),
-		})
-	})
-}
-
 // getGlobalTracker returns the global tracker instance.
 func getGlobalTracker() *Tracker {
 	trackerMu.Lock()
