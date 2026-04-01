@@ -76,6 +76,16 @@ type Bundle struct {
 	FinalTokens    int
 }
 
+// Metadata describes how smart-read content was produced.
+type Metadata struct {
+	Kind          string
+	RequestedMode string
+	ResolvedMode  string
+	Target        string
+	RelatedFiles  int
+	Bundle        bool
+}
+
 var renderCache = cache.NewLRUCache(512, 10*time.Minute)
 var persistedStoreMu sync.Mutex
 
@@ -175,6 +185,56 @@ func ResolveMode(mode, filePath, content string, startLine, endLine int) (filter
 		return filter.ReadMode(mode), nil
 	default:
 		return "", fmt.Errorf("invalid read mode: %s (use: auto, full, map, signatures, aggressive, entropy, lines, delta, graph)", mode)
+	}
+}
+
+// Describe returns normalized smart-read metadata for tracking and analytics.
+func Describe(kind, filePath, content string, opts Options) Metadata {
+	requestedMode := strings.ToLower(strings.TrimSpace(opts.Mode))
+	if requestedMode == "" {
+		requestedMode = "legacy"
+	}
+
+	resolvedMode := requestedMode
+	switch requestedMode {
+	case "legacy":
+		resolvedMode = strings.ToLower(strings.TrimSpace(opts.Level))
+		if resolvedMode == "" {
+			resolvedMode = "minimal"
+		}
+	case "graph":
+		resolvedMode = "graph"
+	case "delta":
+		resolvedMode = "delta"
+	case "auto":
+		resolvedMode = string(DetectAutoMode(filePath, content, opts.StartLine, opts.EndLine))
+	default:
+		if mode, err := ResolveMode(requestedMode, filePath, content, opts.StartLine, opts.EndLine); err == nil {
+			resolvedMode = string(mode)
+		}
+	}
+
+	target := filePath
+	if filePath != "" && filePath != "stdin" {
+		target = filepath.Clean(filePath)
+	}
+
+	related := 0
+	bundle := requestedMode == "graph" || resolvedMode == "graph"
+	if bundle {
+		related = opts.RelatedFiles
+		if related <= 0 {
+			related = 3
+		}
+	}
+
+	return Metadata{
+		Kind:          strings.ToLower(strings.TrimSpace(kind)),
+		RequestedMode: requestedMode,
+		ResolvedMode:  resolvedMode,
+		Target:        target,
+		RelatedFiles:  related,
+		Bundle:        bundle,
 	}
 }
 

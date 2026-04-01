@@ -298,3 +298,45 @@ curl -X POST http://localhost:8080/bundle \
 - Any MCP-capable tool:
   - use `POST /read` for single-file refreshes
   - use `POST /bundle` for multi-file graph context
+
+### Direct integration snippets
+
+Claude Code / Cursor style bundle request:
+
+```json
+{
+  "tool": "tokman.read_bundle",
+  "server": "http://localhost:8080",
+  "method": "POST",
+  "path": "/bundle",
+  "body": {
+    "path": "internal/server/server.go",
+    "mode": "graph",
+    "related_files": 4,
+    "max_tokens": 500,
+    "save_snapshot": true
+  }
+}
+```
+
+Codex / OpenCode style single-file refresh:
+
+```json
+{
+  "tool": "tokman.read_file",
+  "server": "http://localhost:8080",
+  "method": "POST",
+  "path": "/read",
+  "body": {
+    "path": "internal/contextread/read.go",
+    "mode": "auto",
+    "max_tokens": 320,
+    "save_snapshot": true
+  }
+}
+```
+
+Recommended pattern:
+- use `/bundle` first for target file + neighbors
+- switch to `/read` for focused refreshes
+- use `mode=delta` after edits when the agent already saw the file earlier

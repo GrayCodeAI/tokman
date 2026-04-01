@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -61,8 +62,6 @@ func init() {
 }
 
 func runRead(cmd *cobra.Command, args []string) error {
-	timer := tracking.Start()
-
 	var content string
 	var filePath string
 
@@ -91,7 +90,8 @@ func runRead(cmd *cobra.Command, args []string) error {
 		content = string(data)
 	}
 
-	filtered, originalTokens, filteredTokens, err := buildReadOutput(filePath, content, readOptions{
+	start := time.Now()
+	opts := readOptions{
 		level:        readLevel,
 		mode:         readMode,
 		maxLines:     readMaxLines,
@@ -101,7 +101,8 @@ func runRead(cmd *cobra.Command, args []string) error {
 		endLine:      readEndLine,
 		saveSnapshot: readSaveSnapshot && filePath != "stdin",
 		relatedFiles: readRelatedFiles,
-	})
+	}
+	filtered, originalTokens, filteredTokens, err := buildReadOutput(filePath, content, opts)
 	if err != nil {
 		return err
 	}
@@ -112,8 +113,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	// Track savings
-	timer.Track(fmt.Sprintf("tokman read %s", filePath), "tokman read", originalTokens, filteredTokens)
+	recordSmartRead("tokman read", filePath, content, opts, originalTokens, filteredTokens, time.Since(start).Milliseconds())
 
 	if shared.Verbose > 0 {
 		originalLines := len(strings.Split(content, "\n"))
@@ -152,5 +152,50 @@ func buildReadOutput(filePath, content string, opts readOptions) (string, int, i
 		EndLine:      opts.endLine,
 		SaveSnapshot: opts.saveSnapshot,
 		RelatedFiles: opts.relatedFiles,
+	})
+}
+
+func recordSmartRead(commandName, filePath, content string, opts readOptions, originalTokens, filteredTokens int, execTimeMs int64) {
+	tracker := tracking.GetGlobalTracker()
+	if tracker == nil {
+		return
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	savedTokens := originalTokens - filteredTokens
+	if savedTokens < 0 {
+		savedTokens = 0
+	}
+
+	meta := contextread.Describe("read", filePath, content, contextread.Options{
+		Level:        opts.level,
+		Mode:         opts.mode,
+		MaxLines:     opts.maxLines,
+		MaxTokens:    opts.maxTokens,
+		LineNumbers:  opts.lineNumbers,
+		StartLine:    opts.startLine,
+		EndLine:      opts.endLine,
+		SaveSnapshot: opts.saveSnapshot,
+		RelatedFiles: opts.relatedFiles,
+	})
+
+	_ = tracker.Record(&tracking.CommandRecord{
+		Command:             fmt.Sprintf("%s %s", commandName, filePath),
+		OriginalTokens:      originalTokens,
+		FilteredTokens:      filteredTokens,
+		SavedTokens:         savedTokens,
+		ProjectPath:         cwd,
+		ExecTimeMs:          execTimeMs,
+		ParseSuccess:        true,
+		ContextKind:         meta.Kind,
+		ContextMode:         meta.RequestedMode,
+		ContextResolvedMode: meta.ResolvedMode,
+		ContextTarget:       meta.Target,
+		ContextRelatedFiles: meta.RelatedFiles,
+		ContextBundle:       meta.Bundle,
 	})
 }

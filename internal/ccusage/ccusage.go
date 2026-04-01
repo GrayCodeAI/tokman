@@ -88,8 +88,9 @@ func buildCommand() (*exec.Cmd, bool) {
 
 // IsAvailable checks if ccusage CLI is available (binary or via npx)
 func IsAvailable() bool {
-	_, ok := buildCommand()
-	return ok
+	// Keep availability checks cheap and deterministic for dashboard paths.
+	// The npx fallback is still used by Fetch when called directly.
+	return binaryExists()
 }
 
 // Fetch retrieves usage data from ccusage.

@@ -147,6 +147,7 @@ TokMan now tracks and visualizes smart context delivery separately from normal c
 - MCP-served reads
 - top files and projects by context savings
 - graph-aware MCP bundles for agent context delivery
+- structured smart-read analytics by kind, mode, target, and bundle quality
 
 ### Git
 

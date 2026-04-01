@@ -21,7 +21,7 @@ func statsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		// Get 24h and total savings (best-effort; partial data is acceptable)
 		saved24h, _ := tracker.TokensSaved24h()
 		savedTotal, _ := tracker.TokensSavedTotal()
-		contextStats, _ := tracker.GetSavingsForCommands("", contextread.TrackedCommandPatterns())
+		contextStats, _ := tracker.GetSavingsForContextReads("", "", "")
 
 		response := map[string]any{
 			"tokens_saved":          stats.TotalSaved,
@@ -41,17 +41,14 @@ func statsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 func contextReadsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		kind := r.URL.Query().Get("kind")
-		patterns := contextread.TrackedCommandPatterns()
-		if kind != "" {
-			patterns = contextread.TrackedCommandPatternsForKind(kind)
-			if len(patterns) == 0 {
-				http.Error(w, "invalid context read kind", http.StatusBadRequest)
-				return
-			}
+		kind := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("kind")))
+		mode := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("mode")))
+		if kind != "" && len(contextread.TrackedCommandPatternsForKind(kind)) == 0 {
+			http.Error(w, "invalid context read kind", http.StatusBadRequest)
+			return
 		}
 
-		records, err := tracker.GetRecentCommandsForPatterns("", 20, patterns)
+		records, err := tracker.GetRecentContextReads("", kind, mode, 20)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -73,6 +70,11 @@ func contextReadsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				"timestamp":     rec.Timestamp,
 				"exec_time_ms":  rec.ExecTimeMs,
 				"parse_success": rec.ParseSuccess,
+				"kind":          contextReadKind(rec),
+				"mode":          contextReadMode(rec),
+				"target":        contextReadTarget(rec),
+				"bundle":        rec.ContextBundle,
+				"related_files": rec.ContextRelatedFiles,
 			})
 		}
 
@@ -84,7 +86,7 @@ func contextReadSummaryHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		result := make(map[string]any)
 		for _, kind := range contextread.TrackedCommandKinds() {
-			summary, err := tracker.GetSavingsForCommands("", contextread.TrackedCommandPatternsForKind(kind))
+			summary, err := tracker.GetSavingsForContextReads("", kind, "")
 			if err != nil {
 				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
@@ -110,15 +112,13 @@ func contextReadTrendHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				COALESCE(SUM(saved_tokens), 0) as saved,
 				COALESCE(SUM(original_tokens), 0) as original
 			FROM commands
-			WHERE command GLOB 'tokman read *'
-			   OR command GLOB 'tokman ctx read *'
-			   OR command GLOB 'tokman ctx delta *'
-			   OR command GLOB 'tokman mcp read *'
-			   OR command GLOB 'tokman mcp bundle *'
-			GROUP BY DATE(timestamp)
+		`
+		where, args := contextReadQueryFilters("", "")
+		query += " WHERE " + where + " GROUP BY DATE(timestamp)"
+		query += `
 			ORDER BY day ASC
 		`
-		rows, err := tracker.Query(query)
+		rows, err := tracker.Query(query, args...)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -150,22 +150,21 @@ func contextReadTrendHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 func contextReadTopFilesHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := tracker.Query(`
+		query := `
 			SELECT
-				command,
+				COALESCE(NULLIF(context_target, ''), command) as target,
 				COUNT(*) as commands,
 				COALESCE(SUM(saved_tokens), 0) as saved,
 				COALESCE(SUM(original_tokens), 0) as original
 			FROM commands
-			WHERE command GLOB 'tokman read *'
-			   OR command GLOB 'tokman ctx read *'
-			   OR command GLOB 'tokman ctx delta *'
-			   OR command GLOB 'tokman mcp read *'
-			   OR command GLOB 'tokman mcp bundle *'
-			GROUP BY command
+		`
+		where, args := contextReadQueryFilters("", "")
+		query += " WHERE " + where + `
+			GROUP BY COALESCE(NULLIF(context_target, ''), command)
 			ORDER BY saved DESC
 			LIMIT 10
-		`)
+		`
+		rows, err := tracker.Query(query, args...)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -174,9 +173,9 @@ func contextReadTopFilesHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 		var result []map[string]any
 		for rows.Next() {
-			var command string
+			var target string
 			var commands, saved, original int
-			if err := rows.Scan(&command, &commands, &saved, &original); err != nil {
+			if err := rows.Scan(&target, &commands, &saved, &original); err != nil {
 				continue
 			}
 			reduction := 0.0
@@ -184,8 +183,7 @@ func contextReadTopFilesHandler(tracker *tracking.Tracker) http.HandlerFunc {
 				reduction = float64(saved) / float64(original) * 100
 			}
 			result = append(result, map[string]any{
-				"command":       command,
-				"file":          extractReadTarget(command),
+				"file":          normalizeContextTarget(target),
 				"commands":      commands,
 				"tokens_saved":  saved,
 				"reduction_pct": reduction,
@@ -197,23 +195,22 @@ func contextReadTopFilesHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 func contextReadProjectsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := tracker.Query(`
+		query := `
 			SELECT
 				project_path,
 				COUNT(*) as commands,
 				COALESCE(SUM(saved_tokens), 0) as saved,
 				COALESCE(SUM(original_tokens), 0) as original
 			FROM commands
-			WHERE (command GLOB 'tokman read *'
-			    OR command GLOB 'tokman ctx read *'
-			    OR command GLOB 'tokman ctx delta *'
-			    OR command GLOB 'tokman mcp read *'
-			    OR command GLOB 'tokman mcp bundle *')
+		`
+		where, args := contextReadQueryFilters("", "")
+		query += " WHERE " + where + `
 			  AND project_path IS NOT NULL AND project_path != ''
 			GROUP BY project_path
 			ORDER BY saved DESC
 			LIMIT 10
-		`)
+		`
+		rows, err := tracker.Query(query, args...)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -242,30 +239,32 @@ func contextReadProjectsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	}
 }
 
-func extractReadTarget(command string) string {
-	parts := strings.Fields(command)
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[len(parts)-1]
-}
-
 func contextReadComparisonHandler(tracker *tracking.Tracker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		singlePatterns := []string{
-			"tokman read *",
-			"tokman ctx read *",
-			"tokman ctx delta *",
-			"tokman mcp read *",
-		}
-		bundlePatterns := []string{"tokman mcp bundle *"}
-
-		singleSummary, err := tracker.GetSavingsForCommands("", singlePatterns)
+		singleQuery := `
+			SELECT COUNT(*), COALESCE(SUM(saved_tokens), 0), COALESCE(SUM(original_tokens), 0), COALESCE(AVG(filtered_tokens), 0)
+			FROM commands
+		`
+		singleWhere, singleArgs := contextReadQueryFilters("", "")
+		singleQuery += " WHERE " + singleWhere + " AND COALESCE(context_bundle, 0) = 0 AND command NOT GLOB 'tokman mcp bundle *'"
+		var singleCommands, singleSaved, singleOriginal int
+		var singleAvgDelivered float64
+		err := tracker.QueryRow(singleQuery, singleArgs...).Scan(&singleCommands, &singleSaved, &singleOriginal, &singleAvgDelivered)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		bundleSummary, err := tracker.GetSavingsForCommands("", bundlePatterns)
+
+		bundleQuery := `
+			SELECT COUNT(*), COALESCE(SUM(saved_tokens), 0), COALESCE(SUM(original_tokens), 0),
+			       COALESCE(AVG(filtered_tokens), 0), COALESCE(AVG(context_related_files), 0)
+			FROM commands
+		`
+		bundleWhere, bundleArgs := contextReadQueryFilters("", "")
+		bundleQuery += " WHERE " + bundleWhere + " AND (COALESCE(context_bundle, 0) = 1 OR command GLOB 'tokman mcp bundle *')"
+		var bundleCommands, bundleSaved, bundleOriginal int
+		var bundleAvgDelivered, bundleAvgRelated float64
+		err = tracker.QueryRow(bundleQuery, bundleArgs...).Scan(&bundleCommands, &bundleSaved, &bundleOriginal, &bundleAvgDelivered, &bundleAvgRelated)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -273,17 +272,181 @@ func contextReadComparisonHandler(tracker *tracking.Tracker) http.HandlerFunc {
 
 		httpmw.JSONResponse(w, http.StatusOK, map[string]any{
 			"single": map[string]any{
-				"commands":      singleSummary.TotalCommands,
-				"tokens_saved":  singleSummary.TotalSaved,
-				"reduction_pct": singleSummary.ReductionPct,
+				"commands":             singleCommands,
+				"tokens_saved":         singleSaved,
+				"reduction_pct":        reductionPercent(singleOriginal, singleSaved),
+				"avg_delivered_tokens": singleAvgDelivered,
 			},
 			"bundle": map[string]any{
-				"commands":      bundleSummary.TotalCommands,
-				"tokens_saved":  bundleSummary.TotalSaved,
-				"reduction_pct": bundleSummary.ReductionPct,
+				"commands":             bundleCommands,
+				"tokens_saved":         bundleSaved,
+				"reduction_pct":        reductionPercent(bundleOriginal, bundleSaved),
+				"avg_delivered_tokens": bundleAvgDelivered,
+				"avg_related_files":    bundleAvgRelated,
 			},
 		})
 	}
+}
+
+func contextReadQualityHandler(tracker *tracking.Tracker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := tracker.Query(`
+			SELECT
+				COALESCE(NULLIF(context_resolved_mode, ''), NULLIF(context_mode, ''), 'unknown') as mode,
+				COUNT(*) as commands,
+				COALESCE(SUM(saved_tokens), 0) as saved,
+				COALESCE(SUM(original_tokens), 0) as original,
+				COALESCE(AVG(filtered_tokens), 0) as avg_final,
+				COALESCE(AVG(saved_tokens), 0) as avg_saved,
+				COALESCE(AVG(CASE WHEN COALESCE(context_bundle, 0) = 1 THEN context_related_files ELSE NULL END), 0) as avg_related
+			FROM commands
+			WHERE `+mustContextReadWhere()+`
+			GROUP BY COALESCE(NULLIF(context_resolved_mode, ''), NULLIF(context_mode, ''), 'unknown')
+			ORDER BY saved DESC, commands DESC
+		`, mustContextReadArgs()...)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var modes []map[string]any
+		for rows.Next() {
+			var mode string
+			var commands, saved, original int
+			var avgFinal, avgSaved, avgRelated float64
+			if err := rows.Scan(&mode, &commands, &saved, &original, &avgFinal, &avgSaved, &avgRelated); err != nil {
+				continue
+			}
+			modes = append(modes, map[string]any{
+				"mode":                 mode,
+				"commands":             commands,
+				"tokens_saved":         saved,
+				"reduction_pct":        reductionPercent(original, saved),
+				"avg_delivered_tokens": avgFinal,
+				"avg_saved_tokens":     avgSaved,
+				"avg_related_files":    avgRelated,
+			})
+		}
+
+		httpmw.JSONResponse(w, http.StatusOK, map[string]any{"modes": modes})
+	}
+}
+
+func contextReadQueryFilters(kind, mode string) (string, []any) {
+	filter, args := trackingBuildContextReadFilter(kind, mode)
+	return filter, args
+}
+
+func mustContextReadWhere() string {
+	where, _ := contextReadQueryFilters("", "")
+	return where
+}
+
+func mustContextReadArgs() []any {
+	_, args := contextReadQueryFilters("", "")
+	return args
+}
+
+func trackingBuildContextReadFilter(kind, mode string) (string, []any) {
+	var filters []string
+	var args []any
+
+	if strings.TrimSpace(kind) != "" {
+		fallback := contextread.TrackedCommandPatternsForKind(kind)
+		fallbackClause, fallbackArgs := contextReadFallbackClause(fallback)
+		if fallbackClause != "" {
+			filters = append(filters, "(context_kind = ? OR (COALESCE(context_kind, '') = '' AND ("+fallbackClause+")))")
+			args = append(args, strings.ToLower(kind))
+			args = append(args, fallbackArgs...)
+		} else {
+			filters = append(filters, "context_kind = ?")
+			args = append(args, strings.ToLower(kind))
+		}
+	} else {
+		fallbackClause, fallbackArgs := contextReadFallbackClause(contextread.TrackedCommandPatterns())
+		filters = append(filters, "(COALESCE(context_kind, '') != '' OR ("+fallbackClause+"))")
+		args = append(args, fallbackArgs...)
+	}
+
+	if strings.TrimSpace(mode) != "" {
+		mode = strings.ToLower(mode)
+		filters = append(filters, "(context_mode = ? OR context_resolved_mode = ?)")
+		args = append(args, mode, mode)
+	}
+
+	return strings.Join(filters, " AND "), args
+}
+
+func contextReadFallbackClause(patterns []string) (string, []any) {
+	if len(patterns) == 0 {
+		return "", nil
+	}
+	parts := make([]string, 0, len(patterns))
+	args := make([]any, 0, len(patterns))
+	for _, pattern := range patterns {
+		parts = append(parts, "command GLOB ?")
+		args = append(args, pattern)
+	}
+	return strings.Join(parts, " OR "), args
+}
+
+func contextReadKind(rec tracking.CommandRecord) string {
+	if rec.ContextKind != "" {
+		return rec.ContextKind
+	}
+	command := rec.Command
+	switch {
+	case strings.Contains(command, " ctx delta "):
+		return "delta"
+	case strings.Contains(command, " mcp "):
+		return "mcp"
+	default:
+		return "read"
+	}
+}
+
+func contextReadMode(rec tracking.CommandRecord) string {
+	if rec.ContextResolvedMode != "" {
+		return rec.ContextResolvedMode
+	}
+	if rec.ContextMode != "" {
+		return rec.ContextMode
+	}
+	command := rec.Command
+	switch {
+	case strings.Contains(command, " ctx delta "):
+		return "delta"
+	case strings.Contains(command, " mcp bundle "):
+		return "graph"
+	default:
+		return ""
+	}
+}
+
+func contextReadTarget(rec tracking.CommandRecord) string {
+	if rec.ContextTarget != "" {
+		return rec.ContextTarget
+	}
+	return normalizeContextTarget(rec.Command)
+}
+
+func normalizeContextTarget(value string) string {
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) >= 4 && parts[0] == "tokman" {
+		return parts[len(parts)-1]
+	}
+	return value
+}
+
+func reductionPercent(original, saved int) float64 {
+	if original <= 0 {
+		return 0
+	}
+	return float64(saved) / float64(original) * 100
 }
 
 func dailyHandler(tracker *tracking.Tracker) http.HandlerFunc {

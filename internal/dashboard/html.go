@@ -643,6 +643,10 @@ const dashboardHTML = `<!DOCTYPE html>
                 <div id="context-read-projects">
                     <div class="loading">Loading...</div>
                 </div>
+                <h2 style="margin-top:1.25rem"><i data-lucide="sliders-horizontal" style="width:18px;height:18px;vertical-align:middle;margin-right:8px"></i>Context Mode Quality</h2>
+                <div id="context-read-quality">
+                    <div class="loading">Loading...</div>
+                </div>
             </div>
         </div>
 
@@ -722,7 +726,7 @@ const dashboardHTML = `<!DOCTYPE html>
             const contextReadEndpoint = currentContextReadKind === 'all'
                 ? '/api/context-reads'
                 : '/api/context-reads?kind=' + encodeURIComponent(currentContextReadKind);
-            const [stats, economics, daily, hourly, recent, topCommands, failures, performance, llmStatus, dailyBreakdown, projectStats, alerts, modelBreakdown, cacheMetrics, contextReads, contextReadSummary, contextReadTrend, contextReadTopFiles, contextReadProjects, contextReadComparison] = await Promise.all([
+            const [stats, economics, daily, hourly, recent, topCommands, failures, performance, llmStatus, dailyBreakdown, projectStats, alerts, modelBreakdown, cacheMetrics, contextReads, contextReadSummary, contextReadTrend, contextReadTopFiles, contextReadProjects, contextReadComparison, contextReadQuality] = await Promise.all([
                 fetchAPI('/api/stats'),
                 fetchAPI('/api/economics'),
                 fetchAPI('/api/daily?days=' + currentDays),
@@ -743,6 +747,7 @@ const dashboardHTML = `<!DOCTYPE html>
                 fetchAPI('/api/context-read-top-files'),
                 fetchAPI('/api/context-read-projects'),
                 fetchAPI('/api/context-read-comparison'),
+                fetchAPI('/api/context-read-quality'),
             ]);
 
             // Update LLM Banner
@@ -812,6 +817,7 @@ const dashboardHTML = `<!DOCTYPE html>
             renderContextReads(contextReads || []);
             renderContextReadTopFiles(contextReadTopFiles || []);
             renderContextReadProjects(contextReadProjects || []);
+            renderContextReadQuality(contextReadQuality);
             
             // Failures
             renderFailures(failures);
@@ -1231,7 +1237,22 @@ const dashboardHTML = `<!DOCTYPE html>
             const single = data && data.single ? data.single : { tokens_saved: 0, commands: 0 };
             document.getElementById('context-bundle-saved').textContent = '+' + (bundle.tokens_saved || 0).toLocaleString();
             document.getElementById('context-single-saved').textContent =
-                'single: +' + (single.tokens_saved || 0).toLocaleString() + ' · bundle cmds: ' + (bundle.commands || 0);
+                'single: +' + (single.tokens_saved || 0).toLocaleString() +
+                ' · avg related: ' + ((bundle.avg_related_files || 0).toFixed ? bundle.avg_related_files.toFixed(1) : '0.0');
+        }
+
+        function renderContextReadQuality(data) {
+            const container = document.getElementById('context-read-quality');
+            const modes = data && data.modes ? data.modes : [];
+            if (!modes || modes.length === 0) {
+                container.innerHTML = '<div class="activity-item"><span style="color:#8892b0">No mode quality data yet</span></div>';
+                return;
+            }
+            container.innerHTML = modes.slice(0, 5).map(item =>
+                '<div class=\"project-item\"><span class=\"name\">' + (item.mode || 'unknown') + '</span>' +
+                '<div class=\"stats\"><span class=\"tokens\">+' + Math.round(item.avg_saved_tokens || 0).toLocaleString() + '</span>' +
+                '<span>' + (item.commands || 0) + ' reads</span><span>' + ((item.reduction_pct || 0).toFixed(1)) + '%</span></div></div>'
+            ).join('');
         }
 
         function renderFailures(data) {

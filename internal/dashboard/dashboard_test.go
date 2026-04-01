@@ -190,9 +190,9 @@ func TestContextReadsHandler_FilterByKind(t *testing.T) {
 	tracker := setupTestDB(t)
 
 	for _, record := range []*tracking.CommandRecord{
-		{Command: "tokman ctx read main.go", OriginalTokens: 100, FilteredTokens: 40, SavedTokens: 60, ExecTimeMs: 12},
-		{Command: "tokman ctx delta main.go", OriginalTokens: 50, FilteredTokens: 10, SavedTokens: 40, ExecTimeMs: 8},
-		{Command: "tokman mcp read /tmp/main.go", OriginalTokens: 70, FilteredTokens: 20, SavedTokens: 50, ExecTimeMs: 5},
+		{Command: "tokman ctx read main.go", OriginalTokens: 100, FilteredTokens: 40, SavedTokens: 60, ExecTimeMs: 12, ContextKind: "read", ContextMode: "auto", ContextResolvedMode: "signatures", ContextTarget: "main.go"},
+		{Command: "tokman ctx delta main.go", OriginalTokens: 50, FilteredTokens: 10, SavedTokens: 40, ExecTimeMs: 8, ContextKind: "delta", ContextMode: "delta", ContextResolvedMode: "delta", ContextTarget: "main.go"},
+		{Command: "tokman mcp read /tmp/main.go", OriginalTokens: 70, FilteredTokens: 20, SavedTokens: 50, ExecTimeMs: 5, ContextKind: "mcp", ContextMode: "graph", ContextResolvedMode: "graph", ContextTarget: "/tmp/main.go", ContextBundle: true, ContextRelatedFiles: 4},
 	} {
 		if err := tracker.Record(record); err != nil {
 			t.Fatalf("Record() error = %v", err)
@@ -216,6 +216,41 @@ func TestContextReadsHandler_FilterByKind(t *testing.T) {
 	}
 	if response[0]["command"].(string) != "tokman ctx delta main.go" {
 		t.Fatalf("unexpected command %v", response[0]["command"])
+	}
+	if response[0]["kind"].(string) != "delta" {
+		t.Fatalf("expected delta kind, got %v", response[0]["kind"])
+	}
+}
+
+func TestContextReadsHandler_FilterByMode(t *testing.T) {
+	tracker := setupTestDB(t)
+
+	for _, record := range []*tracking.CommandRecord{
+		{Command: "tokman ctx read alpha.go", OriginalTokens: 100, FilteredTokens: 25, SavedTokens: 75, ContextKind: "read", ContextMode: "auto", ContextResolvedMode: "map", ContextTarget: "alpha.go"},
+		{Command: "tokman ctx read beta.go", OriginalTokens: 80, FilteredTokens: 20, SavedTokens: 60, ContextKind: "read", ContextMode: "auto", ContextResolvedMode: "signatures", ContextTarget: "beta.go"},
+	} {
+		if err := tracker.Record(record); err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+	}
+
+	req := httptest.NewRequest("GET", "/api/context-reads?mode=map", nil)
+	w := httptest.NewRecorder()
+	contextReadsHandler(tracker)(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var response []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+	if len(response) != 1 {
+		t.Fatalf("expected 1 map record, got %d", len(response))
+	}
+	if response[0]["mode"].(string) != "map" {
+		t.Fatalf("expected map mode, got %v", response[0]["mode"])
 	}
 }
 
@@ -340,6 +375,37 @@ func TestContextReadComparisonHandler(t *testing.T) {
 	}
 	if response["bundle"]["tokens_saved"].(float64) != 140 {
 		t.Fatalf("expected 140 bundle tokens saved, got %v", response["bundle"]["tokens_saved"])
+	}
+}
+
+func TestContextReadQualityHandler(t *testing.T) {
+	tracker := setupTestDB(t)
+	for _, record := range []*tracking.CommandRecord{
+		{Command: "tokman ctx read alpha.go", OriginalTokens: 100, FilteredTokens: 30, SavedTokens: 70, ContextKind: "read", ContextMode: "auto", ContextResolvedMode: "map", ContextTarget: "alpha.go"},
+		{Command: "tokman mcp bundle /tmp/alpha.go", OriginalTokens: 200, FilteredTokens: 60, SavedTokens: 140, ContextKind: "mcp", ContextMode: "graph", ContextResolvedMode: "graph", ContextTarget: "/tmp/alpha.go", ContextBundle: true, ContextRelatedFiles: 4},
+	} {
+		if err := tracker.Record(record); err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+	}
+
+	req := httptest.NewRequest("GET", "/api/context-read-quality", nil)
+	w := httptest.NewRecorder()
+	contextReadQualityHandler(tracker)(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var response map[string][]map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+	if len(response["modes"]) == 0 {
+		t.Fatal("expected at least one mode entry")
+	}
+	if response["modes"][0]["mode"] == nil {
+		t.Fatalf("expected mode field in response: %v", response["modes"][0])
 	}
 }
 

@@ -17,7 +17,7 @@ func TestBuildContextFileAutoMode(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	out, _, _, err := buildContextFile(path, contextread.Options{Mode: "auto"})
+	out, _, _, _, err := buildContextFile(path, contextread.Options{Mode: "auto"})
 	if err != nil {
 		t.Fatalf("buildContextFile() error = %v", err)
 	}
@@ -34,7 +34,7 @@ func TestBuildContextFileDeltaMode(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	first, _, _, err := buildContextFile(path, contextread.Options{Mode: "delta", SaveSnapshot: true})
+	first, _, _, _, err := buildContextFile(path, contextread.Options{Mode: "delta", SaveSnapshot: true})
 	if err != nil {
 		t.Fatalf("first buildContextFile() error = %v", err)
 	}
@@ -46,7 +46,7 @@ func TestBuildContextFileDeltaMode(t *testing.T) {
 		t.Fatalf("WriteFile() second error = %v", err)
 	}
 
-	second, _, _, err := buildContextFile(path, contextread.Options{Mode: "delta", SaveSnapshot: true})
+	second, _, _, _, err := buildContextFile(path, contextread.Options{Mode: "delta", SaveSnapshot: true})
 	if err != nil {
 		t.Fatalf("second buildContextFile() error = %v", err)
 	}

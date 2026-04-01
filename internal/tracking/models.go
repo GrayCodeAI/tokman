@@ -21,6 +21,13 @@ type CommandRecord struct {
 	ModelName   string `json:"model_name,omitempty"`   // e.g., "claude-3-opus", "gpt-4", "gemini-pro"
 	Provider    string `json:"provider,omitempty"`     // e.g., "Anthropic", "OpenAI", "Google"
 	ModelFamily string `json:"model_family,omitempty"` // e.g., "claude", "gpt", "gemini"
+	// Smart context read metadata
+	ContextKind         string `json:"context_kind,omitempty"`          // e.g., "read", "delta", "mcp"
+	ContextMode         string `json:"context_mode,omitempty"`          // requested mode: auto, graph, delta, ...
+	ContextResolvedMode string `json:"context_resolved_mode,omitempty"` // effective mode after auto-resolution
+	ContextTarget       string `json:"context_target,omitempty"`        // file path or target identifier
+	ContextRelatedFiles int    `json:"context_related_files,omitempty"` // number of related files included
+	ContextBundle       bool   `json:"context_bundle,omitempty"`        // whether multiple files were delivered together
 }
 
 // SavingsSummary represents aggregated token savings.

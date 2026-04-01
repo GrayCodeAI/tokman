@@ -384,24 +384,14 @@ func cacheMetricsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 }
 
 func buildContextEffectivenessByKind(tracker *tracking.Tracker) []map[string]any {
-	type kindDef struct {
-		name     string
-		patterns []string
-	}
-	defs := []kindDef{
-		{name: "read", patterns: contextread.TrackedCommandPatternsForKind("read")},
-		{name: "delta", patterns: contextread.TrackedCommandPatternsForKind("delta")},
-		{name: "mcp", patterns: contextread.TrackedCommandPatternsForKind("mcp")},
-	}
-
-	result := make([]map[string]any, 0, len(defs))
-	for _, def := range defs {
-		summary, err := tracker.GetSavingsForCommands("", def.patterns)
+	result := make([]map[string]any, 0, len(contextread.TrackedCommandKinds()))
+	for _, kind := range contextread.TrackedCommandKinds() {
+		summary, err := tracker.GetSavingsForContextReads("", kind, "")
 		if err != nil {
 			continue
 		}
 		result = append(result, map[string]any{
-			"kind":          def.name,
+			"kind":          kind,
 			"commands":      summary.TotalCommands,
 			"tokens_saved":  summary.TotalSaved,
 			"reduction_pct": summary.ReductionPct,
@@ -411,6 +401,7 @@ func buildContextEffectivenessByKind(tracker *tracking.Tracker) []map[string]any
 }
 
 func buildContextEffectivenessByProject(tracker *tracking.Tracker) []map[string]any {
+	where, args := contextReadQueryFilters("", "")
 	rows, err := tracker.Query(`
 		SELECT
 			project_path,
@@ -418,16 +409,12 @@ func buildContextEffectivenessByProject(tracker *tracking.Tracker) []map[string]
 			COALESCE(SUM(saved_tokens), 0) as saved,
 			COALESCE(SUM(original_tokens), 0) as original
 		FROM commands
-		WHERE (command GLOB 'tokman read *'
-		    OR command GLOB 'tokman ctx read *'
-		    OR command GLOB 'tokman ctx delta *'
-		    OR command GLOB 'tokman mcp read *'
-		    OR command GLOB 'tokman mcp bundle *')
+		WHERE `+where+`
 		  AND project_path IS NOT NULL AND project_path != ''
 		GROUP BY project_path
 		ORDER BY saved DESC
 		LIMIT 5
-	`)
+	`, args...)
 	if err != nil {
 		return nil
 	}

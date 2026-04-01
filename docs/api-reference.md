@@ -72,6 +72,7 @@ Returns recent smart-read activity from tracking.
 
 Optional query parameter:
 - `kind=read|delta|mcp`
+- `mode=auto|full|map|signatures|aggressive|entropy|lines|delta|graph`
 
 ### Dashboard `GET /api/context-read-summary`
 
@@ -91,6 +92,19 @@ Returns the highest-value files by smart-read savings.
 ### Dashboard `GET /api/context-read-projects`
 
 Returns the highest-value projects by smart-read savings.
+
+### Dashboard `GET /api/context-read-quality`
+
+Returns mode-level smart-read quality metrics, including:
+- `mode`
+- `commands`
+- `tokens_saved`
+- `reduction_pct`
+- `avg_delivered_tokens`
+- `avg_saved_tokens`
+- `avg_related_files`
+
+This endpoint is backed by structured tracking fields (`context_kind`, `context_mode`, `context_resolved_mode`, `context_target`, `context_bundle`) rather than command-name parsing.
 
 ## Base URL
 

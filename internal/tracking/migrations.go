@@ -1,7 +1,7 @@
 package tracking
 
 // SchemaVersion is the current database schema version.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // CreateCommandsTable creates the main commands table.
 const CreateCommandsTable = `
@@ -84,8 +84,8 @@ const AddAgentAttributionColumns = `
 -- These are run via safeAddColumn which checks if column exists first
 `
 
-// AgentAttributionColumnDefs defines the columns to add for agent attribution.
-var AgentAttributionColumnDefs = []struct {
+// CommandColumnDefs defines optional columns added after the base table exists.
+var CommandColumnDefs = []struct {
 	Name string
 	Type string
 }{
@@ -93,6 +93,12 @@ var AgentAttributionColumnDefs = []struct {
 	{"model_name", "TEXT"},
 	{"provider", "TEXT"},
 	{"model_family", "TEXT"},
+	{"context_kind", "TEXT"},
+	{"context_mode", "TEXT"},
+	{"context_resolved_mode", "TEXT"},
+	{"context_target", "TEXT"},
+	{"context_related_files", "INTEGER NOT NULL DEFAULT 0"},
+	{"context_bundle", "BOOLEAN NOT NULL DEFAULT 0"},
 }
 
 // AgentAttributionIndexes defines indexes for agent attribution.
@@ -100,6 +106,10 @@ const AgentAttributionIndexes = `
 CREATE INDEX IF NOT EXISTS idx_commands_agent ON commands(agent_name);
 CREATE INDEX IF NOT EXISTS idx_commands_model ON commands(model_name);
 CREATE INDEX IF NOT EXISTS idx_commands_provider ON commands(provider);
+CREATE INDEX IF NOT EXISTS idx_commands_context_kind ON commands(context_kind);
+CREATE INDEX IF NOT EXISTS idx_commands_context_mode ON commands(context_mode);
+CREATE INDEX IF NOT EXISTS idx_commands_context_target ON commands(context_target);
+CREATE INDEX IF NOT EXISTS idx_commands_context_bundle ON commands(context_bundle);
 `
 
 // CreateAgentSummaryView creates a view for per-agent statistics.

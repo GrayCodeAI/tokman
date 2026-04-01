@@ -14,6 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/GrayCodeAI/tokman/internal/config"
+	"github.com/GrayCodeAI/tokman/internal/contextread"
 	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/utils"
 )
@@ -171,10 +172,10 @@ func NewTracker(dbPath string) (*Tracker, error) {
 		}
 	}
 
-	// Safely add agent attribution columns (idempotent)
-	if err := addAgentAttributionColumns(db); err != nil {
+	// Safely add optional metadata columns (idempotent)
+	if err := addOptionalCommandColumns(db); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to add agent attribution columns: %w", err)
+		return nil, fmt.Errorf("failed to add command metadata columns: %w", err)
 	}
 
 	t := &Tracker{
@@ -201,9 +202,9 @@ func (t *Tracker) cleanupWorker() {
 	}
 }
 
-// addAgentAttributionColumns safely adds agent attribution columns if they don't exist.
+// addOptionalCommandColumns safely adds optional metadata columns if they don't exist.
 // This is idempotent and won't fail if columns already exist.
-func addAgentAttributionColumns(db *sql.DB) error {
+func addOptionalCommandColumns(db *sql.DB) error {
 	// Get existing columns
 	rows, err := db.Query("PRAGMA table_info(commands)")
 	if err != nil {
@@ -225,7 +226,7 @@ func addAgentAttributionColumns(db *sql.DB) error {
 	}
 
 	// Add missing columns
-	for _, col := range AgentAttributionColumnDefs {
+	for _, col := range CommandColumnDefs {
 		if !existingCols[col.Name] {
 			_, err := db.Exec(fmt.Sprintf("ALTER TABLE commands ADD COLUMN %s %s", col.Name, col.Type))
 			if err != nil {
@@ -248,6 +249,11 @@ func (t *Tracker) Query(query string, args ...any) (*sql.Rows, error) {
 	return t.db.Query(query, args...)
 }
 
+// QueryRow executes a raw SQL query expected to return at most one row.
+func (t *Tracker) QueryRow(query string, args ...any) *sql.Row {
+	return t.db.QueryRow(query, args...)
+}
+
 // EstimateTokens provides a heuristic token count.
 // Delegates to core.EstimateTokens for single source of truth (T22).
 func EstimateTokens(text string) int {
@@ -267,8 +273,10 @@ func (t *Tracker) RecordContext(ctx context.Context, record *CommandRecord) erro
 			command, original_output, filtered_output,
 			original_tokens, filtered_tokens, saved_tokens,
 			project_path, session_id, exec_time_ms, parse_success,
-			agent_name, model_name, provider, model_family
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			agent_name, model_name, provider, model_family,
+			context_kind, context_mode, context_resolved_mode,
+			context_target, context_related_files, context_bundle
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := t.db.ExecContext(ctx, query,
@@ -286,6 +294,12 @@ func (t *Tracker) RecordContext(ctx context.Context, record *CommandRecord) erro
 		record.ModelName,
 		record.Provider,
 		record.ModelFamily,
+		record.ContextKind,
+		record.ContextMode,
+		record.ContextResolvedMode,
+		record.ContextTarget,
+		record.ContextRelatedFiles,
+		record.ContextBundle,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to record command: %w", err)
@@ -519,6 +533,52 @@ func (t *Tracker) GetSavings(projectPath string) (*SavingsSummary, error) {
 	return t.GetSavingsForCommands(projectPath, nil)
 }
 
+// GetSavingsForContextReads returns smart-read savings using structured metadata
+// when available, with command-pattern fallback for older records.
+func (t *Tracker) GetSavingsForContextReads(projectPath, kind, mode string) (*SavingsSummary, error) {
+	var args []any
+	var filters []string
+
+	query := `
+		SELECT
+			COUNT(*) as total_commands,
+			COALESCE(SUM(saved_tokens), 0) as total_saved,
+			COALESCE(SUM(original_tokens), 0) as total_original,
+			COALESCE(SUM(filtered_tokens), 0) as total_filtered
+		FROM commands
+	`
+
+	if projectPath != "" {
+		filters = append(filters, "(project_path GLOB ? OR project_path = ?)")
+		pattern := projectPath + "/%"
+		args = append(args, pattern, projectPath)
+	}
+
+	contextFilter, contextArgs := buildContextReadFilter(kind, mode)
+	if contextFilter != "" {
+		filters = append(filters, contextFilter)
+		args = append(args, contextArgs...)
+	}
+
+	if len(filters) > 0 {
+		query += " WHERE " + strings.Join(filters, " AND ")
+	}
+
+	summary := &SavingsSummary{}
+	if err := t.db.QueryRow(query, args...).Scan(
+		&summary.TotalCommands,
+		&summary.TotalSaved,
+		&summary.TotalOriginal,
+		&summary.TotalFiltered,
+	); err != nil {
+		return nil, fmt.Errorf("failed to get context-read savings: %w", err)
+	}
+	if summary.TotalOriginal > 0 {
+		summary.ReductionPct = float64(summary.TotalSaved) / float64(summary.TotalOriginal) * 100
+	}
+	return summary, nil
+}
+
 // GetSavingsForCommands returns token savings for commands matching any of the
 // provided GLOB patterns. When commandPatterns is empty, it returns all records.
 func (t *Tracker) GetSavingsForCommands(projectPath string, commandPatterns []string) (*SavingsSummary, error) {
@@ -731,6 +791,65 @@ func (t *Tracker) GetRecentCommands(projectPath string, limit int) ([]CommandRec
 	return t.GetRecentCommandsForPatterns(projectPath, limit, nil)
 }
 
+// GetRecentContextReads returns recent smart-read records using structured
+// metadata when available, with legacy command fallback for older rows.
+func (t *Tracker) GetRecentContextReads(projectPath, kind, mode string, limit int) ([]CommandRecord, error) {
+	var args []any
+	var filters []string
+
+	query := `
+		SELECT id, command, original_tokens, filtered_tokens, saved_tokens,
+		       project_path, session_id, exec_time_ms, timestamp, parse_success,
+		       context_kind, context_mode, context_resolved_mode,
+		       context_target, context_related_files, context_bundle
+		FROM commands
+	`
+
+	if projectPath != "" {
+		filters = append(filters, "(project_path GLOB ? OR project_path = ?)")
+		pattern := projectPath + "/%"
+		args = append(args, pattern, projectPath)
+	}
+
+	contextFilter, contextArgs := buildContextReadFilter(kind, mode)
+	if contextFilter != "" {
+		filters = append(filters, contextFilter)
+		args = append(args, contextArgs...)
+	}
+
+	if len(filters) > 0 {
+		query += " WHERE " + strings.Join(filters, " AND ")
+	}
+	query += " ORDER BY timestamp DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := t.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent context reads: %w", err)
+	}
+	defer rows.Close()
+
+	var records []CommandRecord
+	for rows.Next() {
+		var r CommandRecord
+		var parseSuccess int
+		if err := rows.Scan(
+			&r.ID, &r.Command, &r.OriginalTokens, &r.FilteredTokens, &r.SavedTokens,
+			&r.ProjectPath, &r.SessionID, &r.ExecTimeMs, &r.Timestamp, &parseSuccess,
+			&r.ContextKind, &r.ContextMode, &r.ContextResolvedMode,
+			&r.ContextTarget, &r.ContextRelatedFiles, &r.ContextBundle,
+		); err != nil {
+			return nil, err
+		}
+		r.ParseSuccess = parseSuccess == 1
+		records = append(records, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
 // GetRecentCommandsForPatterns returns recent commands optionally filtered by
 // command GLOB patterns. When commandPatterns is empty, it returns all commands.
 func (t *Tracker) GetRecentCommandsForPatterns(projectPath string, limit int, commandPatterns []string) ([]CommandRecord, error) {
@@ -740,7 +859,9 @@ func (t *Tracker) GetRecentCommandsForPatterns(projectPath string, limit int, co
 
 	query = `
 		SELECT id, command, original_tokens, filtered_tokens, saved_tokens,
-		       project_path, session_id, exec_time_ms, timestamp, parse_success
+		       project_path, session_id, exec_time_ms, timestamp, parse_success,
+		       context_kind, context_mode, context_resolved_mode,
+		       context_target, context_related_files, context_bundle
 		FROM commands
 	`
 
@@ -776,6 +897,8 @@ func (t *Tracker) GetRecentCommandsForPatterns(projectPath string, limit int, co
 		if err := rows.Scan(
 			&r.ID, &r.Command, &r.OriginalTokens, &r.FilteredTokens, &r.SavedTokens,
 			&r.ProjectPath, &r.SessionID, &r.ExecTimeMs, &r.Timestamp, &parseSuccess,
+			&r.ContextKind, &r.ContextMode, &r.ContextResolvedMode,
+			&r.ContextTarget, &r.ContextRelatedFiles, &r.ContextBundle,
 		); err != nil {
 			return nil, err
 		}
@@ -787,6 +910,42 @@ func (t *Tracker) GetRecentCommandsForPatterns(projectPath string, limit int, co
 	}
 
 	return records, nil
+}
+
+func buildContextReadFilter(kind, mode string) (string, []any) {
+	var filters []string
+	var args []any
+
+	if strings.TrimSpace(kind) != "" {
+		legacyPatterns := contextread.TrackedCommandPatternsForKind(kind)
+		var legacy []string
+		for _, pattern := range legacyPatterns {
+			legacy = append(legacy, "command GLOB ?")
+			args = append(args, pattern)
+		}
+		if len(legacy) > 0 {
+			filters = append(filters, "(context_kind = ? OR (COALESCE(context_kind, '') = '' AND ("+strings.Join(legacy, " OR ")+")))")
+			args = append([]any{strings.ToLower(kind)}, args...)
+		} else {
+			filters = append(filters, "context_kind = ?")
+			args = append(args, strings.ToLower(kind))
+		}
+	} else {
+		var legacy []string
+		for _, pattern := range contextread.TrackedCommandPatterns() {
+			legacy = append(legacy, "command GLOB ?")
+			args = append(args, pattern)
+		}
+		filters = append(filters, "(COALESCE(context_kind, '') != '' OR ("+strings.Join(legacy, " OR ")+"))")
+	}
+
+	if strings.TrimSpace(mode) != "" {
+		filters = append(filters, "(context_mode = ? OR context_resolved_mode = ?)")
+		mode = strings.ToLower(mode)
+		args = append(args, mode, mode)
+	}
+
+	return strings.Join(filters, " AND "), args
 }
 
 // GetDailySavings returns token savings grouped by day.

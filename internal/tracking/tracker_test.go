@@ -215,3 +215,102 @@ func TestGetRecentCommands(t *testing.T) {
 		t.Errorf("GetRecentCommands() returned %d commands, want 5", len(commands))
 	}
 }
+
+func TestRecordAndQueryContextMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	tracker, err := NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer tracker.Close()
+
+	record := &CommandRecord{
+		Command:             "tokman ctx read main.go",
+		OriginalTokens:      200,
+		FilteredTokens:      60,
+		SavedTokens:         140,
+		ProjectPath:         "/test/project",
+		ParseSuccess:        true,
+		ContextKind:         "read",
+		ContextMode:         "auto",
+		ContextResolvedMode: "signatures",
+		ContextTarget:       "/test/project/main.go",
+		ContextRelatedFiles: 4,
+		ContextBundle:       true,
+	}
+	if err := tracker.Record(record); err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+
+	records, err := tracker.GetRecentContextReads("/test/project", "read", "", 10)
+	if err != nil {
+		t.Fatalf("GetRecentContextReads() error = %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].ContextResolvedMode != "signatures" {
+		t.Fatalf("expected resolved mode signatures, got %q", records[0].ContextResolvedMode)
+	}
+	if records[0].ContextTarget != "/test/project/main.go" {
+		t.Fatalf("expected target to persist, got %q", records[0].ContextTarget)
+	}
+	if !records[0].ContextBundle {
+		t.Fatal("expected bundle flag to persist")
+	}
+}
+
+func TestGetSavingsForContextReadsFallbackAndMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	tracker, err := NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer tracker.Close()
+
+	for _, record := range []*CommandRecord{
+		{
+			Command:             "tokman ctx read alpha.go",
+			OriginalTokens:      120,
+			FilteredTokens:      30,
+			SavedTokens:         90,
+			ProjectPath:         "/test/project",
+			ParseSuccess:        true,
+			ContextKind:         "read",
+			ContextMode:         "auto",
+			ContextResolvedMode: "map",
+		},
+		{
+			Command:        "tokman mcp bundle /tmp/alpha.go",
+			OriginalTokens: 200,
+			FilteredTokens: 80,
+			SavedTokens:    120,
+			ProjectPath:    "/test/project",
+			ParseSuccess:   true,
+		},
+	} {
+		if err := tracker.Record(record); err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+	}
+
+	modeSummary, err := tracker.GetSavingsForContextReads("/test/project", "read", "map")
+	if err != nil {
+		t.Fatalf("GetSavingsForContextReads() mode error = %v", err)
+	}
+	if modeSummary.TotalCommands != 1 || modeSummary.TotalSaved != 90 {
+		t.Fatalf("unexpected mode summary: %+v", modeSummary)
+	}
+
+	fallbackSummary, err := tracker.GetSavingsForContextReads("/test/project", "mcp", "")
+	if err != nil {
+		t.Fatalf("GetSavingsForContextReads() fallback error = %v", err)
+	}
+	if fallbackSummary.TotalCommands != 1 || fallbackSummary.TotalSaved != 120 {
+		t.Fatalf("unexpected fallback summary: %+v", fallbackSummary)
+	}
+}

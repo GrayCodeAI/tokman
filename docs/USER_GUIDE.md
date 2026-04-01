@@ -281,9 +281,11 @@ Recommended usage:
 
 Dashboard support:
 - `/api/context-reads` shows recent smart reads
+- `/api/context-reads?mode=graph` isolates graph/bundle reads
 - `/api/context-read-summary` breaks them down into `read`, `delta`, and `mcp`
 - `/api/context-read-trend` shows smart-read savings over time
 - `/api/context-read-top-files` and `/api/context-read-projects` show where context delivery is paying off
+- `/api/context-read-quality` shows which read modes deliver the best savings
 - the dashboard UI can filter smart-read activity by type
 
 MCP support:
