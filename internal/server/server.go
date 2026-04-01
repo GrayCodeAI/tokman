@@ -32,6 +32,7 @@ type Server struct {
 	apiKey   string
 	version  string
 	selector *filter.AdaptiveLayerSelector
+	pipeline filter.PipelineConfig
 	metrics  *Metrics
 	logger   *Logger
 
@@ -100,11 +101,12 @@ func (rl *rateLimiter) Allow(ip string) bool {
 
 // Config holds server configuration
 type Config struct {
-	Port      int
-	APIKey    string // Optional API key for authentication (empty = no auth)
-	LogLevel  string // "debug", "info", "error"
-	Version   string
-	RateLimit int // Requests per minute (0 = unlimited)
+	Port           int
+	APIKey         string // Optional API key for authentication (empty = no auth)
+	LogLevel       string // "debug", "info", "error"
+	Version        string
+	RateLimit      int // Requests per minute (0 = unlimited)
+	PipelineConfig filter.PipelineConfig
 }
 
 // New creates a new server
@@ -115,7 +117,7 @@ func New(config Config) *Server {
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
 	}
-	if config.RateLimit == 0 {
+	if config.RateLimit < 0 {
 		config.RateLimit = defaultRateLimit
 	}
 	return &Server{
@@ -123,6 +125,7 @@ func New(config Config) *Server {
 		apiKey:      config.APIKey,
 		version:     config.Version,
 		selector:    filter.NewAdaptiveLayerSelector(),
+		pipeline:    config.PipelineConfig,
 		metrics:     NewMetrics(),
 		logger:      NewLogger(config.LogLevel),
 		rateLimiter: newRateLimiter(config.RateLimit),
@@ -210,7 +213,7 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 			ip = host
 		}
 
-		if !s.rateLimiter.Allow(ip) {
+		if s.rateLimiter.limit > 0 && !s.rateLimiter.Allow(ip) {
 			s.metrics.RecordError()
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
@@ -244,7 +247,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Health check is always accessible
-		if r.URL.Path == "/health" {
+		if r.URL.Path == "/health" || r.URL.Path == "/health/ready" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -370,15 +373,9 @@ func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
 
 	// Process
 	start := time.Now()
-	config := filter.PipelineConfig{
-		Mode:                mode,
-		Budget:              budget,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-	}
+	config := s.pipeline
+	config.Mode = mode
+	config.Budget = budget
 	coordinator := filter.NewPipelineCoordinator(config)
 	output, stats := coordinator.Process(req.Input)
 	elapsed := time.Since(start)

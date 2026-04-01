@@ -58,13 +58,13 @@ type LayerInfo struct {
 
 // Service implements CompressionService using the filter pipeline.
 type Service struct {
-	pipeline *filter.PipelineCoordinator
+	baseConfig filter.PipelineConfig
 }
 
 // NewService creates a new compression service.
 func NewService(cfg filter.PipelineConfig) *Service {
 	return &Service{
-		pipeline: filter.NewPipelineCoordinator(cfg),
+		baseConfig: cfg,
 	}
 }
 
@@ -72,14 +72,17 @@ func NewService(cfg filter.PipelineConfig) *Service {
 func (s *Service) Compress(ctx context.Context, req *CompressRequest) (*CompressResponse, error) {
 	start := time.Now()
 
-	cfg := filter.PipelineConfig{
-		Mode:        req.Mode,
-		QueryIntent: req.QueryIntent,
-		Budget:      req.Budget,
+	cfg := s.baseConfig
+	cfg.Mode = req.Mode
+	cfg.QueryIntent = req.QueryIntent
+	cfg.Budget = req.Budget
+	if req.Preset != "" {
+		cfg = filter.PresetConfig(filter.PipelinePreset(req.Preset), req.Mode)
+		cfg.QueryIntent = req.QueryIntent
+		cfg.Budget = req.Budget
 	}
 
-	output, stats := s.pipeline.Process(req.Input)
-	_ = cfg // Use config for pipeline reinitialization if needed
+	output, stats := filter.NewPipelineCoordinator(cfg).Process(req.Input)
 
 	// Calculate duration
 	duration := time.Since(start)

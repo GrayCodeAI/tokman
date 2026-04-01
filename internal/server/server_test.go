@@ -8,6 +8,54 @@ import (
 	"testing"
 )
 
+func TestAuthMiddlewareAllowsReadinessChecks(t *testing.T) {
+	s := New(Config{Port: 8080, APIKey: "secret"})
+	handler := s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	for _, path := range []string{"/health", "/health/ready"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("%s returned %d, want %d", path, rec.Code, http.StatusNoContent)
+		}
+	}
+}
+
+func TestAuthMiddlewareProtectsNonHealthRoutes(t *testing.T) {
+	s := New(Config{Port: 8080, APIKey: "secret"})
+	handler := s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/stats", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestRateLimitZeroMeansUnlimited(t *testing.T) {
+	s := New(Config{Port: 8080, RateLimit: 0})
+	handler := s.rateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/stats", nil)
+		req.RemoteAddr = "127.0.0.1:12345"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("request %d status = %d, want %d", i+1, rec.Code, http.StatusNoContent)
+		}
+	}
+}
+
 func TestHandleHealth(t *testing.T) {
 	s := New(Config{Port: 8080})
 

@@ -18,6 +18,7 @@ type Config struct {
 	CompressionAddr string // Compression service address (e.g., "localhost:50051")
 	AnalyticsAddr   string // Analytics service address (e.g., "localhost:50053")
 	Timeout         time.Duration
+	DialOptions     []grpc.DialOption // Optional extra dial options, primarily for tests
 }
 
 // DefaultConfig returns default client configuration.
@@ -93,12 +94,13 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	c := &Client{config: cfg}
+	baseDialOptions := append([]grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}, cfg.DialOptions...)
 
 	// Connect to compression service
 	if cfg.CompressionAddr != "" {
-		conn, err := grpc.NewClient(cfg.CompressionAddr,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
+		conn, err := grpc.NewClient(cfg.CompressionAddr, baseDialOptions...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to compression service: %w", err)
 		}
@@ -108,9 +110,7 @@ func New(cfg *Config) (*Client, error) {
 
 	// Connect to analytics service
 	if cfg.AnalyticsAddr != "" {
-		conn, err := grpc.NewClient(cfg.AnalyticsAddr,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
+		conn, err := grpc.NewClient(cfg.AnalyticsAddr, baseDialOptions...)
 		if err != nil {
 			c.Close()
 			return nil, fmt.Errorf("failed to connect to analytics service: %w", err)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 
 	analyticspb "github.com/GrayCodeAI/tokman/pkg/api/proto/analyticsv1"
 	compressionpb "github.com/GrayCodeAI/tokman/pkg/api/proto/compressionv1"
@@ -57,12 +58,8 @@ func (s *mockAnalyticsServer) GetEconomics(ctx context.Context, req *analyticspb
 	}, nil
 }
 
-func startMockServer(t *testing.T) (string, *grpc.Server) {
-	lis, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
+func startMockServer(t *testing.T) (*bufconn.Listener, *grpc.Server) {
+	lis := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
 	compressionpb.RegisterCompressionServiceServer(server, &mockCompressionServer{})
 	analyticspb.RegisterAnalyticsServiceServer(server, &mockAnalyticsServer{})
@@ -73,16 +70,25 @@ func startMockServer(t *testing.T) (string, *grpc.Server) {
 		}
 	}()
 
-	return lis.Addr().String(), server
+	return lis, server
+}
+
+func testDialOptions(lis *bufconn.Listener) []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return lis.DialContext(ctx)
+		}),
+	}
 }
 
 func TestClientCompress(t *testing.T) {
-	addr, server := startMockServer(t)
+	lis, server := startMockServer(t)
 	defer server.Stop()
 
 	cfg := &Config{
-		CompressionAddr: addr,
+		CompressionAddr: "passthrough:///bufnet",
 		Timeout:         5 * time.Second,
+		DialOptions:     testDialOptions(lis),
 	}
 
 	client, err := New(cfg)
@@ -114,12 +120,13 @@ func TestClientCompress(t *testing.T) {
 }
 
 func TestClientGetLayers(t *testing.T) {
-	addr, server := startMockServer(t)
+	lis, server := startMockServer(t)
 	defer server.Stop()
 
 	cfg := &Config{
-		CompressionAddr: addr,
+		CompressionAddr: "passthrough:///bufnet",
 		Timeout:         5 * time.Second,
+		DialOptions:     testDialOptions(lis),
 	}
 
 	client, err := New(cfg)
@@ -145,12 +152,13 @@ func TestClientGetLayers(t *testing.T) {
 }
 
 func TestClientGetMetrics(t *testing.T) {
-	addr, server := startMockServer(t)
+	lis, server := startMockServer(t)
 	defer server.Stop()
 
 	cfg := &Config{
-		AnalyticsAddr: addr,
+		AnalyticsAddr: "passthrough:///bufnet",
 		Timeout:       5 * time.Second,
+		DialOptions:   testDialOptions(lis),
 	}
 
 	client, err := New(cfg)
@@ -176,12 +184,13 @@ func TestClientGetMetrics(t *testing.T) {
 }
 
 func TestClientGetEconomics(t *testing.T) {
-	addr, server := startMockServer(t)
+	lis, server := startMockServer(t)
 	defer server.Stop()
 
 	cfg := &Config{
-		AnalyticsAddr: addr,
+		AnalyticsAddr: "passthrough:///bufnet",
 		Timeout:       5 * time.Second,
+		DialOptions:   testDialOptions(lis),
 	}
 
 	client, err := New(cfg)

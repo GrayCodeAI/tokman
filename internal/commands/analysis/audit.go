@@ -249,21 +249,8 @@ func auditTruncate(s string, maxLen int) string {
 
 // convertConfigToPipeline converts config.PipelineConfig to filter.PipelineConfig
 func convertConfigToPipeline(cfg config.PipelineConfig) filter.PipelineConfig {
-	return filter.PipelineConfig{
-		Mode:               filter.ModeMinimal, // Will be overridden by manager
-		QueryIntent:        "",
-		Budget:             cfg.DefaultBudget,
-		LLMEnabled:         false,
-		SessionTracking:    true,
-		NgramEnabled:       cfg.EnableNgram,
-		PromptTemplate:     "",
-		EnableEntropy:      cfg.EnableEntropy,
-		EnablePerplexity:   cfg.EnablePerplexity,
-		EnableGoalDriven:   cfg.EnableGoalDriven,
-		EnableAST:          cfg.EnableAST,
-		EnableContrastive:  cfg.EnableContrastive,
-		EnableEvaluator:    cfg.EnableEvaluator,
-		EnableGist:         cfg.EnableGist,
-		EnableHierarchical: cfg.EnableHierarchical,
-	}
+	return cfg.ToFilterPipelineConfig(config.PipelineRuntimeOptions{
+		Mode:   filter.ModeMinimal, // Overridden by manager per request.
+		Budget: cfg.DefaultBudget,
+	})
 }

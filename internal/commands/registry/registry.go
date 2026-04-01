@@ -10,6 +10,11 @@ func Init(root *cobra.Command) {
 
 func Register(cmd *cobra.Command) {
 	if globalRoot != nil {
+		for _, existing := range globalRoot.Commands() {
+			if existing.Name() == cmd.Name() {
+				return
+			}
+		}
 		globalRoot.AddCommand(cmd)
 	}
 }

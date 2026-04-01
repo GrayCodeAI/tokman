@@ -121,15 +121,10 @@ func loadConfig(path string) (*config.Config, error) {
 // runCompressionService runs the compression service.
 func runCompressionService(ctx context.Context, cfg *config.Config, port int) error {
 	// Create pipeline config from loaded config
-	pipelineCfg := filter.PipelineConfig{
-		Mode:                filter.ModeMinimal,
-		Budget:              4000,
-		SessionTracking:     true,
-		NgramEnabled:        true,
-		EnableCompaction:    true,
-		EnableH2O:           true,
-		EnableAttentionSink: true,
-	}
+	pipelineCfg := cfg.Pipeline.ToFilterPipelineConfig(config.PipelineRuntimeOptions{
+		Mode:   filter.ModeMinimal,
+		Budget: cfg.Pipeline.DefaultBudget,
+	})
 
 	svc := compression.NewService(pipelineCfg)
 
@@ -170,9 +165,10 @@ func runCompressionService(ctx context.Context, cfg *config.Config, port int) er
 			httpPort = port + 1000 // HTTP on different port when gRPC enabled
 		}
 		srv := server.New(server.Config{
-			Port:     httpPort,
-			LogLevel: "info",
-			Version:  Version,
+			Port:           httpPort,
+			LogLevel:       "info",
+			Version:        Version,
+			PipelineConfig: pipelineCfg,
 		})
 		return srv.Start()
 	}

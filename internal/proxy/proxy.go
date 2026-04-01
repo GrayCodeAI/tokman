@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	appconfig "github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 )
@@ -63,26 +64,16 @@ type cachedResponse struct {
 
 // NewProxy creates a new HTTP proxy instance.
 func NewProxy(listenAddr, targetURL string) *Proxy {
-	cfg := filter.PipelineConfig{
-		Mode:                   filter.ModeMinimal,
-		SessionTracking:        true,
-		NgramEnabled:           true,
-		EnableCompaction:       true,
-		EnableAttribution:      true,
-		EnableH2O:              true,
-		EnableAttentionSink:    true,
-		EnableMetaToken:        true,
-		EnableSemanticChunk:    true,
-		EnableSketchStore:      true,
-		EnableLazyPruner:       true,
-		EnableSemanticAnchor:   true,
-		EnableAgentMemory:      true,
-		EnableTFIDF:            true,
-		EnableSymbolicCompress: true,
-		EnablePhraseGrouping:   true,
-		EnableNumericalQuant:   true,
-		EnableDynamicRatio:     true,
-	}
+	defaults := appconfig.Defaults()
+	cfg := defaults.Pipeline.ToFilterPipelineConfig(appconfig.PipelineRuntimeOptions{
+		Mode:   filter.ModeMinimal,
+		Budget: defaults.Pipeline.DefaultBudget,
+	})
+	return NewProxyWithPipeline(listenAddr, targetURL, cfg)
+}
+
+// NewProxyWithPipeline creates a proxy with an explicit runtime pipeline config.
+func NewProxyWithPipeline(listenAddr, targetURL string, cfg filter.PipelineConfig) *Proxy {
 	return &Proxy{
 		compressor: filter.NewPipelineCoordinator(cfg),
 		stats: &ProxyStats{
