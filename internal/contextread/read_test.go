@@ -97,3 +97,25 @@ func TestBuildGraphModeIncludesRelatedFiles(t *testing.T) {
 		t.Fatalf("expected helper.go in graph output, got %q", out)
 	}
 }
+
+func TestBuildCachesRepeatedReads(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "main.go")
+	content := "package main\n\nfunc alpha() {}\n"
+
+	before := CacheStats()
+	if _, _, _, err := Build(filePath, content, Options{Mode: "auto"}); err != nil {
+		t.Fatalf("Build() first error = %v", err)
+	}
+	mid := CacheStats()
+	if _, _, _, err := Build(filePath, content, Options{Mode: "auto"}); err != nil {
+		t.Fatalf("Build() second error = %v", err)
+	}
+	after := CacheStats()
+
+	if mid.Misses <= before.Misses {
+		t.Fatalf("expected cache miss count to increase")
+	}
+	if after.Hits <= mid.Hits {
+		t.Fatalf("expected cache hit count to increase")
+	}
+}

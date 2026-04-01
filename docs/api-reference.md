@@ -54,6 +54,18 @@ Returns aggregate smart-read savings grouped by:
 - `delta`
 - `mcp`
 
+### Dashboard `GET /api/context-read-trend`
+
+Returns daily smart-read savings over time.
+
+### Dashboard `GET /api/context-read-top-files`
+
+Returns the highest-value files by smart-read savings.
+
+### Dashboard `GET /api/context-read-projects`
+
+Returns the highest-value projects by smart-read savings.
+
 ## Base URL
 
 ```

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/GrayCodeAI/tokman/internal/ccusage"
+	"github.com/GrayCodeAI/tokman/internal/contextread"
 	"github.com/GrayCodeAI/tokman/internal/httpmw"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
@@ -356,6 +357,11 @@ func cacheMetricsHandler(tracker *tracking.Tracker) http.HandlerFunc {
 			"commands_count": stats.TotalCommands,
 			"hourly_pattern": hourlyPattern,
 		}
+		contextCache := contextread.CacheStats()
+		response["context_cache_entries"] = contextCache.Entries
+		response["context_cache_hits"] = contextCache.Hits
+		response["context_cache_misses"] = contextCache.Misses
+		response["context_cache_hit_rate"] = contextCache.HitRate * 100
 
 		// Add ccusage cache stats if available
 		if ccusage.IsAvailable() {

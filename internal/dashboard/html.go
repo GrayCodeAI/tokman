@@ -328,6 +328,11 @@ const dashboardHTML = `<!DOCTYPE html>
             background: linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%);
         }
         .chart-cache h2 { color: #10b981; }
+        .chart-context {
+            border-color: rgba(249, 115, 22, 0.3);
+            background: linear-gradient(145deg, rgba(249, 115, 22, 0.08) 0%, rgba(249, 115, 22, 0.02) 100%);
+        }
+        .chart-context h2 { color: #fb923c; }
         
         .cache-stats {
             display: grid;
@@ -619,6 +624,23 @@ const dashboardHTML = `<!DOCTYPE html>
             </div>
         </div>
 
+        <div class="charts-grid">
+            <div class="chart-container chart-context">
+                <h2><i data-lucide="route" style="width:18px;height:18px;vertical-align:middle;margin-right:8px"></i>Smart Read Trend</h2>
+                <canvas id="contextTrendChart"></canvas>
+            </div>
+            <div class="activity-list projects-section">
+                <h2><i data-lucide="file-stack" style="width:18px;height:18px;vertical-align:middle;margin-right:8px"></i>Top Smart Read Files</h2>
+                <div id="context-read-top-files">
+                    <div class="loading">Loading...</div>
+                </div>
+                <h2 style="margin-top:1.25rem"><i data-lucide="folders" style="width:18px;height:18px;vertical-align:middle;margin-right:8px"></i>Top Smart Read Projects</h2>
+                <div id="context-read-projects">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Daily Breakdown Section -->
         <div class="activity-section breakdown-section">
             <div class="activity-list daily-section">
@@ -695,7 +717,7 @@ const dashboardHTML = `<!DOCTYPE html>
             const contextReadEndpoint = currentContextReadKind === 'all'
                 ? '/api/context-reads'
                 : '/api/context-reads?kind=' + encodeURIComponent(currentContextReadKind);
-            const [stats, economics, daily, hourly, recent, topCommands, failures, performance, llmStatus, dailyBreakdown, projectStats, alerts, modelBreakdown, cacheMetrics, contextReads, contextReadSummary] = await Promise.all([
+            const [stats, economics, daily, hourly, recent, topCommands, failures, performance, llmStatus, dailyBreakdown, projectStats, alerts, modelBreakdown, cacheMetrics, contextReads, contextReadSummary, contextReadTrend, contextReadTopFiles, contextReadProjects] = await Promise.all([
                 fetchAPI('/api/stats'),
                 fetchAPI('/api/economics'),
                 fetchAPI('/api/daily?days=' + currentDays),
@@ -712,6 +734,9 @@ const dashboardHTML = `<!DOCTYPE html>
                 fetchAPI('/api/cache-metrics'),
                 fetchAPI(contextReadEndpoint),
                 fetchAPI('/api/context-read-summary'),
+                fetchAPI('/api/context-read-trend'),
+                fetchAPI('/api/context-read-top-files'),
+                fetchAPI('/api/context-read-projects'),
             ]);
 
             // Update LLM Banner
@@ -725,6 +750,7 @@ const dashboardHTML = `<!DOCTYPE html>
             
             // Render Cache Metrics
             renderCacheMetrics(cacheMetrics);
+            renderContextTrend(contextReadTrend || []);
 
             // Stats
             if (stats) {
@@ -777,6 +803,8 @@ const dashboardHTML = `<!DOCTYPE html>
             // Recent activity
             renderRecentActivity(recent || []);
             renderContextReads(contextReads || []);
+            renderContextReadTopFiles(contextReadTopFiles || []);
+            renderContextReadProjects(contextReadProjects || []);
             
             // Failures
             renderFailures(failures);
@@ -847,6 +875,7 @@ const dashboardHTML = `<!DOCTYPE html>
             var savedCompact = formatCompact(data.total_saved || 0);
             var cacheReadCompact = data.cc_cache_read ? formatCompact(data.cc_cache_read) : 'N/A';
             var cacheCreateCompact = data.cc_cache_create ? formatCompact(data.cc_cache_create) : 'N/A';
+            var contextHitRate = data.context_cache_hit_rate ? data.context_cache_hit_rate.toFixed(1) + '%' : '0.0%';
             
             container.innerHTML = 
                 '<div class="cache-stat highlight">' +
@@ -864,6 +893,10 @@ const dashboardHTML = `<!DOCTYPE html>
                 '<div class="cache-stat">' +
                     '<div class="value">' + cacheCreateCompact + '</div>' +
                     '<div class="label">Cache Creates</div>' +
+                '</div>' +
+                '<div class="cache-stat highlight">' +
+                    '<div class="value">' + contextHitRate + '</div>' +
+                    '<div class="label">Context Cache Hit Rate</div>' +
                 '</div>';
         }
 
@@ -1078,6 +1111,35 @@ const dashboardHTML = `<!DOCTYPE html>
             ).join('');
         }
 
+        function renderContextTrend(data) {
+            const ctx = document.getElementById('contextTrendChart').getContext('2d');
+            if (charts.contextTrend) charts.contextTrend.destroy();
+
+            charts.contextTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date ? d.date.slice(5) : ''),
+                    datasets: [{
+                        label: 'Smart Read Savings',
+                        data: data.map(d => d.tokens_saved || 0),
+                        borderColor: '#fb923c',
+                        backgroundColor: 'rgba(249, 115, 22, 0.15)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892b0' } },
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892b0' } }
+                    }
+                }
+            });
+        }
+
         function renderContextReads(data) {
             const container = document.getElementById('context-read-list');
             if (!data || data.length === 0) {
@@ -1105,6 +1167,31 @@ const dashboardHTML = `<!DOCTYPE html>
                 return fallbackSaved.toLocaleString() + ' tokens saved';
             }
             return parts.join(' · ');
+        }
+
+        function renderContextReadTopFiles(data) {
+            const container = document.getElementById('context-read-top-files');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="activity-item"><span style="color:#8892b0">No smart read file data</span></div>';
+                return;
+            }
+            container.innerHTML = data.slice(0, 5).map(item =>
+                '<div class=\"project-item\"><span class=\"name\" title=\"' + (item.file || '') + '\">' + (item.file || 'unknown') + '</span>' +
+                '<div class=\"stats\"><span class=\"tokens\">+' + (item.tokens_saved || 0).toLocaleString() + '</span><span>' + (item.commands || 0) + ' reads</span></div></div>'
+            ).join('');
+        }
+
+        function renderContextReadProjects(data) {
+            const container = document.getElementById('context-read-projects');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="activity-item"><span style="color:#8892b0">No smart read project data</span></div>';
+                return;
+            }
+            container.innerHTML = data.slice(0, 5).map(item => {
+                const name = item.project ? item.project.split('/').pop() : 'unknown';
+                return '<div class=\"project-item\"><span class=\"name\" title=\"' + (item.project || '') + '\">' + name + '</span>' +
+                    '<div class=\"stats\"><span class=\"tokens\">+' + (item.tokens_saved || 0).toLocaleString() + '</span><span>' + (item.commands || 0) + ' reads</span></div></div>';
+            }).join('');
         }
 
         function renderFailures(data) {

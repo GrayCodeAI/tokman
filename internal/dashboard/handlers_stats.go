@@ -3,6 +3,7 @@ package dashboard
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/GrayCodeAI/tokman/internal/contextread"
 	"github.com/GrayCodeAI/tokman/internal/httpmw"
@@ -98,6 +99,152 @@ func contextReadSummaryHandler(tracker *tracking.Tracker) http.HandlerFunc {
 		}
 		httpmw.JSONResponse(w, http.StatusOK, result)
 	}
+}
+
+func contextReadTrendHandler(tracker *tracking.Tracker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := `
+			SELECT
+				DATE(timestamp) as day,
+				COUNT(*) as commands,
+				COALESCE(SUM(saved_tokens), 0) as saved,
+				COALESCE(SUM(original_tokens), 0) as original
+			FROM commands
+			WHERE command GLOB 'tokman read *'
+			   OR command GLOB 'tokman ctx read *'
+			   OR command GLOB 'tokman ctx delta *'
+			   OR command GLOB 'tokman mcp read *'
+			GROUP BY DATE(timestamp)
+			ORDER BY day ASC
+		`
+		rows, err := tracker.Query(query)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var result []map[string]any
+		for rows.Next() {
+			var day string
+			var commands, saved, original int
+			if err := rows.Scan(&day, &commands, &saved, &original); err != nil {
+				continue
+			}
+			reduction := 0.0
+			if original > 0 {
+				reduction = float64(saved) / float64(original) * 100
+			}
+			result = append(result, map[string]any{
+				"date":         day,
+				"commands":     commands,
+				"tokens_saved": saved,
+				"original":     original,
+				"reduction":    reduction,
+			})
+		}
+		httpmw.JSONResponse(w, http.StatusOK, result)
+	}
+}
+
+func contextReadTopFilesHandler(tracker *tracking.Tracker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := tracker.Query(`
+			SELECT
+				command,
+				COUNT(*) as commands,
+				COALESCE(SUM(saved_tokens), 0) as saved,
+				COALESCE(SUM(original_tokens), 0) as original
+			FROM commands
+			WHERE command GLOB 'tokman read *'
+			   OR command GLOB 'tokman ctx read *'
+			   OR command GLOB 'tokman ctx delta *'
+			   OR command GLOB 'tokman mcp read *'
+			GROUP BY command
+			ORDER BY saved DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var result []map[string]any
+		for rows.Next() {
+			var command string
+			var commands, saved, original int
+			if err := rows.Scan(&command, &commands, &saved, &original); err != nil {
+				continue
+			}
+			reduction := 0.0
+			if original > 0 {
+				reduction = float64(saved) / float64(original) * 100
+			}
+			result = append(result, map[string]any{
+				"command":       command,
+				"file":          extractReadTarget(command),
+				"commands":      commands,
+				"tokens_saved":  saved,
+				"reduction_pct": reduction,
+			})
+		}
+		httpmw.JSONResponse(w, http.StatusOK, result)
+	}
+}
+
+func contextReadProjectsHandler(tracker *tracking.Tracker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := tracker.Query(`
+			SELECT
+				project_path,
+				COUNT(*) as commands,
+				COALESCE(SUM(saved_tokens), 0) as saved,
+				COALESCE(SUM(original_tokens), 0) as original
+			FROM commands
+			WHERE (command GLOB 'tokman read *'
+			    OR command GLOB 'tokman ctx read *'
+			    OR command GLOB 'tokman ctx delta *'
+			    OR command GLOB 'tokman mcp read *')
+			  AND project_path IS NOT NULL AND project_path != ''
+			GROUP BY project_path
+			ORDER BY saved DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var result []map[string]any
+		for rows.Next() {
+			var project string
+			var commands, saved, original int
+			if err := rows.Scan(&project, &commands, &saved, &original); err != nil {
+				continue
+			}
+			reduction := 0.0
+			if original > 0 {
+				reduction = float64(saved) / float64(original) * 100
+			}
+			result = append(result, map[string]any{
+				"project":       project,
+				"commands":      commands,
+				"tokens_saved":  saved,
+				"reduction_pct": reduction,
+			})
+		}
+		httpmw.JSONResponse(w, http.StatusOK, result)
+	}
+}
+
+func extractReadTarget(command string) string {
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 func dailyHandler(tracker *tracking.Tracker) http.HandlerFunc {

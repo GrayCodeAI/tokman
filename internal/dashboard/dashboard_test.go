@@ -255,6 +255,63 @@ func TestContextReadSummaryHandler(t *testing.T) {
 	}
 }
 
+func TestContextReadTrendHandler(t *testing.T) {
+	tracker := setupTestDB(t)
+	if err := tracker.Record(&tracking.CommandRecord{
+		Command:        "tokman ctx read main.go",
+		OriginalTokens: 100,
+		FilteredTokens: 40,
+		SavedTokens:    60,
+	}); err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/context-read-trend", nil)
+	w := httptest.NewRecorder()
+	contextReadTrendHandler(tracker)(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var response []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+	if len(response) == 0 {
+		t.Fatal("expected at least one trend point")
+	}
+}
+
+func TestContextReadTopFilesHandler(t *testing.T) {
+	tracker := setupTestDB(t)
+	for _, record := range []*tracking.CommandRecord{
+		{Command: "tokman ctx read alpha.go", OriginalTokens: 100, FilteredTokens: 30, SavedTokens: 70},
+		{Command: "tokman ctx read alpha.go", OriginalTokens: 90, FilteredTokens: 20, SavedTokens: 70},
+		{Command: "tokman ctx delta beta.go", OriginalTokens: 50, FilteredTokens: 10, SavedTokens: 40},
+	} {
+		if err := tracker.Record(record); err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+	}
+
+	req := httptest.NewRequest("GET", "/api/context-read-top-files", nil)
+	w := httptest.NewRecorder()
+	contextReadTopFilesHandler(tracker)(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var response []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+	if len(response) == 0 || response[0]["file"].(string) != "alpha.go" {
+		t.Fatalf("expected alpha.go to rank first, got %v", response)
+	}
+}
+
 func TestExportCSVHandler(t *testing.T) {
 	tracker := setupTestDB(t)
 

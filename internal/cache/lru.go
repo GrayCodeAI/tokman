@@ -19,6 +19,15 @@ type LRUCache struct {
 	misses  atomic.Int64
 }
 
+// LRUStats holds basic LRU cache statistics.
+type LRUStats struct {
+	Entries int
+	MaxSize int
+	Hits    int64
+	Misses  int64
+	HitRate float64
+}
+
 type lruEntry struct {
 	key       string
 	value     interface{}
@@ -107,4 +116,27 @@ func (c *LRUCache) removeElement(elem *list.Element) {
 	entry := elem.Value.(*lruEntry)
 	delete(c.entries, entry.key)
 	c.order.Remove(elem)
+}
+
+// Stats returns cache statistics.
+func (c *LRUCache) Stats() LRUStats {
+	c.mu.RLock()
+	entries := len(c.entries)
+	c.mu.RUnlock()
+
+	hits := c.hits.Load()
+	misses := c.misses.Load()
+	total := hits + misses
+	hitRate := 0.0
+	if total > 0 {
+		hitRate = float64(hits) / float64(total)
+	}
+
+	return LRUStats{
+		Entries: entries,
+		MaxSize: c.maxSize,
+		Hits:    hits,
+		Misses:  misses,
+		HitRate: hitRate,
+	}
 }

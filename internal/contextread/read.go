@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/GrayCodeAI/tokman/internal/cache"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/graph"
 )
@@ -56,8 +59,22 @@ type Options struct {
 	RelatedFiles int
 }
 
+type buildResult struct {
+	Output         string
+	OriginalTokens int
+	FinalTokens    int
+}
+
+var renderCache = cache.NewLRUCache(512, 10*time.Minute)
+
 // Build renders content according to the requested read behavior.
 func Build(filePath, content string, opts Options) (string, int, int, error) {
+	if key, ok := cacheKey(filePath, content, opts); ok {
+		if cached, ok := renderCache.Get(key).(buildResult); ok {
+			return cached.Output, cached.OriginalTokens, cached.FinalTokens, nil
+		}
+	}
+
 	filtered, err := ApplyMode(filePath, content, opts)
 	if err != nil {
 		return "", 0, 0, err
@@ -71,7 +88,15 @@ func Build(filePath, content string, opts Options) (string, int, int, error) {
 	if opts.LineNumbers {
 		filtered = addLineNumbers(filtered)
 	}
-	return filtered, filter.EstimateTokens(content), filter.EstimateTokens(filtered), nil
+	result := buildResult{
+		Output:         filtered,
+		OriginalTokens: filter.EstimateTokens(content),
+		FinalTokens:    filter.EstimateTokens(filtered),
+	}
+	if key, ok := cacheKey(filePath, content, opts); ok {
+		renderCache.Set(key, result)
+	}
+	return result.Output, result.OriginalTokens, result.FinalTokens, nil
 }
 
 // ApplyMode applies the selected read mode before line or token budgeting.
@@ -264,6 +289,42 @@ func detectProjectRoot(filePath string) string {
 		}
 		dir = parent
 	}
+}
+
+// CacheStats returns smart-read render cache statistics.
+func CacheStats() cache.LRUStats {
+	return renderCache.Stats()
+}
+
+func cacheKey(filePath, content string, opts Options) (string, bool) {
+	if filePath == "stdin" {
+		return "", false
+	}
+	var b strings.Builder
+	b.WriteString(normalizePath(filePath))
+	b.WriteString("|")
+	b.WriteString(cache.ComputeFingerprint(content))
+	b.WriteString("|")
+	b.WriteString(strings.ToLower(opts.Level))
+	b.WriteString("|")
+	b.WriteString(strings.ToLower(opts.Mode))
+	b.WriteString("|")
+	b.WriteString(strconv.Itoa(opts.MaxLines))
+	b.WriteString("|")
+	b.WriteString(strconv.Itoa(opts.MaxTokens))
+	b.WriteString("|")
+	b.WriteString(strconv.Itoa(opts.StartLine))
+	b.WriteString("|")
+	b.WriteString(strconv.Itoa(opts.EndLine))
+	b.WriteString("|")
+	b.WriteString(strconv.Itoa(opts.RelatedFiles))
+	if opts.LineNumbers {
+		b.WriteString("|ln")
+	}
+	if opts.SaveSnapshot {
+		b.WriteString("|snap")
+	}
+	return b.String(), true
 }
 
 func truncateLines(content string, maxLines int) string {

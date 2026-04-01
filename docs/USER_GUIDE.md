@@ -282,6 +282,8 @@ Recommended usage:
 Dashboard support:
 - `/api/context-reads` shows recent smart reads
 - `/api/context-read-summary` breaks them down into `read`, `delta`, and `mcp`
+- `/api/context-read-trend` shows smart-read savings over time
+- `/api/context-read-top-files` and `/api/context-read-projects` show where context delivery is paying off
 - the dashboard UI can filter smart-read activity by type
 
 ### Debugging Failed Tests

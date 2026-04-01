@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -26,6 +27,8 @@ type Node struct {
 	Language   string
 	Size       int64
 	Imports    []string
+	Symbols    []string
+	References []string
 	ImportedBy []string
 	Tags       []string
 }
@@ -67,6 +70,9 @@ func (g *ProjectGraph) Analyze() error {
 
 		imports := extractImports(path, lang)
 		node.Imports = imports
+		symbols, refs := extractSymbols(path, lang)
+		node.Symbols = symbols
+		node.References = refs
 
 		g.mu.Lock()
 		g.nodes[relPath] = node
@@ -136,6 +142,18 @@ func (g *ProjectGraph) FindRelatedFiles(path string, maxResults int) []string {
 	for file := range g.nodes {
 		if filepath.Dir(file) == dir && file != path {
 			related[file] += 5
+		}
+	}
+
+	// Prefer files whose symbols are referenced by the target file and vice versa.
+	if target, ok := g.nodes[path]; ok {
+		for file, node := range g.nodes {
+			if file == path {
+				continue
+			}
+			defMatches := overlapScore(target.References, node.Symbols)
+			refMatches := overlapScore(node.References, target.Symbols)
+			related[file] += defMatches*4 + refMatches*3
 		}
 	}
 
@@ -328,6 +346,140 @@ func extractImports(path string, lang string) []string {
 	}
 
 	return imports
+}
+
+var identRe = regexp.MustCompile(`\b[A-Za-z_][A-Za-z0-9_]*\b`)
+
+func extractSymbols(path, lang string) ([]string, []string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil
+	}
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	symbols := map[string]struct{}{}
+	refs := map[string]struct{}{}
+
+	switch lang {
+	case "go":
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "func ") {
+				name := symbolAfter(trimmed, "func ")
+				if name != "" {
+					symbols[name] = struct{}{}
+				}
+			}
+			if strings.HasPrefix(trimmed, "type ") {
+				name := symbolAfter(trimmed, "type ")
+				if name != "" {
+					symbols[name] = struct{}{}
+				}
+			}
+			if strings.HasPrefix(trimmed, "var ") || strings.HasPrefix(trimmed, "const ") {
+				parts := strings.Fields(trimmed)
+				if len(parts) > 1 {
+					symbols[trimPunctuation(parts[1])] = struct{}{}
+				}
+			}
+		}
+	case "python":
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "def ") || strings.HasPrefix(trimmed, "class ") {
+				fields := strings.Fields(trimmed)
+				if len(fields) > 1 {
+					symbols[trimPunctuation(fields[1])] = struct{}{}
+				}
+			}
+		}
+	case "javascript", "typescript":
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			for _, prefix := range []string{"function ", "class ", "const ", "let ", "var "} {
+				if strings.HasPrefix(trimmed, prefix) {
+					name := symbolAfter(trimmed, prefix)
+					if name != "" {
+						symbols[name] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	for _, ident := range identRe.FindAllString(content, -1) {
+		if len(ident) < 3 || isKeyword(ident) {
+			continue
+		}
+		refs[ident] = struct{}{}
+	}
+	for sym := range symbols {
+		delete(refs, sym)
+	}
+
+	return mapKeys(symbols), mapKeys(refs)
+}
+
+func symbolAfter(line, prefix string) string {
+	value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "(") {
+		if idx := strings.Index(value, ")"); idx >= 0 && idx+1 < len(value) {
+			value = strings.TrimSpace(value[idx+1:])
+		}
+	}
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return ""
+	}
+	return trimPunctuation(fields[0])
+}
+
+func trimPunctuation(value string) string {
+	return strings.Trim(value, "({[,:;*")
+}
+
+func makeStringSet(values []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		set[value] = struct{}{}
+	}
+	return set
+}
+
+func overlapScore(refs []string, symbols []string) int {
+	if len(refs) == 0 || len(symbols) == 0 {
+		return 0
+	}
+	refSet := makeStringSet(refs)
+	score := 0
+	for _, symbol := range symbols {
+		if _, ok := refSet[symbol]; ok {
+			score++
+		}
+	}
+	return score
+}
+
+func mapKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func isKeyword(ident string) bool {
+	switch ident {
+	case "func", "type", "var", "const", "package", "import", "return", "class", "def", "from", "for", "if", "else", "switch", "case", "interface":
+		return true
+	default:
+		return false
+	}
 }
 
 func (g *ProjectGraph) resolveImport(fromFile, imp string) (string, bool) {

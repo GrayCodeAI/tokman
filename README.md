@@ -141,6 +141,12 @@ tokman ctx delta internal/server/server.go
 tokman ctx read internal/server/server.go --mode graph --related-files 4
 ```
 
+TokMan now tracks and visualizes smart context delivery separately from normal command filtering, including:
+- direct file reads
+- delta reads
+- MCP-served reads
+- top files and projects by context savings
+
 ### Git
 
 ```bash
