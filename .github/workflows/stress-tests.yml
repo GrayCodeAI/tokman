@@ -1,0 +1,27 @@
+name: Stress Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  stress-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Run stress tests
+      run: |
+        go test -v -timeout 5m ./internal/stress/...
+
+    - name: Run chaos tests
+      run: |
+        go test -v -timeout 5m ./internal/chaos/...
