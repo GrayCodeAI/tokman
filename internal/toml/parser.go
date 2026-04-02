@@ -13,8 +13,8 @@ import (
 // SchemaVersion is the expected TOML filter schema version
 const SchemaVersion = 1
 
-// FilterConfig represents a single TOML filter configuration
-type FilterConfig struct {
+// TOMLFilterRule represents a single TOML filter rule configuration
+type TOMLFilterRule struct {
 	MatchCommand       string            `toml:"match_command"`
 	StripANSI          bool              `toml:"strip_ansi"`
 	Replace            []ReplaceRule     `toml:"replace"`
@@ -46,9 +46,9 @@ type MatchOutputRule struct {
 
 // TOMLFilter represents a parsed TOML filter file
 type TOMLFilter struct {
-	SchemaVersion int                     `toml:"schema_version"`
-	Filters       map[string]FilterConfig `toml:"-"`
-	RawContent    map[string]any          `toml:"-"`
+	SchemaVersion int                       `toml:"schema_version"`
+	Filters       map[string]TOMLFilterRule `toml:"-"`
+	RawContent    map[string]any            `toml:"-"`
 }
 
 // Parser handles parsing TOML filter files
@@ -79,7 +79,7 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 	}
 
 	filter := &TOMLFilter{
-		Filters:    make(map[string]FilterConfig),
+		Filters:    make(map[string]TOMLFilterRule),
 		RawContent: raw,
 	}
 
@@ -104,7 +104,7 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 			if name == "filters" {
 				for nestedName, nestedVal := range filterMap {
 					if nestedFilterMap, ok := nestedVal.(map[string]any); ok {
-						cfg, err := parseFilterConfig(nestedFilterMap)
+						cfg, err := parseFilterRule(nestedFilterMap)
 						if err != nil {
 							return nil, fmt.Errorf("failed to parse filter %q: %w", nestedName, err)
 						}
@@ -114,7 +114,7 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 				continue
 			}
 
-			cfg, err := parseFilterConfig(filterMap)
+			cfg, err := parseFilterRule(filterMap)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse filter %q: %w", name, err)
 			}
@@ -125,9 +125,9 @@ func (p *Parser) ParseContent(content []byte, source string) (*TOMLFilter, error
 	return filter, nil
 }
 
-// parseFilterConfig parses a single filter configuration from raw map
-func parseFilterConfig(m map[string]any) (FilterConfig, error) {
-	cfg := FilterConfig{
+// parseFilterRule parses a single filter rule configuration from raw map
+func parseFilterRule(m map[string]any) (TOMLFilterRule, error) {
+	cfg := TOMLFilterRule{
 		TruncateLinesAt: 0,
 		Head:            0,
 		Tail:            0,
@@ -300,7 +300,7 @@ func (f *TOMLFilter) Validate() error {
 }
 
 // MatchesCommand checks if any filter matches the given command
-func (f *TOMLFilter) MatchesCommand(command string) (string, *FilterConfig, error) {
+func (f *TOMLFilter) MatchesCommand(command string) (string, *TOMLFilterRule, error) {
 	for name, cfg := range f.Filters {
 		matched, err := regexp.MatchString(cfg.MatchCommand, command)
 		if err != nil {
@@ -347,7 +347,7 @@ func (r *FilterRegistry) LoadFile(path string) error {
 }
 
 // FindMatchingFilter finds a filter that matches the given command
-func (r *FilterRegistry) FindMatchingFilter(command string) (string, string, *FilterConfig) {
+func (r *FilterRegistry) FindMatchingFilter(command string) (string, string, *TOMLFilterRule) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

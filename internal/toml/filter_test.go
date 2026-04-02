@@ -9,13 +9,13 @@ import (
 func TestTOMLFilterEngine_Apply(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  FilterConfig
+		config  TOMLFilterRule
 		input   string
 		wantLen int // approximate expected length
 	}{
 		{
 			name: "strip ansi",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				StripANSI: true,
 			},
 			input:   "\x1b[32mHello\x1b[0m World",
@@ -23,7 +23,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "strip lines matching",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				StripLinesMatching: []string{"^DEBUG:.*"},
 			},
 			input:   "DEBUG: line1\nINFO: line2\nDEBUG: line3\nINFO: line4",
@@ -31,7 +31,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "keep lines matching",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				KeepLinesMatching: []string{"ERROR:.*"},
 			},
 			input:   "INFO: line1\nERROR: line2\nINFO: line3\nERROR: line4",
@@ -39,7 +39,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "truncate lines",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				TruncateLinesAt: 10,
 			},
 			input:   "short\nthis is a very long line that should be truncated\nanother short",
@@ -47,7 +47,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "head only",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				Head: 2,
 			},
 			input:   "line1\nline2\nline3\nline4\nline5",
@@ -55,7 +55,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "tail only",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				Tail: 2,
 			},
 			input:   "line1\nline2\nline3\nline4\nline5",
@@ -63,7 +63,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "head and tail",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				Head: 1,
 				Tail: 1,
 			},
@@ -72,7 +72,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "max lines",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				MaxLines: 4,
 			},
 			input:   "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8",
@@ -80,7 +80,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "on empty",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				StripLinesMatching: []string{".*"},
 				OnEmpty:            "No output",
 			},
@@ -89,7 +89,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 		},
 		{
 			name: "replace patterns",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				Replace: []ReplaceRule{
 					{Pattern: "foo", Replacement: "bar"},
 					{Pattern: "hello", Replacement: "hi"},
@@ -119,7 +119,7 @@ func TestTOMLFilterEngine_Apply(t *testing.T) {
 
 func TestTOMLFilterEngine_Pipeline(t *testing.T) {
 	// Test that pipeline stages are applied in order
-	config := FilterConfig{
+	config := TOMLFilterRule{
 		StripANSI:          true,
 		StripLinesMatching: []string{"^DEBUG:.*"},
 		TruncateLinesAt:    20,
@@ -185,7 +185,7 @@ max_lines = 2
 }
 
 func TestTOMLFilterWrapper(t *testing.T) {
-	config := FilterConfig{
+	config := TOMLFilterRule{
 		StripANSI: true,
 		MaxLines:  5,
 	}
@@ -210,13 +210,13 @@ func TestTOMLFilterWrapper(t *testing.T) {
 func TestMatchOutputUnless(t *testing.T) {
 	tests := []struct {
 		name       string
-		config     FilterConfig
+		config     TOMLFilterRule
 		input      string
 		wantOutput string
 	}{
 		{
 			name: "match_output short-circuits when pattern matches",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				MatchOutput: []MatchOutputRule{
 					{Pattern: "Build succeeded", Message: "✓ Build OK"},
 				},
@@ -226,7 +226,7 @@ func TestMatchOutputUnless(t *testing.T) {
 		},
 		{
 			name: "unless clause prevents short-circuit when errors present",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				MatchOutput: []MatchOutputRule{
 					{
 						Pattern: "Build succeeded",
@@ -240,7 +240,7 @@ func TestMatchOutputUnless(t *testing.T) {
 		},
 		{
 			name: "unless clause allows short-circuit when no errors",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				MatchOutput: []MatchOutputRule{
 					{
 						Pattern: "Build succeeded",
@@ -254,7 +254,7 @@ func TestMatchOutputUnless(t *testing.T) {
 		},
 		{
 			name: "multiple match_output rules - first wins",
-			config: FilterConfig{
+			config: TOMLFilterRule{
 				MatchOutput: []MatchOutputRule{
 					{Pattern: "Tests passed", Message: "✓ Tests OK"},
 					{Pattern: "Build succeeded", Message: "✓ Build OK"},

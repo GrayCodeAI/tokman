@@ -14,7 +14,7 @@ import (
 
 // TOMLFilterEngine applies TOML-defined filter rules to output
 type TOMLFilterEngine struct {
-	config           *FilterConfig
+	config           *TOMLFilterRule
 	compiledRe       []*regexp.Regexp // pre-compiled replace patterns
 	compiledMatchRe  []*regexp.Regexp // pre-compiled match_output patterns
 	compiledUnlessRe []*regexp.Regexp // pre-compiled unless patterns (nil if no unless clause)
@@ -24,7 +24,7 @@ type TOMLFilterEngine struct {
 }
 
 // NewTOMLFilterEngine creates a new filter engine from a TOML config
-func NewTOMLFilterEngine(config *FilterConfig) *TOMLFilterEngine {
+func NewTOMLFilterEngine(config *TOMLFilterRule) *TOMLFilterEngine {
 	return &TOMLFilterEngine{config: config}
 }
 
@@ -280,7 +280,7 @@ func capLines(input string, maxLines int) string {
 }
 
 // ApplyTOMLFilter is a convenience function to apply a TOML filter config
-func ApplyTOMLFilter(input string, config *FilterConfig) (string, int) {
+func ApplyTOMLFilter(input string, config *TOMLFilterRule) (string, int) {
 	engine := NewTOMLFilterEngine(config)
 	return engine.Apply(input, filter.ModeMinimal)
 }
@@ -300,15 +300,15 @@ func MatchAndFilter(command string, output string, registry *FilterRegistry) (st
 	return filtered, saved, true
 }
 
-// FilterFilter implements the filter.Filter interface for TOML filters
+// TOMLFilterWrapper implements the filter.Filter interface for TOML filters
 type TOMLFilterWrapper struct {
-	config *FilterConfig
+	config *TOMLFilterRule
 	name   string
 	engine *TOMLFilterEngine // cached engine for regex compilation reuse
 }
 
 // NewTOMLFilterWrapper creates a filter.Filter wrapper for a TOML filter
-func NewTOMLFilterWrapper(name string, config *FilterConfig) *TOMLFilterWrapper {
+func NewTOMLFilterWrapper(name string, config *TOMLFilterRule) *TOMLFilterWrapper {
 	return &TOMLFilterWrapper{
 		config: config,
 		name:   name,

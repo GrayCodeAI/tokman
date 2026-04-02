@@ -226,7 +226,7 @@ func (h *FallbackHandler) rotateTeeFiles() {
 	}
 }
 
-func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.FilterConfig) string {
+func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.TOMLFilterRule) string {
 	mode := filter.ModeMinimal
 	if IsUltraCompact() {
 		mode = filter.ModeAggressive
