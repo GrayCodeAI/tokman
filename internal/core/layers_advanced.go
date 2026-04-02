@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // Layer 11: LLM Compaction with Ollama Support
@@ -62,7 +64,7 @@ func (l *LLMCompactionLayer) chunkContent(content string) []string {
 
 func (l *LLMCompactionLayer) summarize(chunk string) string {
 	// Add marker for LLM to expand
-	return fmt.Sprintf("[llm:summarize]%s[/llm]", chunk[:min(100, len(chunk))])
+	return fmt.Sprintf("[llm:summarize]%s[/llm]", chunk[:utils.Min(100, len(chunk))])
 }
 
 // Layer 12: Attribution Filter
@@ -205,7 +207,7 @@ func (l *AttentionSinkLayer) Apply(content string) (string, int) {
 	}
 
 	// Keep first few tokens (attention sinks) + recent window
-	sinks := tokens[:min(4, len(tokens))]
+	sinks := tokens[:utils.Min(4, len(tokens))]
 	window := tokens[len(tokens)-l.windowSize+len(sinks):]
 
 	result := append(sinks, window...)
@@ -395,7 +397,7 @@ func (l *SketchStoreLayer) summarize(content string) string {
 	if len(lines) > 0 {
 		return lines[0]
 	}
-	return content[:min(100, len(content))]
+	return content[:utils.Min(100, len(content))]
 }
 
 // Layer 18: Lazy Pruner
@@ -514,7 +516,7 @@ func (l *SemanticAnchorLayer) Apply(content string) (string, int) {
 		if anchors[i] {
 			result = append(result, line)
 			// Keep context lines
-			for j := max(0, i-2); j <= min(len(lines)-1, i+2); j++ {
+			for j := utils.Max(0, i-2); j <= utils.Min(len(lines)-1, i+2); j++ {
 				if j != i && !anchors[j] {
 					result = append(result, lines[j])
 				}
@@ -628,9 +630,3 @@ func RegisterAdvancedLayers(registry *LayerRegistry) {
 	registry.Register(NewKnowledgeGraphLayer())
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

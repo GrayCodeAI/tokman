@@ -3,6 +3,8 @@ package filter
 import (
 	"regexp"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // SemanticAnchorFilter implements Layer 19: Semantic-Anchor Compression (SAC style).
@@ -182,7 +184,7 @@ func (f *SemanticAnchorFilter) detectAnchors(tokens []string) {
 		// Check spacing constraint
 		tooClose := false
 		for pos := range selectedPositions {
-			if abs(s.pos-pos) < f.config.MinAnchorSpacing {
+			if utils.Abs(s.pos-pos) < f.config.MinAnchorSpacing {
 				tooClose = true
 				break
 			}
@@ -296,7 +298,7 @@ func (f *SemanticAnchorFilter) findNearestAnchor(pos int) int {
 	nearest := -1
 
 	for _, a := range f.anchorTokens {
-		dist := abs(a.Position - pos)
+		dist := utils.Abs(a.Position - pos)
 		if dist < minDist {
 			minDist = dist
 			nearest = a.Position
@@ -360,13 +362,6 @@ func (f *SemanticAnchorFilter) reconstructWithAnchors(tokens []string, aggregate
 	return strings.TrimSpace(result.String()), saved
 }
 
-// abs returns absolute value of an integer
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
 
 // GetAnchors returns all detected anchor tokens
 func (f *SemanticAnchorFilter) GetAnchors() []AnchorToken {

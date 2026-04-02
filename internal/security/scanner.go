@@ -3,6 +3,8 @@ package security
 import (
 	"regexp"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // Scanner performs security scanning on content.
@@ -101,7 +103,7 @@ func DetectSecrets(content string) []Finding {
 					Severity: "critical",
 					Message:  "Potential secret detected: " + name,
 					Line:     lineNum + 1,
-					Match:    match[:min(len(match), 50)],
+					Match:    match[:utils.Min(len(match), 50)],
 				})
 			}
 		}
@@ -128,7 +130,7 @@ func DetectPromptInjection(content string) []Finding {
 				Severity: "high",
 				Message:  "Potential prompt injection detected",
 				Line:     0,
-				Match:    match[:min(len(match), 80)],
+				Match:    match[:utils.Min(len(match), 80)],
 			})
 		}
 	}
@@ -162,13 +164,6 @@ func buildDefaultRules() []Rule {
 			Description: "Potential SSRF target",
 		},
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func itoa(n int) string {

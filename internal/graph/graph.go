@@ -614,13 +614,6 @@ func readModuleName(rootDir string) string {
 	return ""
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // FormatGraphStats returns a human-readable stats string.
 func FormatGraphStats(stats map[string]any) string {
 	return fmt.Sprintf("Graph: %d files, %d edges, %d languages",

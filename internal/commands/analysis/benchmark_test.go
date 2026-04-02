@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/GrayCodeAI/tokman/internal/filter"
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // BenchmarkCommandOverhead measures the overhead of command processing
@@ -92,7 +93,7 @@ func BenchmarkUltraCompactMode(b *testing.B) {
 		result, _ := engine.Process(input)
 		// Additional compact formatting
 		lines := strings.Split(result, "\n")
-		compactResult := strings.Join(lines[:min(10, len(lines))], "\n")
+		compactResult := strings.Join(lines[:utils.Min(10, len(lines))], "\n")
 		_ = compactResult
 	}
 }
@@ -280,9 +281,3 @@ func generateLargeOutput(lines int) string {
 	return sb.String()
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

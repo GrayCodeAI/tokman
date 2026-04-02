@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/GrayCodeAI/tokman/internal/simd"
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // Pre-compiled keywords for SIMD matching
@@ -316,7 +317,7 @@ func (a *AttributionFilter) computeTokenConnectivity(tokens []token) []float64 {
 				}
 			}
 			// Structural co-occurrence: adjacent tokens in code
-			if abs(i-j) == 1 && (isCodeSymbol(tokens[i].text) || isCodeSymbol(tokens[j].text)) {
+			if utils.Abs(i-j) == 1 && (isCodeSymbol(tokens[i].text) || isCodeSymbol(tokens[j].text)) {
 				connectivity[i] += 0.15
 			}
 		}

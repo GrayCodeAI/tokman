@@ -4,6 +4,8 @@ package core
 import (
 	"regexp"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // GoalType represents the type of user goal.
@@ -200,7 +202,7 @@ func (a *GoalAnalyzer) RankFiles(files map[string]string) []RankedFile {
 
 	for path, content := range files {
 		result := a.Analyze(content, path)
-		score := result.RelevanceAvg * float64(result.FilteredItems) / float64(max(result.TotalItems, 1))
+		score := result.RelevanceAvg * float64(result.FilteredItems) / float64(utils.Max(result.TotalItems, 1))
 
 		ranked = append(ranked, RankedFile{
 			Path:      path,
@@ -363,9 +365,3 @@ func sortByScore(items []ContextItem) {
 	}
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

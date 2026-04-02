@@ -6,6 +6,41 @@ import (
 	"strings"
 )
 
+// Min returns the smaller of a and b.
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Max returns the larger of a and b.
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Abs returns the absolute value of x.
+func Abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// Clamp returns x constrained to the range [min, max].
+func Clamp(x, min, max int) int {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
+
 // ShortenPath truncates a path to fit within maxLen characters.
 // It preserves the end of the path and adds "..." prefix if truncated.
 func ShortenPath(path string, maxLen int) string {

@@ -3,6 +3,8 @@ package filter
 import (
 	"hash/fnv"
 	"strings"
+
+	"github.com/GrayCodeAI/tokman/internal/utils"
 )
 
 // KVCacheAligner implements KV-cache alignment for LLM prompt caching.
@@ -60,12 +62,12 @@ func CacheabilityScore(content string) int {
 
 	// Bonus for system prompt patterns
 	if strings.Contains(content, "You are a") || strings.Contains(content, "System:") {
-		score = min(score+10, 100)
+		score = utils.Min(score+10, 100)
 	}
 
 	// Penalty for high variability patterns
 	if strings.Contains(content, "timestamp") || strings.Contains(content, "file_path") {
-		score = max(score-20, 0)
+		score = utils.Max(score-20, 0)
 	}
 
 	return score
@@ -222,16 +224,3 @@ func computeCacheKey(content string) string {
 	return string(h.Sum(nil))
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
