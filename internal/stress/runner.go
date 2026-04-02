@@ -73,6 +73,8 @@ type Result struct {
 	MaxLatency       time.Duration
 	AvgLatency       time.Duration
 	ThroughputRPS    float64
+	SuccessRate      float64
+	ErrorRate        float64
 	Errors           map[string]int
 	ResourceUsage    ResourceMetrics
 }
@@ -163,6 +165,8 @@ func (r *Runner) Run(ctx context.Context, scenarioName string) (*Result, error) 
 	if result.TotalRequests > 0 {
 		result.AvgLatency = time.Duration(int64(metrics.totalLatency) / result.TotalRequests)
 		result.ThroughputRPS = float64(result.TotalRequests) / result.Duration.Seconds()
+		result.SuccessRate = float64(result.SuccessCount) / float64(result.TotalRequests) * 100
+		result.ErrorRate = float64(result.ErrorCount) / float64(result.TotalRequests) * 100
 	}
 
 	result.LatencyP50 = metrics.calculatePercentile(0.5)
