@@ -243,6 +243,9 @@ func isUnknownCommandError(err error) bool {
 
 // extractUnknownCommandArgs extracts args for the fallback handler
 func extractUnknownCommandArgs() []string {
+	if len(fallbackArgs) == 0 && len(os.Args) > 1 {
+		return os.Args[1:]
+	}
 	return fallbackArgs
 }
 
@@ -255,7 +258,7 @@ func init() {
 	rootCmd.SetVersionTemplate("TokMan {{.Version}}\n")
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
-		"config file (default is ~/.config/tokman/config.toml)")
+		fmt.Sprintf("config file (default is %s)", config.ConfigPath()))
 	rootCmd.PersistentFlags().CountVarP(&verbose, "verbose", "v",
 		"verbosity level (-v, -vv, -vvv)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false,

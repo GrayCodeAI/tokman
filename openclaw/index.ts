@@ -9,7 +9,7 @@
  * Go registry, not this file.
  */
 
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 
 let tokmanAvailable: boolean | null = null;
 
@@ -26,11 +26,13 @@ function checkTokman(): boolean {
 
 function tryRewrite(command: string): string | null {
   try {
-    const result = execSync(`tokman rewrite ${JSON.stringify(command)}`, {
+    const result = spawnSync("tokman", ["rewrite", command], {
       encoding: "utf-8",
       timeout: 2000,
-    }).trim();
-    return result && result !== command ? result : null;
+    });
+    if (result.status !== 0 || result.error) return null;
+    const out = result.stdout.trim();
+    return out && out !== command ? out : null;
   } catch {
     return null;
   }

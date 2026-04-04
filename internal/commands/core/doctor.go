@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/filter"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
 var doctorFix bool
@@ -106,11 +106,10 @@ func checkBinary() checkResult {
 }
 
 func checkConfigDir() checkResult {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return checkResult{"Config Dir", "error", "cannot determine home directory"}
+	configDir := shared.GetConfigDir()
+	if configDir == "" {
+		return checkResult{"Config Dir", "error", "cannot determine config directory"}
 	}
-	configDir := filepath.Join(home, ".config", "tokman")
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		return checkResult{"Config Dir", "warn", configDir + " (not found — run 'tokman init')"}
 	}
@@ -118,14 +117,14 @@ func checkConfigDir() checkResult {
 }
 
 func checkDatabase() checkResult {
-	dbPath := tracking.DatabasePath()
+	dbPath := shared.GetDatabasePath()
 	if dbPath == "" {
 		return checkResult{"Database", "error", "cannot determine database path"}
 	}
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return checkResult{"Database", "warn", dbPath + " (will be created on first use)"}
 	}
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return checkResult{"Database", "error", dbPath + " (" + err.Error() + ")"}
 	}
@@ -134,24 +133,35 @@ func checkDatabase() checkResult {
 }
 
 func checkShellHook() checkResult {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return checkResult{"Shell Hook", "error", "cannot determine home directory"}
-	}
-
-	// Check common hook locations
-	hookPaths := []string{
-		filepath.Join(home, ".claude", "hooks", "tokman.sh"),
-		filepath.Join(home, ".config", "tokman", "hook.sh"),
-	}
-
-	for _, p := range hookPaths {
+	for _, p := range doctorHookPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return checkResult{"Shell Hook", "ok", p}
 		}
 	}
 
 	return checkResult{"Shell Hook", "warn", "no shell hook found — run 'tokman init'"}
+}
+
+func doctorHookPaths() []string {
+	var hookPaths []string
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		hookPaths = append(hookPaths,
+			filepath.Join(home, ".claude", "hooks", "tokman-rewrite.sh"),
+			filepath.Join(home, ".claude", "hooks", "tokman.sh"),
+		)
+	}
+
+	hooksDir := shared.GetHooksPath()
+	if hooksDir != "" {
+		hookPaths = append(hookPaths, filepath.Join(hooksDir, "tokman-rewrite.sh"))
+	}
+
+	configDir := shared.GetConfigDir()
+	if configDir != "" {
+		hookPaths = append(hookPaths, filepath.Join(configDir, "hook.sh"))
+	}
+
+	return hookPaths
 }
 
 func checkPath() checkResult {
@@ -196,14 +206,10 @@ func checkTOMLFilters() checkResult {
 }
 
 func checkDiskSpace() checkResult {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
+	dbPath := shared.GetDatabasePath()
+	if dbPath == "" {
+		return checkResult{"Disk Space", "warn", "cannot determine database path"}
 	}
-	if home == "" {
-		return checkResult{"Disk Space", "warn", "cannot check disk space"}
-	}
-	dbPath := filepath.Join(home, ".local", "share", "tokman", "tracking.db")
 	if info, err := os.Stat(dbPath); err == nil {
 		sizeMB := float64(info.Size()) / 1024 / 1024
 		if sizeMB > 100 {

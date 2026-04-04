@@ -3,6 +3,7 @@ package tracking
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -63,6 +64,45 @@ func TestNewTracker(t *testing.T) {
 	// Check database was created
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		t.Error("Database file was not created")
+	}
+}
+
+func TestNewTrackerCreatesParentDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "nested", "tracker", "test.db")
+
+	tracker, err := NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer tracker.Close()
+
+	if _, err := os.Stat(filepath.Dir(dbPath)); err != nil {
+		t.Fatalf("expected parent directory to exist: %v", err)
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected database file to exist: %v", err)
+	}
+}
+
+func TestDatabasePathUsesConfiguredPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	xdgConfigHome := filepath.Join(tmpDir, "xdg-config")
+	configDir := filepath.Join(xdgConfigHome, "tokman")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	wantPath := filepath.Join(tmpDir, "custom", "tracking.sqlite")
+	content := []byte("[tracking]\ndatabase_path = \"" + wantPath + "\"\n")
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), content, 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+
+	if got := DatabasePath(); got != wantPath {
+		t.Fatalf("DatabasePath() = %q, want %q", got, wantPath)
 	}
 }
 
@@ -213,6 +253,62 @@ func TestGetRecentCommands(t *testing.T) {
 
 	if len(commands) != 5 {
 		t.Errorf("GetRecentCommands() returned %d commands, want 5", len(commands))
+	}
+}
+
+func TestProjectPathsAreNormalizedForRecordAndQuery(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink normalization test is Unix-focused")
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	tracker, err := NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer tracker.Close()
+
+	realProject := filepath.Join(tmpDir, "real-project")
+	if err := os.MkdirAll(realProject, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	wantProjectPath, err := filepath.EvalSymlinks(realProject)
+	if err != nil {
+		t.Fatalf("EvalSymlinks() error = %v", err)
+	}
+	linkProject := filepath.Join(tmpDir, "project-link")
+	if err := os.Symlink(realProject, linkProject); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+
+	if err := tracker.Record(&CommandRecord{
+		Command:      "echo hi",
+		ProjectPath:  linkProject,
+		SavedTokens:  5,
+		ParseSuccess: true,
+	}); err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+
+	summary, err := tracker.GetSavings(realProject)
+	if err != nil {
+		t.Fatalf("GetSavings() error = %v", err)
+	}
+	if summary.TotalCommands != 1 {
+		t.Fatalf("TotalCommands = %d, want 1", summary.TotalCommands)
+	}
+
+	records, err := tracker.GetRecentCommands(linkProject, 5)
+	if err != nil {
+		t.Fatalf("GetRecentCommands() error = %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].ProjectPath != wantProjectPath {
+		t.Fatalf("stored ProjectPath = %q, want %q", records[0].ProjectPath, wantProjectPath)
 	}
 }
 

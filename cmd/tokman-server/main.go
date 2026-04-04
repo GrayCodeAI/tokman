@@ -188,10 +188,7 @@ func runCompressionService(ctx context.Context, cfg *config.Config, port int) er
 // runAnalyticsService runs the analytics service.
 func runAnalyticsService(ctx context.Context, cfg *config.Config, port int) error {
 	// Initialize tracking database
-	dbPath := cfg.Tracking.DatabasePath
-	if dbPath == "" {
-		dbPath = os.ExpandEnv("$HOME/.local/share/tokman/tokman.db")
-	}
+	dbPath := cfg.GetDatabasePath()
 
 	tracker, err := tracking.NewTracker(dbPath)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var sessionCmd = &cobra.Command{
@@ -19,8 +19,7 @@ var sessionCmd = &cobra.Command{
 }
 
 func runSession() error {
-	dbPath := tracking.DatabasePath()
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return err
 	}
@@ -44,18 +43,22 @@ func runSession() error {
 		totalOriginal += r.OriginalTokens
 	}
 
-	avgSavings := 0.0
-	if totalOriginal > 0 {
-		avgSavings = float64(totalSaved) / float64(totalOriginal) * 100
-	}
+	avgSavings := percentOf(totalSaved, totalOriginal)
 
 	fmt.Printf("Session Summary (last %d commands)\n", totalCmds)
 	fmt.Println("────────────────────────────────────────")
 	fmt.Printf("  Commands:     %d\n", totalCmds)
 	fmt.Printf("  Tokens saved: %s\n", formatTokens(totalSaved))
 	fmt.Printf("  Avg savings:  %.1f%%\n", avgSavings)
-	fmt.Printf("  Adoption:     %.0f%%\n", float64(totalSaved)/float64(totalOriginal)*100)
+	fmt.Printf("  Adoption:     %.0f%%\n", percentOf(totalSaved, totalOriginal))
 	return nil
+}
+
+func percentOf(part, total int) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return float64(part) / float64(total) * 100
 }
 
 func formatTokens(n int) string {

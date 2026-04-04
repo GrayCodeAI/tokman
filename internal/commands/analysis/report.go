@@ -28,13 +28,7 @@ var reportCmd = &cobra.Command{
 	Long: `Generate detailed reports of token savings with various filters
 and output formats.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := shared.GetConfig()
-		if err != nil {
-			return fmt.Errorf("error loading config: %w", err)
-		}
-
-		dbPath := cfg.GetDatabasePath()
-		tracker, err := tracking.NewTracker(dbPath)
+		tracker, err := shared.OpenTracker()
 		if err != nil {
 			return fmt.Errorf("error connecting to database: %w", err)
 		}

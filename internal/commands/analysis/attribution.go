@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
@@ -40,11 +41,12 @@ func init() {
 }
 
 func runAttribution(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		fmt.Fprintln(os.Stderr, "Tracking not initialized")
+	tracker, err := shared.OpenTracker()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Tracking not initialized: %v\n", err)
 		return nil
 	}
+	defer tracker.Close()
 
 	byModel, _ := cmd.Flags().GetBool("by-model")
 	byProvider, _ := cmd.Flags().GetBool("by-provider")

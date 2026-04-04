@@ -27,9 +27,7 @@ func main() {
 	var closeTrackerOnce sync.Once
 	closeTracker := func() {
 		closeTrackerOnce.Do(func() {
-			if tracker := tracking.GetGlobalTracker(); tracker != nil {
-				_ = tracker.Close()
-			}
+			_ = tracking.CloseGlobalTracker()
 		})
 	}
 

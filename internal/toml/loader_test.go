@@ -3,6 +3,7 @@ package toml
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -164,6 +165,41 @@ max_lines = 20
 	}
 }
 
+func TestLoaderLoadAll_WithXDGUserFilters(t *testing.T) {
+	tmpDir := t.TempDir()
+	xdgConfigHome := filepath.Join(tmpDir, "xdg-config")
+	configDir := filepath.Join(xdgConfigHome, "tokman")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	filterContent := `schema_version = 1
+
+[xdg_tool]
+match_command = "^xdg-tool.*"
+keep_lines_matching = ["^ERROR:"]
+`
+	if err := os.WriteFile(filepath.Join(configDir, "filters.toml"), []byte(filterContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+
+	loader := NewLoader("")
+	reg, err := loader.LoadAll("")
+	if err != nil {
+		t.Fatalf("LoadAll() error = %v", err)
+	}
+
+	_, _, cfg := reg.FindMatchingFilter("xdg-tool run")
+	if cfg == nil {
+		t.Fatal("expected XDG user filter to match command")
+	}
+	if len(cfg.KeepLinesMatching) != 1 || cfg.KeepLinesMatching[0] != "^ERROR:" {
+		t.Fatalf("loaded wrong filter config: %+v", cfg)
+	}
+}
+
 func TestLoaderLoadAll_InvalidTOML(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "home")
@@ -203,6 +239,34 @@ func TestLoaderTrustPersistence(t *testing.T) {
 
 	if !loader2.IsTrusted(projectPath) {
 		t.Error("Trust should persist across loader instances")
+	}
+}
+
+func TestLoaderTrustUsesCanonicalProjectPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink normalization test is Unix-focused")
+	}
+
+	tmpDir := t.TempDir()
+	realProject := filepath.Join(tmpDir, "real-project")
+	if err := os.MkdirAll(realProject, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	linkProject := filepath.Join(tmpDir, "project-link")
+	if err := os.Symlink(realProject, linkProject); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+
+	loader := NewLoader(tmpDir)
+	if err := loader.TrustProject(linkProject); err != nil {
+		t.Fatalf("TrustProject() error = %v", err)
+	}
+
+	if !loader.IsTrusted(realProject) {
+		t.Fatal("expected canonical project path to be trusted")
+	}
+	if !loader.IsTrusted(linkProject) {
+		t.Fatal("expected symlink project path to resolve as trusted")
 	}
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
 	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/config"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
 var statusCmd = &cobra.Command{
@@ -22,13 +21,7 @@ For a comprehensive report with graphs and history, use 'tokman gain'.`,
 		"tokman:skip_integrity": "true",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := shared.GetConfig()
-		if err != nil {
-			return fmt.Errorf("error loading config: %w", err)
-		}
-
-		dbPath := cfg.GetDatabasePath()
-		tracker, err := tracking.NewTracker(dbPath)
+		tracker, err := shared.OpenTracker()
 		if err != nil {
 			return fmt.Errorf("error connecting to database: %w", err)
 		}

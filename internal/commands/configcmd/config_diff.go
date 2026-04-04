@@ -3,7 +3,6 @@ package configcmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 
 	"github.com/spf13/cobra"
@@ -25,11 +24,7 @@ func init() {
 func runConfigDiff(cmd *cobra.Command, args []string) error {
 	defaults := config.Defaults()
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	configPath := filepath.Join(home, ".config", "tokman", "config.toml")
+	configPath := effectiveConfigPath()
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		fmt.Println("No config file found. Using defaults.")

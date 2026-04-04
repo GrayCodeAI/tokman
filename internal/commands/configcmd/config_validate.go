@@ -3,7 +3,6 @@ package configcmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -33,15 +32,7 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		shared.CfgFile,
 	}
 	if shared.CfgFile == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
-		}
-		if home != "" {
-			configPaths = []string{
-				filepath.Join(home, ".config", "tokman", "config.toml"),
-			}
-		}
+		configPaths = []string{effectiveConfigPath()}
 	}
 
 	for _, path := range configPaths {

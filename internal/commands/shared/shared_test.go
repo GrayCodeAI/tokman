@@ -4,11 +4,21 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
+	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/core"
+	"github.com/GrayCodeAI/tokman/internal/toml"
+	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
+
+func resetConfigCacheForTest() {
+	cachedConfig = nil
+	cfgFile = ""
+	configOnce = sync.Once{}
+}
 
 func TestIsVerbose(t *testing.T) {
 	Verbose = 0
@@ -261,6 +271,7 @@ func TestSetFlags(t *testing.T) {
 		LLMEnabled:          true,
 		TokenBudget:         500,
 		LayerPreset:         "fast",
+		LayerProfile:        "code",
 		QuietMode:           true,
 		JSONOutput:          true,
 		RemoteMode:          true,
@@ -297,6 +308,9 @@ func TestSetFlags(t *testing.T) {
 	if LayerPreset != "fast" {
 		t.Errorf("LayerPreset: expected 'fast', got %q", LayerPreset)
 	}
+	if LayerProfile != "code" {
+		t.Errorf("LayerProfile: expected 'code', got %q", LayerProfile)
+	}
 	if !QuietMode {
 		t.Error("QuietMode: expected true")
 	}
@@ -332,6 +346,23 @@ func TestSetFlags(t *testing.T) {
 	}
 }
 
+func TestGetLayerProfile(t *testing.T) {
+	os.Unsetenv("TOKMAN_PROFILE")
+
+	LayerProfile = "thread"
+	if got := GetLayerProfile(); got != "thread" {
+		t.Errorf("expected 'thread', got %q", got)
+	}
+
+	LayerProfile = ""
+	os.Setenv("TOKMAN_PROFILE", "log")
+	if got := GetLayerProfile(); got != "log" {
+		t.Errorf("expected 'log', got %q", got)
+	}
+
+	os.Unsetenv("TOKMAN_PROFILE")
+}
+
 type testRootCmd struct {
 	ctx context.Context
 }
@@ -342,13 +373,21 @@ func (t testRootCmd) Context() context.Context {
 
 type capturingRunner struct {
 	ctx context.Context
+	output string
+	code int
 	err error
 }
 
 func (r *capturingRunner) Run(ctx context.Context, args []string) (string, int, error) {
 	r.ctx = ctx
 	if r.err != nil {
-		return "", 1, r.err
+		return r.output, r.code, r.err
+	}
+	if r.code != 0 {
+		return r.output, r.code, nil
+	}
+	if r.output != "" {
+		return r.output, 0, nil
 	}
 	return "ok", 0, nil
 }
@@ -399,6 +438,177 @@ func TestFallbackExecuteCommandWithoutRootContext(t *testing.T) {
 	}
 	if runner.ctx == nil {
 		t.Fatal("runner context was nil")
+	}
+}
+
+func TestFallbackApplyPipelineUsesTOMLMaxLines(t *testing.T) {
+	t.Cleanup(func() { SetFlags(FlagConfig{}) })
+	SetFlags(FlagConfig{})
+
+	handler := &FallbackHandler{}
+	output := handler.applyPipeline("line1\nline2\nline3", &toml.TOMLFilterRule{
+		KeepLinesMatching: []string{"^line1$"},
+	})
+
+	if output != "line1" {
+		t.Fatalf("applyPipeline() = %q, want %q", output, "line1")
+	}
+}
+
+func TestFallbackRawPassthroughRecordsCommand(t *testing.T) {
+	t.Cleanup(func() { SetFlags(FlagConfig{}) })
+	SetFlags(FlagConfig{})
+
+	dbPath := filepath.Join(t.TempDir(), "tracking.db")
+	trackerDB, err := tracking.NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer trackerDB.Close()
+
+	handler := &FallbackHandler{
+		tracker:    trackerDB,
+		runner:     &capturingRunner{output: "hi\n"},
+		teeEnabled: false,
+	}
+
+	output, handled, err := handler.rawPassthrough([]string{"echo", "hi"})
+	if err != nil {
+		t.Fatalf("rawPassthrough() error = %v", err)
+	}
+	if !handled {
+		t.Fatal("rawPassthrough() should mark command as handled")
+	}
+	if output != "hi\n" {
+		t.Fatalf("rawPassthrough() output = %q, want %q", output, "hi\n")
+	}
+
+	summary, err := trackerDB.GetSavings(getProjectPath())
+	if err != nil {
+		t.Fatalf("GetSavings() error = %v", err)
+	}
+	if summary.TotalCommands != 1 {
+		t.Fatalf("TotalCommands = %d, want 1", summary.TotalCommands)
+	}
+}
+
+func TestFallbackHandleFiltersAndRecordsOnCommandError(t *testing.T) {
+	t.Cleanup(func() { SetFlags(FlagConfig{}) })
+	SetFlags(FlagConfig{})
+
+	dbPath := filepath.Join(t.TempDir(), "tracking.db")
+	trackerDB, err := tracking.NewTracker(dbPath)
+	if err != nil {
+		t.Fatalf("NewTracker() error = %v", err)
+	}
+	defer trackerDB.Close()
+
+	registry := toml.NewFilterRegistry()
+	filterPath := filepath.Join(t.TempDir(), "echo.toml")
+	filterContent := []byte("schema_version = 1\n[echo]\nmatch_command = \"^echo \"\nkeep_lines_matching = [\"^line1$\"]\n")
+	if err := os.WriteFile(filterPath, filterContent, 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := registry.LoadFile(filterPath); err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+
+	handler := &FallbackHandler{
+		registry:   registry,
+		tracker:    trackerDB,
+		runner:     &capturingRunner{output: "line1\nline2\n", code: 1, err: errors.New("boom")},
+		teeEnabled: false,
+	}
+
+	output, handled, err := handler.Handle([]string{"echo", "hello"})
+	if err == nil {
+		t.Fatal("Handle() expected command error")
+	}
+	if !handled {
+		t.Fatal("Handle() should mark command as handled")
+	}
+	if output != "line1" {
+		t.Fatalf("Handle() output = %q, want %q", output, "line1")
+	}
+
+	commands, err := trackerDB.GetRecentCommands(getProjectPath(), 5)
+	if err != nil {
+		t.Fatalf("GetRecentCommands() error = %v", err)
+	}
+	if len(commands) != 1 {
+		t.Fatalf("GetRecentCommands() returned %d commands, want 1", len(commands))
+	}
+	if commands[0].ParseSuccess {
+		t.Fatal("expected ParseSuccess to be false for non-zero exit")
+	}
+}
+
+func TestGetProjectPathUsesCanonicalPath(t *testing.T) {
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWD) })
+
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkDir := filepath.Join(base, "link")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	if err := os.Chdir(linkDir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	got := getProjectPath()
+	want := config.ProjectPath()
+	if got != want {
+		t.Fatalf("getProjectPath() = %q, want %q", got, want)
+	}
+}
+
+func TestGetDatabasePathUsesConfiguredPath(t *testing.T) {
+	resetConfigCacheForTest()
+	t.Cleanup(resetConfigCacheForTest)
+
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	wantDBPath := filepath.Join(t.TempDir(), "custom", "tracking.db")
+	content := []byte("[tracking]\ndatabase_path = \"" + wantDBPath + "\"\n")
+	if err := os.WriteFile(configPath, content, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	SetConfigFile(configPath)
+
+	if got := GetDatabasePath(); got != wantDBPath {
+		t.Fatalf("GetDatabasePath() = %q, want %q", got, wantDBPath)
+	}
+}
+
+func TestOpenTrackerUsesConfiguredPath(t *testing.T) {
+	resetConfigCacheForTest()
+	t.Cleanup(resetConfigCacheForTest)
+
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	wantDBPath := filepath.Join(t.TempDir(), "nested", "tracking.db")
+	content := []byte("[tracking]\ndatabase_path = \"" + wantDBPath + "\"\n")
+	if err := os.WriteFile(configPath, content, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	SetConfigFile(configPath)
+
+	trackerDB, err := OpenTracker()
+	if err != nil {
+		t.Fatalf("OpenTracker() error = %v", err)
+	}
+	defer trackerDB.Close()
+
+	if _, err := os.Stat(wantDBPath); err != nil {
+		t.Fatalf("expected configured DB to exist: %v", err)
 	}
 }
 

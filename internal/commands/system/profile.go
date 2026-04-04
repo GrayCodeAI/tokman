@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var profileCmd = &cobra.Command{
@@ -22,10 +22,11 @@ func init() {
 }
 
 func runProfile(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
+	tracker, err := shared.OpenTracker()
+	if err != nil {
+		return fmt.Errorf("tracking not available: %w", err)
 	}
+	defer tracker.Close()
 
 	layers, err := tracker.GetTopLayers(20)
 	if err != nil {

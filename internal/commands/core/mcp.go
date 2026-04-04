@@ -261,37 +261,35 @@ func newMCPHandler(apiKey string) http.Handler {
 			ReductionPct:   percentSaved(originalTokens, finalTokens),
 		}
 
-		if tracker := tracking.GetGlobalTracker(); tracker != nil {
-			cwd, err := os.Getwd()
-			if err == nil {
-				meta := contextread.Describe("mcp", cleanPath, string(data), contextread.Options{
-					Level:        level,
-					Mode:         mode,
-					MaxLines:     req.MaxLines,
-					MaxTokens:    req.MaxTokens,
-					LineNumbers:  req.LineNumbers,
-					StartLine:    req.StartLine,
-					EndLine:      req.EndLine,
-					SaveSnapshot: req.SaveSnapshot,
-					RelatedFiles: req.RelatedFiles,
-				})
-				if err := tracker.Record(&tracking.CommandRecord{
-					Command:             fmt.Sprintf("tokman mcp read %s", cleanPath),
-					OriginalTokens:      originalTokens,
-					FilteredTokens:      finalTokens,
-					SavedTokens:         saved,
-					ProjectPath:         cwd,
-					ParseSuccess:        true,
-					ContextKind:         meta.Kind,
-					ContextMode:         meta.RequestedMode,
-					ContextResolvedMode: meta.ResolvedMode,
-					ContextTarget:       meta.Target,
-					ContextRelatedFiles: meta.RelatedFiles,
-					ContextBundle:       meta.Bundle,
-				}); err != nil {
-					log.Printf("failed to record mcp read: %v", err)
-				}
+		if tracker, err := shared.OpenTracker(); err == nil {
+			meta := contextread.Describe("mcp", cleanPath, string(data), contextread.Options{
+				Level:        level,
+				Mode:         mode,
+				MaxLines:     req.MaxLines,
+				MaxTokens:    req.MaxTokens,
+				LineNumbers:  req.LineNumbers,
+				StartLine:    req.StartLine,
+				EndLine:      req.EndLine,
+				SaveSnapshot: req.SaveSnapshot,
+				RelatedFiles: req.RelatedFiles,
+			})
+			if err := tracker.Record(&tracking.CommandRecord{
+				Command:             fmt.Sprintf("tokman mcp read %s", cleanPath),
+				OriginalTokens:      originalTokens,
+				FilteredTokens:      finalTokens,
+				SavedTokens:         saved,
+				ProjectPath:         shared.GetProjectPath(),
+				ParseSuccess:        true,
+				ContextKind:         meta.Kind,
+				ContextMode:         meta.RequestedMode,
+				ContextResolvedMode: meta.ResolvedMode,
+				ContextTarget:       meta.Target,
+				ContextRelatedFiles: meta.RelatedFiles,
+				ContextBundle:       meta.Bundle,
+			}); err != nil {
+				log.Printf("failed to record mcp read: %v", err)
 			}
+			tracker.Close()
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -368,26 +366,24 @@ func newMCPHandler(apiKey string) http.Handler {
 			ReductionPct:   percentSaved(bundle.OriginalTokens, bundle.FinalTokens),
 		}
 
-		if tracker := tracking.GetGlobalTracker(); tracker != nil {
-			cwd, err := os.Getwd()
-			if err == nil {
-				if err := tracker.Record(&tracking.CommandRecord{
-					Command:             fmt.Sprintf("tokman mcp bundle %s", cleanPath),
-					OriginalTokens:      bundle.OriginalTokens,
-					FilteredTokens:      bundle.FinalTokens,
-					SavedTokens:         saved,
-					ProjectPath:         cwd,
-					ParseSuccess:        true,
-					ContextKind:         "mcp",
-					ContextMode:         "graph",
-					ContextResolvedMode: "graph",
-					ContextTarget:       cleanPath,
-					ContextRelatedFiles: len(bundle.RelatedFiles),
-					ContextBundle:       true,
-				}); err != nil {
-					log.Printf("failed to record mcp bundle: %v", err)
-				}
+		if tracker, err := shared.OpenTracker(); err == nil {
+			if err := tracker.Record(&tracking.CommandRecord{
+				Command:             fmt.Sprintf("tokman mcp bundle %s", cleanPath),
+				OriginalTokens:      bundle.OriginalTokens,
+				FilteredTokens:      bundle.FinalTokens,
+				SavedTokens:         saved,
+				ProjectPath:         shared.GetProjectPath(),
+				ParseSuccess:        true,
+				ContextKind:         "mcp",
+				ContextMode:         "graph",
+				ContextResolvedMode: "graph",
+				ContextTarget:       cleanPath,
+				ContextRelatedFiles: len(bundle.RelatedFiles),
+				ContextBundle:       true,
+			}); err != nil {
+				log.Printf("failed to record mcp bundle: %v", err)
 			}
+			tracker.Close()
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var enableCmd = &cobra.Command{
@@ -89,11 +90,7 @@ func init() {
 
 // getEnabledMarkerPath returns the path to the enabled marker file.
 func getEnabledMarkerPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	return filepath.Join(home, ".local", "share", "tokman", ".enabled")
+	return filepath.Join(config.DataPath(), ".enabled")
 }
 
 // isEnabled checks if TokMan is globally enabled.

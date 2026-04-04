@@ -13,12 +13,7 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Show or create configuration file",
-	Long: `Display the current TokMan configuration or create a default config file.
-
-The configuration file is stored at ~/.config/tokman/config.toml and controls:
-- Token tracking behavior
-- Output filtering settings
-- Shell hook exclusions`,
+	Long:  "",
 	Annotations: map[string]string{
 		"tokman:skip_integrity": "true",
 	},
@@ -41,12 +36,18 @@ The configuration file is stored at ~/.config/tokman/config.toml and controls:
 
 func init() {
 	registry.Add(func() { registry.Register(configCmd) })
+	configCmd.Long = fmt.Sprintf(`Display the current TokMan configuration or create a default config file.
+
+The configuration file is stored at %s and controls:
+- Token tracking behavior
+- Output filtering settings
+- Shell hook exclusions`, effectiveConfigPath())
 
 	configCmd.Flags().Bool("create", false, "Create default config file")
 }
 
 func createDefaultConfig() (string, error) {
-	configPath := config.ConfigPath()
+	configPath := effectiveConfigPath()
 
 	cfg := config.Defaults()
 	if err := cfg.Save(configPath); err != nil {
@@ -57,7 +58,7 @@ func createDefaultConfig() (string, error) {
 }
 
 func showConfig() error {
-	configPath := config.ConfigPath()
+	configPath := effectiveConfigPath()
 	fmt.Printf("Config: %s\n\n", configPath)
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {

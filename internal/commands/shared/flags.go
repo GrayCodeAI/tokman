@@ -290,6 +290,7 @@ var (
 	TokenBudget          int
 	FallbackArgs         []string
 	LayerPreset          string
+	LayerProfile         string
 	OutputFile           string
 	QuietMode            bool
 	JSONOutput           bool
@@ -355,6 +356,7 @@ func (s *AppState) syncGlobals() {
 	TokenBudget = state.TokenBudget
 	FallbackArgs = state.FallbackArgs
 	LayerPreset = state.LayerPreset
+	LayerProfile = state.LayerProfile
 	OutputFile = state.OutputFile
 	QuietMode = state.QuietMode
 	JSONOutput = state.JSONOutput
@@ -390,6 +392,7 @@ func (s *AppState) syncFromGlobals() {
 		TokenBudget:          TokenBudget,
 		FallbackArgs:         FallbackArgs,
 		LayerPreset:          LayerPreset,
+		LayerProfile:         LayerProfile,
 		OutputFile:           OutputFile,
 		QuietMode:            QuietMode,
 		JSONOutput:           JSONOutput,

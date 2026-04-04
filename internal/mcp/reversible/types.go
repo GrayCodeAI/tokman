@@ -9,6 +9,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -173,11 +176,32 @@ type Config struct {
 // DefaultConfig returns a default configuration.
 func DefaultConfig() Config {
 	return Config{
-		StorePath:        "~/.local/share/tokman/rewind.db",
+		StorePath:        filepath.Join(rewindDataPath(), "rewind.db"),
 		DefaultAlgorithm: "zstd",
 		MaxEntrySize:     100 * 1024 * 1024, // 100MB
 		AutoVacuum:       true,
 	}
+}
+
+func rewindDataPath() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "tokman")
+	}
+
+	if runtime.GOOS == "windows" {
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return filepath.Join(localAppData, "tokman")
+		}
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "tokman", "data")
+		}
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "share", "tokman")
+	}
+
+	return filepath.Join(os.TempDir(), "tokman-data")
 }
 
 // Compressor provides compression functionality.

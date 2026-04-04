@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
@@ -45,8 +46,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 
 // runWorkflowSuggestions analyzes recent commands and provides optimization suggestions
 func runWorkflowSuggestions() error {
-	dbPath := tracking.DatabasePath()
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return fmt.Errorf("failed to open tracking database: %w", err)
 	}

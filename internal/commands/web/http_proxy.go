@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/proxy"
 )
 
@@ -26,15 +28,7 @@ var (
 var proxyStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the HTTP proxy server",
-	Long: `Start the TokMan HTTP proxy server that intercepts LLM API calls
-and compresses request messages before forwarding them.
-
-Supports OpenAI, Anthropic, and Gemini API formats.
-
-Examples:
-  tokman http-proxy start
-  tokman http-proxy start --listen :8080 --target https://api.openai.com
-  tokman http-proxy start --config ~/.config/tokman/proxy.toml`,
+	Long:  "",
 	RunE: runProxyStart,
 }
 
@@ -59,6 +53,15 @@ Works with OpenAI, Anthropic, and Gemini API formats.`,
 
 func init() {
 	registry.Add(func() { registry.Register(httpProxyCmd) })
+	proxyStartCmd.Long = fmt.Sprintf(`Start the TokMan HTTP proxy server that intercepts LLM API calls
+and compresses request messages before forwarding them.
+
+Supports OpenAI, Anthropic, and Gemini API formats.
+
+Examples:
+  tokman http-proxy start
+  tokman http-proxy start --listen :8080 --target https://api.openai.com
+  tokman http-proxy start --config %s`, filepath.Join(config.ConfigDir(), "proxy.toml"))
 
 	httpProxyCmd.AddCommand(proxyStartCmd)
 	httpProxyCmd.AddCommand(proxyStopCmd)
@@ -159,6 +162,15 @@ func runProxyStart(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Metrics: http://%s/metrics\n", cfg.ListenAddr)
 	fmt.Println()
 
+	pidFile := getProxyPIDFile()
+	if err := os.MkdirAll(filepath.Dir(pidFile), 0755); err != nil {
+		return fmt.Errorf("create proxy runtime dir: %w", err)
+	}
+	if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644); err != nil {
+		return fmt.Errorf("write proxy pid file: %w", err)
+	}
+	defer os.Remove(pidFile)
+
 	errCh := make(chan error, 1)
 	go func() {
 		var serveErr error
@@ -192,7 +204,7 @@ func runProxyStart(cmd *cobra.Command, args []string) error {
 
 func runProxyStop(cmd *cobra.Command, args []string) error {
 	// Send SIGTERM to proxy process
-	pidFile := os.Getenv("HOME") + "/.local/share/tokman/proxy.pid"
+	pidFile := getProxyPIDFile()
 	data, err := os.ReadFile(pidFile)
 	if err != nil {
 		return fmt.Errorf("proxy not running (no PID file)")
@@ -219,7 +231,7 @@ func runProxyStop(cmd *cobra.Command, args []string) error {
 
 func runProxyStatus(cmd *cobra.Command, args []string) error {
 	// Check if proxy is running
-	pidFile := os.Getenv("HOME") + "/.local/share/tokman/proxy.pid"
+	pidFile := getProxyPIDFile()
 	data, err := os.ReadFile(pidFile)
 	if err != nil {
 		fmt.Println("Proxy: not running")
@@ -245,4 +257,8 @@ func runProxyStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func getProxyPIDFile() string {
+	return filepath.Join(config.DataPath(), "proxy.pid")
 }

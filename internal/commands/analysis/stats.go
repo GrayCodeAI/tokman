@@ -10,8 +10,8 @@ import (
 
 	"github.com/GrayCodeAI/tokman/internal/cache"
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/core"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
 var statsJSON bool
@@ -31,18 +31,16 @@ func init() {
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
+	defer tracker.Close()
+
+	projectPath := shared.GetProjectPath()
 
 	// Get overall savings
-	savings, err := tracker.GetSavings(cwd)
+	savings, err := tracker.GetSavings(projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to get savings: %w", err)
 	}
@@ -59,7 +57,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 
 	if statsJSON {
 		output := map[string]any{
-			"project":           cwd,
+			"project":           projectPath,
 			"total_commands":    savings.TotalCommands,
 			"total_original":    savings.TotalOriginal,
 			"total_filtered":    savings.TotalFiltered,
@@ -77,7 +75,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Token Savings Statistics")
 	fmt.Println("========================")
-	fmt.Printf("Project: %s\n\n", cwd)
+	fmt.Printf("Project: %s\n\n", projectPath)
 
 	fmt.Printf("Commands tracked: %d\n", savings.TotalCommands)
 	fmt.Printf("Commands today:   %d\n\n", todayCount)

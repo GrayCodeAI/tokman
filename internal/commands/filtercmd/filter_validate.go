@@ -10,6 +10,7 @@ import (
 
 	"github.com/GrayCodeAI/tokman/internal/commands/core"
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var filterValidateCmd = &cobra.Command{
@@ -32,15 +33,9 @@ func runFilterValidate(cmd *cobra.Command, args []string) error {
 		filterDirs = append(filterDirs, builtinDir)
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	if home != "" {
-		userDir := filepath.Join(home, ".config", "tokman", "filters")
-		if _, err := os.Stat(userDir); err == nil {
-			filterDirs = append(filterDirs, userDir)
-		}
+	userDir := config.FiltersDir()
+	if _, err := os.Stat(userDir); err == nil {
+		filterDirs = append(filterDirs, userDir)
 	}
 
 	hasErrors := false

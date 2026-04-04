@@ -163,6 +163,52 @@ The authentication module handles user login.`
 	}
 }
 
+func TestPipelineManager_ProcessWithQueryUpdatesFilters(t *testing.T) {
+	manager := NewPipelineManager(ManagerConfig{
+		MaxContextTokens: 2000000,
+		ChunkSize:        100000,
+		StreamThreshold:  500000,
+		TeeOnFailure:     false,
+		FailSafeMode:     true,
+		ValidateOutput:   false,
+		CacheEnabled:     false,
+		PipelineCfg: PipelineConfig{
+			Mode:              ModeMinimal,
+			QueryIntent:       "initial",
+			EnableGoalDriven:  true,
+			EnableContrastive: true,
+		},
+	})
+
+	input := strings.Join([]string{
+		"authentication failure at login boundary",
+		"payment timeout during invoice capture",
+		"authentication token refresh failed",
+		"payment gateway returned 502",
+	}, "\n")
+	ctx := CommandContext{Command: "test"}
+
+	if _, err := manager.ProcessWithQuery(input, ModeMinimal, "authentication failure", ctx); err != nil {
+		t.Fatalf("first ProcessWithQuery() error = %v", err)
+	}
+	if manager.coordinator.goalDrivenFilter == nil || manager.coordinator.goalDrivenFilter.goal != "authentication failure" {
+		t.Fatal("goal-driven filter was not updated to first query")
+	}
+	if manager.coordinator.contrastiveFilter == nil || manager.coordinator.contrastiveFilter.question != "authentication failure" {
+		t.Fatal("contrastive filter was not updated to first query")
+	}
+
+	if _, err := manager.ProcessWithQuery(input, ModeMinimal, "payment timeout", ctx); err != nil {
+		t.Fatalf("second ProcessWithQuery() error = %v", err)
+	}
+	if manager.coordinator.goalDrivenFilter == nil || manager.coordinator.goalDrivenFilter.goal != "payment timeout" {
+		t.Fatal("goal-driven filter was not refreshed for second query")
+	}
+	if manager.coordinator.contrastiveFilter == nil || manager.coordinator.contrastiveFilter.question != "payment timeout" {
+		t.Fatal("contrastive filter was not refreshed for second query")
+	}
+}
+
 func TestPipelineManager_FailSafe(t *testing.T) {
 	manager := NewPipelineManager(ManagerConfig{
 		MaxContextTokens: 2000000,
@@ -235,6 +281,42 @@ func TestPipelineManager_Cache(t *testing.T) {
 	// Outputs should match
 	if result1.Output != result2.Output {
 		t.Error("cached output should match original")
+	}
+}
+
+func TestPipelineManager_CacheKeyIncludesBudget(t *testing.T) {
+	manager := NewPipelineManager(ManagerConfig{
+		MaxContextTokens: 2000000,
+		ChunkSize:        100000,
+		StreamThreshold:  500000,
+		TeeOnFailure:     false,
+		FailSafeMode:     true,
+		ValidateOutput:   false,
+		CacheEnabled:     true,
+		CacheMaxSize:     100,
+		PipelineCfg: PipelineConfig{
+			Mode:            ModeAggressive,
+			SessionTracking: true,
+		},
+	})
+
+	input := strings.Repeat("Budget-sensitive compression line.\n", 50)
+	ctx := CommandContext{Command: "test"}
+
+	result1, err := manager.ProcessWithBudget(input, ModeAggressive, 400, ctx)
+	if err != nil {
+		t.Fatalf("ProcessWithBudget() first call error = %v", err)
+	}
+	if result1.CacheHit {
+		t.Fatal("first budgeted call should not be a cache hit")
+	}
+
+	result2, err := manager.ProcessWithBudget(input, ModeAggressive, 50, ctx)
+	if err != nil {
+		t.Fatalf("ProcessWithBudget() second call error = %v", err)
+	}
+	if result2.CacheHit {
+		t.Fatal("different budget should not reuse prior cached result")
 	}
 }
 

@@ -66,7 +66,8 @@ if [ -n "$TOKMAN_VERSION" ]; then
 fi
 
 # Check if TokMan is enabled globally
-if [ ! -f "$HOME/.local/share/tokman/.enabled" ]; then
+TOKMAN_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/tokman"
+if [ ! -f "$TOKMAN_DATA_DIR/.enabled" ]; then
   exit 0
 fi
 
@@ -381,7 +382,12 @@ func runLocalInit() error {
 	fmt.Printf("  %s Hooks directory: %s\n", green("✓"), cyan(hooksDir))
 
 	// Initialize database
-	dbPath := config.DatabasePath()
+	cfg, err := config.Load("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to load config: %v\n", err)
+		cfg = config.Defaults()
+	}
+	dbPath := cfg.GetDatabasePath()
 	tracker, err := tracking.NewTracker(dbPath)
 	if err != nil {
 		return fmt.Errorf("initializing database: %w", err)
@@ -425,7 +431,7 @@ func runLocalInit() error {
 	fmt.Println(green("✓ TokMan initialized successfully!"))
 	fmt.Println()
 	fmt.Println("To enable shell hooks, add to your .bashrc or .zshrc:")
-	fmt.Printf("  %s\n", cyan("source ~/.local/share/tokman/hooks/tokman-rewrite.sh"))
+	fmt.Printf("  %s\n", cyan("source "+filepath.Join(hooksDir, "tokman-rewrite.sh")))
 	fmt.Println()
 	return nil
 }

@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/core"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
 var discoverCmd = &cobra.Command{
@@ -22,8 +22,7 @@ var discoverCmd = &cobra.Command{
 func runDiscover() error {
 	analyzer := core.NewDiscoverAnalyzer()
 
-	dbPath := tracking.DatabasePath()
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return err
 	}

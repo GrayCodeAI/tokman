@@ -3,7 +3,6 @@ package configcmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -58,12 +57,12 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigInit(cmd *cobra.Command, args []string) error {
-	configDir := config.ConfigDir()
+	configDir := effectiveConfigDir()
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("cannot create config directory: %w", err)
 	}
 
-	configPath := filepath.Join(configDir, "config.toml")
+	configPath := effectiveConfigPath()
 	if _, err := os.Stat(configPath); err == nil {
 		fmt.Printf("Config already exists at %s\n", configPath)
 		return nil
@@ -95,8 +94,8 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
 
-	configDir := config.ConfigDir()
-	configPath := filepath.Join(configDir, "config.toml")
+	configDir := effectiveConfigDir()
+	configPath := effectiveConfigPath()
 
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("cannot create config directory: %w", err)

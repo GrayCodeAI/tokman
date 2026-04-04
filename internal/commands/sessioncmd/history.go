@@ -2,12 +2,11 @@ package sessioncmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var historyLimit int
@@ -25,16 +24,13 @@ func init() {
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
-	records, err := tracker.GetRecentCommands(cwd, historyLimit)
+	defer tracker.Close()
+
+	records, err := tracker.GetRecentCommands(shared.GetProjectPath(), historyLimit)
 	if err != nil {
 		return fmt.Errorf("failed to get history: %w", err)
 	}

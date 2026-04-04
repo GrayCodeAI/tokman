@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/core"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/toml"
@@ -46,7 +47,7 @@ func GetFallback() *FallbackHandler {
 func NewFallbackHandler() *FallbackHandler {
 	loader := toml.GetLoader()
 
-	projectDir, _ := os.Getwd()
+	projectDir := config.ProjectPath()
 
 	registry, err := loader.LoadAll(projectDir)
 	if err != nil {
@@ -84,53 +85,25 @@ func (h *FallbackHandler) Handle(args []string) (string, bool, error) {
 	start := time.Now()
 	output, exitCode, err := h.executeCommand(args)
 	execTime := time.Since(start)
-
-	if err != nil {
-		if h.teeEnabled && len(output) > 500 {
-			teePath := h.saveTee(args, output)
-			output = output + fmt.Sprintf("\n[full output saved: %s]", teePath)
-		}
-		return output, true, err
+	filtered := output
+	if output != "" {
+		filtered = h.applyPipeline(output, config)
 	}
-
-	filtered := h.applyPipeline(output, config)
-
-	if h.tracker != nil {
-		originalTokens := core.EstimateTokens(output)
-		filteredTokens := core.EstimateTokens(filtered)
-		saved := originalTokens - filteredTokens
-		if saved < 0 {
-			saved = 0
-		}
-
-		record := &tracking.CommandRecord{
-			Command:        command,
-			OriginalTokens: originalTokens,
-			FilteredTokens: filteredTokens,
-			SavedTokens:    saved,
-			ProjectPath:    getProjectPath(),
-			ExecTimeMs:     execTime.Milliseconds(),
-			Timestamp:      start,
-			ParseSuccess:   exitCode == 0,
-			// AI Agent attribution from environment
-			AgentName:   os.Getenv("TOKMAN_AGENT"),
-			ModelName:   os.Getenv("TOKMAN_MODEL"),
-			Provider:    os.Getenv("TOKMAN_PROVIDER"),
-			ModelFamily: utils.GetModelFamily(os.Getenv("TOKMAN_MODEL")),
-		}
-		h.tracker.Record(record)
-	}
+	h.recordCommand(command, output, filtered, start, execTime, exitCode == 0)
 
 	if exitCode != 0 && h.teeEnabled && len(output) > 500 {
 		teePath := h.saveTee(args, output)
 		filtered = filtered + fmt.Sprintf("\n[full output saved: %s]", teePath)
 	}
 
-	return filtered, true, nil
+	return filtered, true, err
 }
 
 func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
+	start := time.Now()
 	output, exitCode, err := h.executeCommand(args)
+	execTime := time.Since(start)
+	rawOutput := output
 
 	// Apply remote compression even without TOML filter
 	if IsRemoteMode() && len(output) > 100 {
@@ -152,6 +125,7 @@ func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
 	if h.tracker != nil && len(args) > 0 {
 		h.tracker.RecordParseFailure(strings.Join(args, " "), "no filter matched", err == nil)
 	}
+	h.recordCommand(strings.Join(args, " "), rawOutput, output, start, execTime, exitCode == 0)
 
 	if exitCode != 0 && h.teeEnabled && len(output) > 500 {
 		teePath := h.saveTee(args, output)
@@ -159,6 +133,35 @@ func (h *FallbackHandler) rawPassthrough(args []string) (string, bool, error) {
 	}
 
 	return output, true, err
+}
+
+func (h *FallbackHandler) recordCommand(command, originalOutput, filteredOutput string, start time.Time, execTime time.Duration, parseSuccess bool) {
+	if h.tracker == nil || command == "" {
+		return
+	}
+
+	originalTokens := core.EstimateTokens(originalOutput)
+	filteredTokens := core.EstimateTokens(filteredOutput)
+	saved := originalTokens - filteredTokens
+	if saved < 0 {
+		saved = 0
+	}
+
+	record := &tracking.CommandRecord{
+		Command:        command,
+		OriginalTokens: originalTokens,
+		FilteredTokens: filteredTokens,
+		SavedTokens:    saved,
+		ProjectPath:    getProjectPath(),
+		ExecTimeMs:     execTime.Milliseconds(),
+		Timestamp:      start,
+		ParseSuccess:   parseSuccess,
+		AgentName:      os.Getenv("TOKMAN_AGENT"),
+		ModelName:      os.Getenv("TOKMAN_MODEL"),
+		Provider:       os.Getenv("TOKMAN_PROVIDER"),
+		ModelFamily:    utils.GetModelFamily(os.Getenv("TOKMAN_MODEL")),
+	}
+	_ = h.tracker.Record(record)
 }
 
 func (h *FallbackHandler) executeCommand(args []string) (string, int, error) {
@@ -255,6 +258,11 @@ func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.TOMLFilt
 		}
 	}
 
+	if shouldApplyTOMLConfig(tomlConfig) {
+		filtered, _ := toml.ApplyTOMLFilter(output, tomlConfig)
+		output = filtered
+	}
+
 	preset := GetLayerPreset()
 	profile := GetLayerProfile()
 	var cfg filter.PipelineConfig
@@ -288,12 +296,6 @@ func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.TOMLFilt
 
 	pipeline := filter.NewPipelineCoordinator(cfg)
 
-	// Integrate TOML filter into pipeline (Layer 0) instead of applying separately
-	if tomlConfig != nil && (len(tomlConfig.Replace) > 0 || len(tomlConfig.MatchOutput) > 0 || len(tomlConfig.StripLinesMatching) > 0) {
-		tomlWrapper := toml.NewTOMLFilterWrapper("toml_pre_filter", tomlConfig)
-		pipeline.SetTOMLFilter(tomlWrapper, "toml_pre_filter")
-	}
-
 	filtered, stats := pipeline.Process(output)
 
 	if IsVerbose() && stats.TotalSaved > 0 {
@@ -316,23 +318,38 @@ func (h *FallbackHandler) applyPipeline(output string, tomlConfig *toml.TOMLFilt
 	return filtered
 }
 
+func shouldApplyTOMLConfig(rule *toml.TOMLFilterRule) bool {
+	if rule == nil {
+		return false
+	}
+	return rule.StripANSI ||
+		len(rule.Replace) > 0 ||
+		len(rule.MatchOutput) > 0 ||
+		len(rule.StripLinesMatching) > 0 ||
+		len(rule.KeepLinesMatching) > 0 ||
+		rule.TruncateLinesAt > 0 ||
+		rule.Head > 0 ||
+		rule.Tail > 0 ||
+		rule.MaxLines > 0 ||
+		rule.OnEmpty != ""
+}
+
 // Helper functions (package-level)
 
 func getGlobalTracker() *tracking.Tracker {
+	tracker, err := OpenTracker()
+	if err == nil {
+		return tracker
+	}
 	return tracking.GetGlobalTracker()
 }
 
 func getTeeDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(homeDir, ".local", "share", "tokman", "tee")
+	return filepath.Join(config.DataPath(), "tee")
 }
 
 func getProjectPath() string {
-	path, _ := os.Getwd()
-	return path
+	return config.ProjectPath()
 }
 
 // Root command storage (for CLI integration)

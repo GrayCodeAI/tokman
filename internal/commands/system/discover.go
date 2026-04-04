@@ -12,7 +12,6 @@ import (
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
 	"github.com/GrayCodeAI/tokman/internal/commands/shared"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
 var (
@@ -76,18 +75,13 @@ func runDiscover() error {
 	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 
-	// Get current working directory for project filtering
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
-	}
 	projectFilter := discoverProject
 	if projectFilter == "" && !discoverAll {
-		projectFilter = cwd
+		projectFilter = shared.GetProjectPath()
 	}
 
 	// Initialize tracker to get historical data
-	tracker, err := tracking.NewTracker(tracking.DatabasePath())
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return fmt.Errorf("failed to initialize tracker: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var searchCmd = &cobra.Command{
@@ -46,22 +47,16 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	// Search user filters
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	if home != "" {
-		userDir := filepath.Join(home, ".config", "tokman", "filters")
-		if entries, err := os.ReadDir(userDir); err == nil {
-			for _, e := range entries {
-				if !strings.HasSuffix(e.Name(), ".toml") {
-					continue
-				}
-				name := strings.TrimSuffix(e.Name(), ".toml")
-				if strings.Contains(strings.ToLower(name), query) {
-					fmt.Printf("  ✓ %s (user)\n", name)
-					found++
-				}
+	userDir := config.FiltersDir()
+	if entries, err := os.ReadDir(userDir); err == nil {
+		for _, e := range entries {
+			if !strings.HasSuffix(e.Name(), ".toml") {
+				continue
+			}
+			name := strings.TrimSuffix(e.Name(), ".toml")
+			if strings.Contains(strings.ToLower(name), query) {
+				fmt.Printf("  ✓ %s (user)\n", name)
+				found++
 			}
 		}
 	}
@@ -69,7 +64,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	if found == 0 {
 		fmt.Printf("No filters found for '%s'.\n", query)
 		fmt.Println("\nTip: Use 'tokman marketplace search <query>' to find community filters.")
-		fmt.Println("     Or create a custom filter in ~/.config/tokman/filters/<name>.toml")
+		fmt.Printf("     Or create a custom filter in %s\n", filepath.Join(config.FiltersDir(), "<name>.toml"))
 	}
 
 	return nil

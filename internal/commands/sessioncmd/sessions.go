@@ -2,13 +2,12 @@ package sessioncmd
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var sessionsDays int
@@ -26,16 +25,13 @@ func init() {
 }
 
 func runSessions(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
-	records, err := tracker.GetRecentCommands(cwd, 100)
+	defer tracker.Close()
+
+	records, err := tracker.GetRecentCommands(shared.GetProjectPath(), 100)
 	if err != nil {
 		return fmt.Errorf("failed to get sessions: %w", err)
 	}

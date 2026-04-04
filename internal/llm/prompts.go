@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -453,9 +454,26 @@ func CreateCustomTemplate(name, description, systemPrompt, userPrompt, intent st
 
 // DefaultTemplatesDir returns the default templates directory
 func DefaultTemplatesDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+	return filepath.Join(llmDataPath(), "prompts")
+}
+
+func llmDataPath() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "tokman")
 	}
-	return filepath.Join(homeDir, ".local", "share", "tokman", "prompts")
+
+	if runtime.GOOS == "windows" {
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return filepath.Join(localAppData, "tokman")
+		}
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "tokman", "data")
+		}
+	}
+
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(homeDir, ".local", "share", "tokman")
+	}
+
+	return filepath.Join(os.TempDir(), "tokman-data")
 }

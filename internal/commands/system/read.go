@@ -157,15 +157,13 @@ func buildReadOutput(filePath, content string, opts readOptions) (string, int, i
 }
 
 func recordSmartRead(commandName, filePath, content string, opts readOptions, originalTokens, filteredTokens int, execTimeMs int64) {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return
 	}
+	defer tracker.Close()
+
+	projectPath := shared.GetProjectPath()
 
 	savedTokens := originalTokens - filteredTokens
 	if savedTokens < 0 {
@@ -189,7 +187,7 @@ func recordSmartRead(commandName, filePath, content string, opts readOptions, or
 		OriginalTokens:      originalTokens,
 		FilteredTokens:      filteredTokens,
 		SavedTokens:         savedTokens,
-		ProjectPath:         cwd,
+		ProjectPath:         projectPath,
 		ExecTimeMs:          execTimeMs,
 		ParseSuccess:        true,
 		ContextKind:         meta.Kind,

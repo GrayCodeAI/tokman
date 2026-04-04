@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
 
@@ -33,21 +34,19 @@ func init() {
 }
 
 func runExport(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
+	defer tracker.Close()
+
+	projectPath := shared.GetProjectPath()
 	limit := exportLimit
 	if limit <= 0 {
 		limit = 10000
 	}
 
-	records, err := tracker.GetRecentCommands(cwd, limit)
+	records, err := tracker.GetRecentCommands(projectPath, limit)
 	if err != nil {
 		return fmt.Errorf("failed to get records: %w", err)
 	}

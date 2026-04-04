@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 	"github.com/GrayCodeAI/tokman/internal/contextread"
 	"github.com/GrayCodeAI/tokman/internal/tracking"
 )
@@ -70,16 +71,14 @@ func init() {
 }
 
 func runContext(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
-	savings, err := tracker.GetSavings(cwd)
+	defer tracker.Close()
+
+	projectPath := shared.GetProjectPath()
+	savings, err := tracker.GetSavings(projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to get context data: %w", err)
 	}
@@ -99,7 +98,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Tokens saved:      %d tokens\n", savings.TotalSaved)
 	fmt.Printf("Reduction:         %.1f%%\n\n", savings.ReductionPct)
 
-	readSavings, err := tracker.GetSavingsForContextReads(cwd, "", "")
+	readSavings, err := tracker.GetSavingsForContextReads(projectPath, "", "")
 	if err != nil {
 		return fmt.Errorf("failed to get smart read data: %w", err)
 	}
@@ -223,15 +222,13 @@ func buildContextFile(path string, opts contextread.Options) (string, string, in
 }
 
 func recordContextRead(commandName, path, rawContent string, opts contextread.Options, originalTokens, filteredTokens int, execTimeMs int64) {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return
 	}
+	defer tracker.Close()
+
+	projectPath := shared.GetProjectPath()
 
 	savedTokens := originalTokens - filteredTokens
 	if savedTokens < 0 {
@@ -248,7 +245,7 @@ func recordContextRead(commandName, path, rawContent string, opts contextread.Op
 		OriginalTokens:      originalTokens,
 		FilteredTokens:      filteredTokens,
 		SavedTokens:         savedTokens,
-		ProjectPath:         cwd,
+		ProjectPath:         projectPath,
 		ExecTimeMs:          execTimeMs,
 		ParseSuccess:        true,
 		ContextKind:         meta.Kind,

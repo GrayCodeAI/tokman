@@ -3,9 +3,12 @@ package configcmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"reflect"
+	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var configGetCmd = &cobra.Command{
@@ -22,90 +25,92 @@ func init() {
 func runConfigGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	envKey := "TOKMAN_" + key
+	envKey := "TOKMAN_" + strings.ToUpper(strings.NewReplacer(".", "_", "-", "_").Replace(key))
 	if val := os.Getenv(envKey); val != "" {
 		fmt.Printf("%s = %s (from env)\n", key, val)
 		return nil
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
+	configPath := effectiveConfigPath()
+	cfg := config.Defaults()
+	source := "default"
+	if _, err := os.Stat(configPath); err == nil {
+		loadedCfg, loadErr := config.LoadFromFile(configPath)
+		if loadErr != nil {
+			return fmt.Errorf("failed to read config file %s: %w", configPath, loadErr)
+		}
+		cfg = loadedCfg
+		source = "file"
 	}
-	configPath := filepath.Join(home, ".config", "tokman", "config.toml")
 
-	if _, err := os.Stat(configPath); err != nil {
+	value, ok := lookupConfigValue(cfg, key)
+	if !ok {
 		fmt.Printf("%s = (not set)\n", key)
-		fmt.Println("Run 'tokman config init' to create a config file.")
 		return nil
 	}
 
-	data, readErr := os.ReadFile(configPath)
-	if readErr != nil {
-		return fmt.Errorf("failed to read config file %s: %w", configPath, readErr)
+	if source == "file" {
+		fmt.Printf("%s = %s\n", key, value)
+		return nil
 	}
-	content := string(data)
+	fmt.Printf("%s = %s (default)\n", key, value)
+	return nil
+}
 
-	for _, line := range splitLines(content) {
-		trimmed := trimStr(line)
-		if len(trimmed) == 0 || trimmed[0] == '#' || trimmed[0] == '[' {
-			continue
+func lookupConfigValue(cfg *config.Config, key string) (string, bool) {
+	value := reflect.ValueOf(cfg)
+	if !value.IsValid() || value.Kind() != reflect.Ptr || value.IsNil() {
+		return "", false
+	}
+	current := value.Elem()
+	for _, part := range strings.Split(key, ".") {
+		field, ok := findConfigField(current, part)
+		if !ok {
+			return "", false
 		}
+		current = indirectValue(field)
+		if !current.IsValid() {
+			return "", false
+		}
+	}
+	return fmt.Sprintf("%v", current.Interface()), true
+}
 
-		parts := splitFirst(trimmed, "=")
-		if len(parts) == 2 {
-			k := trimStr(parts[0])
-			v := trimStr(parts[1])
-			if k == key {
-				fmt.Printf("%s = %s\n", key, v)
-				return nil
+func findConfigField(v reflect.Value, key string) (reflect.Value, bool) {
+	if v.Kind() != reflect.Struct {
+		return reflect.Value{}, false
+	}
+
+	want := normalizeConfigKey(key)
+	for i := 0; i < v.NumField(); i++ {
+		fieldType := v.Type().Field(i)
+		names := []string{fieldType.Name}
+		if tag := fieldType.Tag.Get("mapstructure"); tag != "" {
+			names = append(names, tag)
+		}
+		for _, name := range names {
+			if normalizeConfigKey(name) == want {
+				return v.Field(i), true
 			}
 		}
 	}
 
-	fmt.Printf("%s = (not set)\n", key)
-	return nil
+	return reflect.Value{}, false
 }
 
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
+func indirectValue(v reflect.Value) reflect.Value {
+	for v.IsValid() && v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}
 		}
+		v = v.Elem()
 	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
+	return v
 }
 
-func splitFirst(s, sep string) []string {
-	idx := findStr(s, sep)
-	if idx < 0 {
-		return []string{s}
-	}
-	return []string{s[:idx], s[idx+len(sep):]}
-}
-
-func trimStr(s string) string {
-	i, j := 0, len(s)
-	for i < j && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {
-		i++
-	}
-	for j > i && (s[j-1] == ' ' || s[j-1] == '\t' || s[j-1] == '\n' || s[j-1] == '\r') {
-		j--
-	}
-	return s[i:j]
-}
-
-func findStr(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+func normalizeConfigKey(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, "_", "")
+	s = strings.ReplaceAll(s, "-", "")
+	return s
 }

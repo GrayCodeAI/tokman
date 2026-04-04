@@ -154,9 +154,7 @@ func (m *PipelineManager) processSingle(input string, mode Mode, ctx CommandCont
 	// Set query intent and process under write lock to prevent races on
 	// coordinator.config between concurrent goroutines.
 	m.mu.Lock()
-	if ctx.Intent != "" {
-		m.coordinator.config.QueryIntent = ctx.Intent
-	}
+	m.syncCoordinatorForRequest(mode, ctx.Intent)
 	output, stats := m.coordinator.Process(input)
 	m.mu.Unlock()
 
@@ -220,6 +218,32 @@ func (m *PipelineManager) processSingle(input string, mode Mode, ctx CommandCont
 	}
 
 	return result, nil
+}
+
+func (m *PipelineManager) syncCoordinatorForRequest(mode Mode, query string) {
+	m.coordinator.config.Mode = mode
+	if m.coordinator.config.QueryIntent == query {
+		return
+	}
+
+	m.coordinator.config.QueryIntent = query
+
+	if query == "" {
+		m.coordinator.goalDrivenFilter = nil
+		m.coordinator.contrastiveFilter = nil
+		if m.coordinator.questionAwareFilter != nil {
+			m.coordinator.questionAwareFilter.SetQuery("")
+		}
+		m.coordinator.buildLayers()
+		return
+	}
+
+	m.coordinator.goalDrivenFilter = NewGoalDrivenFilter(query)
+	m.coordinator.contrastiveFilter = NewContrastiveFilter(query)
+	if m.coordinator.questionAwareFilter != nil {
+		m.coordinator.questionAwareFilter.SetQuery(query)
+	}
+	m.coordinator.buildLayers()
 }
 
 // processStreaming processes large input in chunks
@@ -386,7 +410,9 @@ func (m *PipelineManager) checkStructure(s string) bool {
 // saveTee saves raw output to a file for recovery
 func (m *PipelineManager) saveTee(input string, ctx CommandContext, reason string) string {
 	timestamp := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("tokman-tee-%s-%s-%s.txt", timestamp, ctx.Command, reason)
+	// Sanitize command to prevent path traversal in filename
+	safeCommand := strings.NewReplacer("/", "_", "\\", "_", "..", "_", " ", "_").Replace(ctx.Command)
+	filename := fmt.Sprintf("tokman-tee-%s-%s-%s.txt", timestamp, safeCommand, reason)
 	path := filepath.Join(m.teeDir, filename)
 
 	data := struct {
@@ -419,12 +445,17 @@ func (m *PipelineManager) saveTee(input string, ctx CommandContext, reason strin
 
 // cacheKey generates a cache key for the input
 func (m *PipelineManager) cacheKey(input string, mode Mode, ctx CommandContext) string {
+	m.mu.RLock()
+	budget := m.coordinator.config.Budget
+	m.mu.RUnlock()
+
 	hash := sha256.Sum256([]byte(input))
-	return fmt.Sprintf("%s-%s-%s-%s",
+	return fmt.Sprintf("%s-%s-%s-%s-%d",
 		hex.EncodeToString(hash[:8]),
 		mode,
 		ctx.Command,
 		ctx.Intent,
+		budget,
 	)
 }
 
@@ -514,17 +545,8 @@ func (m *PipelineManager) ProcessWithBudget(input string, mode Mode, budget int,
 // ProcessWithQuery processes with query-aware compression
 func (m *PipelineManager) ProcessWithQuery(input string, mode Mode, query string, ctx CommandContext) (*ProcessResult, error) {
 	m.mu.Lock()
-	// Update query intent
-	m.coordinator.config.QueryIntent = query
 	ctx.Intent = query
-
-	// Initialize query-aware filters if needed
-	if m.coordinator.goalDrivenFilter == nil && query != "" {
-		m.coordinator.goalDrivenFilter = NewGoalDrivenFilter(query)
-	}
-	if m.coordinator.contrastiveFilter == nil && query != "" {
-		m.coordinator.contrastiveFilter = NewContrastiveFilter(query)
-	}
+	m.syncCoordinatorForRequest(mode, query)
 	m.mu.Unlock()
 
 	return m.Process(input, mode, ctx)

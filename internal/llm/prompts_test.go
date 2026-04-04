@@ -212,10 +212,12 @@ func TestCreateCustomTemplate(t *testing.T) {
 }
 
 func TestDefaultTemplatesDir(t *testing.T) {
-	dir := DefaultTemplatesDir()
-	expectedSuffix := filepath.Join(".local", "share", "tokman", "prompts")
+	dataHome := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dataHome)
 
-	if !strings.HasSuffix(dir, expectedSuffix) {
-		t.Errorf("expected dir to end with %q, got %q", expectedSuffix, dir)
+	dir := DefaultTemplatesDir()
+	want := filepath.Join(dataHome, "tokman", "prompts")
+	if dir != want {
+		t.Errorf("DefaultTemplatesDir() = %q, want %q", dir, want)
 	}
 }

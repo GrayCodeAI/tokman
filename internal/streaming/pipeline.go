@@ -168,6 +168,9 @@ func (p *Pipeline) ProcessReader(reader io.Reader, writer io.Writer) (Stats, err
 		}
 		if err != nil {
 			close(chunkChan)
+			wg.Wait()
+			close(resultChan)
+			<-collectDone
 			return stats, err
 		}
 	}
@@ -238,9 +241,10 @@ func (p *Pipeline) collectResults(results <-chan Result, writer io.Writer, stats
 			// Check buffered results
 			for {
 				if data, ok := buffer[nextOffset]; ok {
+					prevOffset := nextOffset
 					writer.Write(data)
 					nextOffset += int64(len(data))
-					delete(buffer, nextOffset)
+					delete(buffer, prevOffset)
 				} else {
 					break
 				}

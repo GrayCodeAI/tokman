@@ -97,8 +97,7 @@ type DayBreakdown struct {
 }
 
 func runGain(verbose bool) error {
-	dbPath := tracking.DatabasePath()
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return fmt.Errorf("error initializing tracker: %w", err)
 	}
@@ -107,11 +106,7 @@ func runGain(verbose bool) error {
 	// Resolve project scope (default to current project)
 	var projectPath string
 	if gainProject || !gainAll {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("error getting working directory: %w", err)
-		}
-		projectPath = cwd
+		projectPath = shared.GetProjectPath()
 	}
 
 	// Handle failure log
@@ -279,8 +274,7 @@ func printDefaultView(tracker *tracking.Tracker, summary *GainSummary, projectPa
 
 	// History
 	if gainHistory {
-		dbPath := tracking.DatabasePath()
-		histTracker, err := tracking.NewTracker(dbPath)
+		histTracker, err := shared.OpenTracker()
 		if err != nil {
 			if shared.Verbose > 0 {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create tracker for history: %v\n", err)

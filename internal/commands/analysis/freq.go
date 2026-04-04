@@ -2,12 +2,11 @@ package analysis
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var freqLimit int
@@ -26,16 +25,13 @@ func init() {
 }
 
 func runFreq(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
-	}
-
-	cwd, err := os.Getwd()
+	tracker, err := shared.OpenTracker()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("tracking not available: %w", err)
 	}
-	stats, err := tracker.GetCommandStats(cwd)
+	defer tracker.Close()
+
+	stats, err := tracker.GetCommandStats(shared.GetProjectPath())
 	if err != nil {
 		return fmt.Errorf("failed to get stats: %w", err)
 	}

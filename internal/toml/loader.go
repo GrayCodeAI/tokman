@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 //go:embed builtin/*.toml
@@ -17,6 +19,8 @@ type Loader struct {
 	parser       *Parser
 	trustedPaths map[string]bool
 	trustedFile  string
+	configDir    string
+	useLegacyDir bool
 	mu           sync.RWMutex
 }
 
@@ -29,13 +33,12 @@ type LoaderConfig struct {
 
 // NewLoader creates a new filter loader
 func NewLoader(configDir string) *Loader {
+	useLegacyDir := false
 	if configDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "."
-		}
-		configDir = filepath.Join(homeDir, ".config", "tokman")
+		configDir = config.ConfigDir()
+		useLegacyDir = true
 	}
+	configDir = filepath.Clean(configDir)
 
 	trustedFile := filepath.Join(configDir, "trusted.txt")
 
@@ -43,6 +46,8 @@ func NewLoader(configDir string) *Loader {
 		parser:       NewParser(),
 		trustedPaths: make(map[string]bool),
 		trustedFile:  trustedFile,
+		configDir:    configDir,
+		useLegacyDir: useLegacyDir,
 	}
 }
 
@@ -58,10 +63,20 @@ func (l *Loader) LoadAll(projectDir string) (*FilterRegistry, error) {
 		return nil, fmt.Errorf("failed to load builtin filters: %w", err)
 	}
 
-	// Load user-global filters
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		userFiltersPath := filepath.Join(homeDir, ".config", "tokman", "filters.toml")
+	// Load user-global filters from the effective config directory. When the
+	// loader uses its default config resolution, keep a legacy fallback to
+	// HOME/.config/tokman for compatibility with older setups.
+	userFilterPaths := []string{filepath.Join(l.configDir, "filters.toml")}
+	if l.useLegacyDir {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			legacyPath := filepath.Join(homeDir, ".config", "tokman", "filters.toml")
+			if legacyPath != userFilterPaths[0] {
+				userFilterPaths = append(userFilterPaths, legacyPath)
+			}
+		}
+	}
+	for _, userFiltersPath := range userFilterPaths {
 		if _, err := os.Stat(userFiltersPath); err == nil {
 			if err := registry.LoadFile(userFiltersPath); err != nil {
 				// Log warning but don't fail
@@ -129,8 +144,7 @@ func (l *Loader) TrustProject(projectPath string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Resolve to absolute path
-	absPath, err := filepath.Abs(projectPath)
+	absPath, err := normalizeTrustedProjectPath(projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve project path: %w", err)
 	}
@@ -146,7 +160,7 @@ func (l *Loader) UntrustProject(projectPath string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	absPath, err := filepath.Abs(projectPath)
+	absPath, err := normalizeTrustedProjectPath(projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve project path: %w", err)
 	}
@@ -161,7 +175,7 @@ func (l *Loader) IsTrusted(projectPath string) bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	absPath, err := filepath.Abs(projectPath)
+	absPath, err := normalizeTrustedProjectPath(projectPath)
 	if err != nil {
 		return false
 	}
@@ -187,7 +201,10 @@ func (l *Loader) LoadTrusted() error {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
-			l.trustedPaths[line] = true
+			normalizedPath, err := normalizeTrustedProjectPath(line)
+			if err == nil {
+				l.trustedPaths[normalizedPath] = true
+			}
 		}
 	}
 
@@ -238,4 +255,15 @@ func GetLoader() *Loader {
 		GlobalFilterLoader.LoadTrusted()
 	})
 	return GlobalFilterLoader
+}
+
+func normalizeTrustedProjectPath(projectPath string) (string, error) {
+	absPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return "", err
+	}
+	if canonicalPath, err := filepath.EvalSymlinks(absPath); err == nil && canonicalPath != "" {
+		return canonicalPath, nil
+	}
+	return absPath, nil
 }

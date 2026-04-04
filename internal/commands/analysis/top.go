@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var topLimit int
@@ -24,10 +24,11 @@ func init() {
 }
 
 func runTop(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracking not available")
+	tracker, err := shared.OpenTracker()
+	if err != nil {
+		return fmt.Errorf("tracking not available: %w", err)
 	}
+	defer tracker.Close()
 
 	topCommands, err := tracker.TopCommands(topLimit)
 	if err != nil {

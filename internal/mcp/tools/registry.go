@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/contextread"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/mcp"
@@ -1080,7 +1081,7 @@ func makeCtxMcpHandler() mcp.ToolHandler {
 			"tools":       27,
 			"entrypoint":  "tokman mcp",
 			"env":         map[string]string{},
-			"config_file": "~/.config/tokman/mcp.json",
+			"config_file": filepath.Join(config.ConfigDir(), "mcp.json"),
 		}, nil
 	}
 }

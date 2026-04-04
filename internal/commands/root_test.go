@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -26,5 +27,22 @@ func TestExitCodeForErrorExitError(t *testing.T) {
 func TestExitCodeForErrorGenericError(t *testing.T) {
 	if got := exitCodeForError(exec.ErrNotFound); got != 1 {
 		t.Fatalf("exitCodeForError(generic) = %d, want 1", got)
+	}
+}
+
+func TestExtractUnknownCommandArgsFallsBackToOSArgs(t *testing.T) {
+	origFallbackArgs := fallbackArgs
+	origArgs := os.Args
+	t.Cleanup(func() {
+		fallbackArgs = origFallbackArgs
+		os.Args = origArgs
+	})
+
+	fallbackArgs = nil
+	os.Args = []string{"tokman", "echo", "hi"}
+
+	got := extractUnknownCommandArgs()
+	if len(got) != 2 || got[0] != "echo" || got[1] != "hi" {
+		t.Fatalf("extractUnknownCommandArgs() = %v, want [echo hi]", got)
 	}
 }

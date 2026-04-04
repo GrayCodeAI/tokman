@@ -156,6 +156,8 @@ func TestExpandTilde(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
 	c := DefaultConfig()
 	if !c.Enabled {
 		t.Error("default config should be enabled")
@@ -165,6 +167,10 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if c.MaxFiles != maxFiles {
 		t.Errorf("default maxFiles = %d, want %d", c.MaxFiles, maxFiles)
+	}
+	wantDir := filepath.Join(os.Getenv("XDG_DATA_HOME"), "tokman", "tee")
+	if c.Dir != wantDir {
+		t.Errorf("default dir = %q, want %q", c.Dir, wantDir)
 	}
 }
 

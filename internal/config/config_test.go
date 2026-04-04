@@ -253,6 +253,39 @@ mode = "aggressive"
 	}
 }
 
+func TestLoadUsesXDGConfigHome(t *testing.T) {
+	tmpDir := t.TempDir()
+	xdgConfigHome := filepath.Join(tmpDir, "xdg-config")
+	configDir := filepath.Join(xdgConfigHome, "tokman")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	content := `
+[tracking]
+database_path = "/tmp/xdg-tracking.db"
+
+[filter]
+mode = "aggressive"
+`
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if cfg.Filter.Mode != "aggressive" {
+		t.Fatalf("Filter.Mode = %q, want aggressive", cfg.Filter.Mode)
+	}
+	if cfg.Tracking.DatabasePath != "/tmp/xdg-tracking.db" {
+		t.Fatalf("Tracking.DatabasePath = %q, want /tmp/xdg-tracking.db", cfg.Tracking.DatabasePath)
+	}
+}
+
 func TestSaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfgPath := filepath.Join(tmpDir, "subdir", "config.toml")

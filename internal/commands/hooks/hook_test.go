@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -416,24 +417,24 @@ func TestFilterEntriesByDays(t *testing.T) {
 }
 
 func TestGetAuditLogPath(t *testing.T) {
-	// Default path should contain .local/share/tokman
+	dataHome := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dataHome)
+
 	path := getAuditLogPath()
-	if !strings.Contains(path, "tokman") {
-		t.Errorf("getAuditLogPath() = %q, should contain 'tokman'", path)
-	}
-	if !strings.Contains(path, "hook-audit.log") {
-		t.Errorf("getAuditLogPath() = %q, should contain 'hook-audit.log'", path)
+	want := filepath.Join(dataHome, "tokman", "hook-audit.log")
+	if path != want {
+		t.Errorf("getAuditLogPath() = %q, want %q", path, want)
 	}
 }
 
 func TestGetAuditLogPath_EnvOverride(t *testing.T) {
-	// Save original env
-	orig := getAuditLogPath()
+	override := t.TempDir()
+	t.Setenv("TOKMAN_AUDIT_DIR", override)
 
-	// Test with env override (we can't easily set env in unit test without affecting other tests,
-	// but we can verify the function uses the env var)
-	if orig == "" {
-		t.Error("getAuditLogPath() should not return empty string")
+	got := getAuditLogPath()
+	want := filepath.Join(override, "hook-audit.log")
+	if got != want {
+		t.Errorf("getAuditLogPath() = %q, want %q", got, want)
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var tuiLegacyCmd = &cobra.Command{
@@ -22,10 +22,11 @@ func init() {
 }
 
 func runTUILegacy(cmd *cobra.Command, args []string) error {
-	tracker := tracking.GetGlobalTracker()
-	if tracker == nil {
-		return fmt.Errorf("tracker not initialized")
+	tracker, err := shared.OpenTracker()
+	if err != nil {
+		return fmt.Errorf("tracker not initialized: %w", err)
 	}
+	defer tracker.Close()
 	fmt.Println("╔════════════════════════════════════════════════════╗")
 	fmt.Println("║          TokMan Token Analytics TUI                ║")
 	fmt.Println("╠════════════════════════════════════════════════════╣")

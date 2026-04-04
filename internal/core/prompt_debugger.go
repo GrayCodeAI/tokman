@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type PromptDebugger struct {
 
 func NewPromptDebugger(dir string) *PromptDebugger {
 	if dir == "" {
-		dir = "~/.local/share/tokman/prompts"
+		dir = defaultPromptDir()
 	}
 	return &PromptDebugger{dir: expandPromptDir(dir)}
 }
@@ -101,4 +102,29 @@ func sanitizeFilename(s string) string {
 		}
 	}
 	return string(result)
+}
+
+func defaultPromptDir() string {
+	return filepath.Join(promptDataPath(), "prompts")
+}
+
+func promptDataPath() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "tokman")
+	}
+
+	if runtime.GOOS == "windows" {
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return filepath.Join(localAppData, "tokman")
+		}
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "tokman", "data")
+		}
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "share", "tokman")
+	}
+
+	return filepath.Join(os.TempDir(), "tokman-data")
 }

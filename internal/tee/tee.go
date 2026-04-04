@@ -8,9 +8,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
-const defaultDir = "~/.local/share/tokman/tee"
 const maxFiles = 20
 
 type Mode string
@@ -33,7 +34,7 @@ func DefaultConfig() Config {
 		Enabled:  true,
 		Mode:     ModeFailures,
 		MaxFiles: maxFiles,
-		Dir:      defaultDir,
+		Dir:      defaultDir(),
 	}
 }
 
@@ -166,4 +167,8 @@ func WriteAndHint(output string, command string, exitCode int) string {
 		return ""
 	}
 	return fmt.Sprintf("[full output saved: %s]", path)
+}
+
+func defaultDir() string {
+	return filepath.Join(config.DataPath(), "tee")
 }

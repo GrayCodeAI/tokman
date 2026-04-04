@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 	"github.com/GrayCodeAI/tokman/internal/filter"
 	"github.com/GrayCodeAI/tokman/internal/graph"
 	"github.com/GrayCodeAI/tokman/internal/memory"
@@ -213,7 +215,7 @@ func init() {
 }
 
 func runMemory(cmd *cobra.Command, args []string) error {
-	storePath := os.Getenv("HOME") + "/.local/share/tokman/memory.json"
+	storePath := memoryStorePath()
 	store := memory.NewMemoryStore(storePath)
 
 	switch memoryAction {
@@ -262,4 +264,8 @@ func runMemory(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func memoryStorePath() string {
+	return filepath.Join(config.DataPath(), "memory.json")
 }

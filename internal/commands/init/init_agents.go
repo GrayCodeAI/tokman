@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/GrayCodeAI/tokman/internal/agents"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 // runAllAgentsInit detects and sets up all installed agents
@@ -355,7 +356,7 @@ func runAiderInit(global bool) {
 		return
 	}
 
-	aliasesPath := filepath.Join(homeDir, ".local/share/tokman/aider-aliases.sh")
+	aliasesPath := filepath.Join(config.DataPath(), "aider-aliases.sh")
 	aliases := `# Aider TokMan Aliases
 # Add to your .bashrc or .zshrc:
 alias git='tokman git'
@@ -376,7 +377,7 @@ alias tree='tokman tree'
 	fmt.Printf("  Config:  %s\n", cyan(configPath))
 	fmt.Printf("  Aliases: %s\n", cyan(aliasesPath))
 	fmt.Println("\n  Add these aliases to your shell for automatic tokman wrapping:")
-	fmt.Printf("  %s\n", cyan("source ~/.local/share/tokman/aider-aliases.sh"))
+	fmt.Printf("  %s\n", cyan("source "+aliasesPath))
 	fmt.Println()
 }
 
@@ -397,7 +398,7 @@ func uninstallAider() []string {
 		}
 	}
 
-	aliasesPath := filepath.Join(homeDir, ".local/share/tokman/aider-aliases.sh")
+	aliasesPath := filepath.Join(config.DataPath(), "aider-aliases.sh")
 	if _, err := os.Stat(aliasesPath); err == nil {
 		if err := os.Remove(aliasesPath); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", aliasesPath, err)

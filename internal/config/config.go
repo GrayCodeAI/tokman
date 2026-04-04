@@ -423,13 +423,22 @@ func Load(cfgFile string) (*Config, error) {
 	cfg := Defaults()
 
 	// Set up viper
+	viper.Reset()
 	viper.SetConfigType("toml")
 
 	if cfgFile != "" {
 		viper.SetConfigFile(os.ExpandEnv(cfgFile))
 	} else {
+		configDir := ConfigDir()
+		viper.AddConfigPath(configDir)
+
+		// Keep the legacy HOME-based path as a fallback when XDG points
+		// somewhere else, so existing setups still load.
 		if home, err := os.UserHomeDir(); err == nil {
-			viper.AddConfigPath(filepath.Join(home, ".config", "tokman"))
+			legacyDir := filepath.Join(home, ".config", "tokman")
+			if legacyDir != configDir {
+				viper.AddConfigPath(legacyDir)
+			}
 		}
 		viper.SetConfigName("config")
 	}
@@ -476,18 +485,34 @@ func bindEnvAliases() {
 				viper.Set("tracking.telemetry", !parsed)
 			}
 		},
-		"TOKMAN_AUDIT_DIR":    func(v string) { viper.Set("hooks.audit_dir", v) },
-		"TOKMAN_TEE_DIR":      func(v string) { viper.Set("hooks.tee_dir", v) },
-		"TOKMAN_TEE":          func(v string) { viper.Set("hooks.tee_enabled", v == "true" || v == "1") },
-		"TOKMAN_HOOK_AUDIT":   func(v string) { viper.Set("hooks.audit_enabled", v == "true" || v == "1") },
-		"TOKMAN_BUDGET":       func(v string) { if n, err := strconv.Atoi(v); err == nil { viper.Set("pipeline.default_budget", n) } },
-		"TOKMAN_MODE":         func(v string) { viper.Set("filter.mode", v) },
-		"TOKMAN_PRESET":       func(v string) { viper.Set("pipeline.preset", v) },
-		"TOKMAN_MAX_CONTEXT":  func(v string) { if n, err := strconv.Atoi(v); err == nil { viper.Set("pipeline.max_context_tokens", n) } },
-		"TOKMAN_CACHE_SIZE":   func(v string) { if n, err := strconv.Atoi(v); err == nil { viper.Set("pipeline.cache_max_size", n) } },
-		"TOKMAN_ENTROPY_THRESHOLD": func(v string) { if f, err := strconv.ParseFloat(v, 64); err == nil { viper.Set("pipeline.entropy_threshold", f) } },
-		"TOKMAN_COMPACTION":   func(v string) { viper.Set("pipeline.enable_compaction", v == "true" || v == "1") },
-		"TOKMAN_H2O":          func(v string) { viper.Set("pipeline.enable_h2o", v == "true" || v == "1") },
+		"TOKMAN_AUDIT_DIR":  func(v string) { viper.Set("hooks.audit_dir", v) },
+		"TOKMAN_TEE_DIR":    func(v string) { viper.Set("hooks.tee_dir", v) },
+		"TOKMAN_TEE":        func(v string) { viper.Set("hooks.tee_enabled", v == "true" || v == "1") },
+		"TOKMAN_HOOK_AUDIT": func(v string) { viper.Set("hooks.audit_enabled", v == "true" || v == "1") },
+		"TOKMAN_BUDGET": func(v string) {
+			if n, err := strconv.Atoi(v); err == nil {
+				viper.Set("pipeline.default_budget", n)
+			}
+		},
+		"TOKMAN_MODE":   func(v string) { viper.Set("filter.mode", v) },
+		"TOKMAN_PRESET": func(v string) { viper.Set("pipeline.preset", v) },
+		"TOKMAN_MAX_CONTEXT": func(v string) {
+			if n, err := strconv.Atoi(v); err == nil {
+				viper.Set("pipeline.max_context_tokens", n)
+			}
+		},
+		"TOKMAN_CACHE_SIZE": func(v string) {
+			if n, err := strconv.Atoi(v); err == nil {
+				viper.Set("pipeline.cache_max_size", n)
+			}
+		},
+		"TOKMAN_ENTROPY_THRESHOLD": func(v string) {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				viper.Set("pipeline.entropy_threshold", f)
+			}
+		},
+		"TOKMAN_COMPACTION":     func(v string) { viper.Set("pipeline.enable_compaction", v == "true" || v == "1") },
+		"TOKMAN_H2O":            func(v string) { viper.Set("pipeline.enable_h2o", v == "true" || v == "1") },
 		"TOKMAN_ATTENTION_SINK": func(v string) { viper.Set("pipeline.enable_attention_sink", v == "true" || v == "1") },
 	}
 	for env, setter := range aliasMap {
@@ -566,6 +591,9 @@ func (c *Config) Validate() error {
 	validateThreshold("lazy_budget_ratio", c.Pipeline.LazyBudgetRatio)
 	validateThreshold("lazy_layer_decay", c.Pipeline.LazyLayerDecay)
 	validateThreshold("anchor_threshold", c.Pipeline.AnchorThreshold)
+	validateThreshold("perplexity_target_ratio", c.Pipeline.PerplexityTargetRatio)
+	validateThreshold("perplexity_prune_ratio", c.Pipeline.PerplexityPruneRatio)
+	validateThreshold("perplexity_convergence_threshold", c.Pipeline.PerplexityConvergenceThreshold)
 
 	// Positive integer constraints
 	if c.Pipeline.MaxContextTokens < 0 {
@@ -646,11 +674,6 @@ func (c *Config) Validate() error {
 		if totalSinkSize > 50 {
 			errs = append(errs, "combined sink sizes (h2o_sink + h2o_heavy + attention_sink) should not exceed 50")
 		}
-	}
-
-	// Cross-field validation: Semantic chunk min < max
-	if c.Pipeline.ChunkMinSize > c.Pipeline.ChunkMaxSize && c.Pipeline.ChunkMaxSize > 0 {
-		errs = append(errs, "chunk_min_size must not exceed chunk_max_size")
 	}
 
 	if len(errs) > 0 {

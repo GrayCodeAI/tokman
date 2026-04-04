@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
 )
 
 var gainToday bool
@@ -40,12 +40,7 @@ func init() {
 }
 
 func runGain(cmd *cobra.Command, args []string) error {
-	dbPath := tracking.DatabasePath()
-	if dbPath == "" {
-		return fmt.Errorf("cannot determine database path")
-	}
-
-	tracker, err := tracking.NewTracker(dbPath)
+	tracker, err := shared.OpenTracker()
 	if err != nil {
 		return fmt.Errorf("cannot open database: %w", err)
 	}

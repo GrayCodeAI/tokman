@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -82,16 +83,13 @@ func (t *TimedExecution) Track(command, tokmanCmd string, originalTokens, filter
 			return
 		}
 
-		cwd, err := os.Getwd()
-		if err != nil {
-			slog.Warn("tracker: failed to get working directory", "error", err)
-		}
+		projectPath := config.ProjectPath()
 		tracker.Record(&CommandRecord{
 			Command:        command,
 			OriginalTokens: originalTokens,
 			FilteredTokens: filteredTokens,
 			SavedTokens:    saved,
-			ProjectPath:    cwd,
+			ProjectPath:    projectPath,
 			ExecTimeMs:     execTime.Milliseconds(),
 			Timestamp:      time.Now(),
 			ParseSuccess:   true,
@@ -135,14 +133,36 @@ func GetGlobalTracker() *Tracker {
 	return getGlobalTracker()
 }
 
-// DatabasePath returns the default database path.
-// Delegates to config.DatabasePath for consistent XDG compliance.
+// CloseGlobalTracker closes the global tracker without creating it when it has
+// not been used in the current process.
+func CloseGlobalTracker() error {
+	trackerMu.Lock()
+	tracker := globalTracker
+	globalTracker = nil
+	trackerMu.Unlock()
+
+	if tracker == nil {
+		return nil
+	}
+	return tracker.Close()
+}
+
+// DatabasePath returns the effective tracking database path using config file
+// resolution when available, with environment/default fallback.
 func DatabasePath() string {
+	cfg, err := config.Load("")
+	if err == nil && cfg != nil {
+		return cfg.GetDatabasePath()
+	}
 	return config.DatabasePath()
 }
 
 // NewTracker creates a new Tracker with the given database path.
 func NewTracker(dbPath string) (*Tracker, error) {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
+		return nil, fmt.Errorf("failed to create tracker directory: %w", err)
+	}
+
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -167,10 +187,10 @@ func NewTracker(dbPath string) (*Tracker, error) {
 	}
 
 	// Run migrations
-	for _, migration := range InitSchema() {
+	for i, migration := range InitSchema() {
 		if _, err := db.Exec(migration); err != nil {
 			db.Close()
-			return nil, fmt.Errorf("failed to run migration: %w", err)
+			return nil, fmt.Errorf("failed to run migration %d: %w", i, err)
 		}
 	}
 
@@ -275,6 +295,9 @@ func (t *Tracker) Record(record *CommandRecord) error {
 // RecordContext saves a command execution to the database with context support.
 // P3: Enables cancellation for long-running database operations.
 func (t *Tracker) RecordContext(ctx context.Context, record *CommandRecord) error {
+	projectPath := normalizeProjectPath(record.ProjectPath)
+	record.ProjectPath = projectPath
+
 	query := `
 		INSERT INTO commands (
 			command, original_output, filtered_output,
@@ -545,6 +568,8 @@ func (t *Tracker) GetSavings(projectPath string) (*SavingsSummary, error) {
 // GetSavingsForContextReads returns smart-read savings using structured metadata
 // when available, with command-pattern fallback for older records.
 func (t *Tracker) GetSavingsForContextReads(projectPath, kind, mode string) (*SavingsSummary, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	var args []any
 	var filters []string
 
@@ -591,6 +616,8 @@ func (t *Tracker) GetSavingsForContextReads(projectPath, kind, mode string) (*Sa
 // GetSavingsForCommands returns token savings for commands matching any of the
 // provided GLOB patterns. When commandPatterns is empty, it returns all records.
 func (t *Tracker) GetSavingsForCommands(projectPath string, commandPatterns []string) (*SavingsSummary, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	var query string
 	var args []any
 	var filters []string
@@ -740,6 +767,8 @@ func (t *Tracker) TokensSavedTotal() (int64, error) {
 // GetCommandStats returns statistics grouped by command.
 // When projectPath is empty, returns all commands without filtering.
 func (t *Tracker) GetCommandStats(projectPath string) ([]CommandStats, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	var query string
 	var rows *sql.Rows
 	var err error
@@ -803,6 +832,8 @@ func (t *Tracker) GetRecentCommands(projectPath string, limit int) ([]CommandRec
 // GetRecentContextReads returns recent smart-read records using structured
 // metadata when available, with legacy command fallback for older rows.
 func (t *Tracker) GetRecentContextReads(projectPath, kind, mode string, limit int) ([]CommandRecord, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	var args []any
 	var filters []string
 
@@ -862,6 +893,8 @@ func (t *Tracker) GetRecentContextReads(projectPath, kind, mode string, limit in
 // GetRecentCommandsForPatterns returns recent commands optionally filtered by
 // command GLOB patterns. When commandPatterns is empty, it returns all commands.
 func (t *Tracker) GetRecentCommandsForPatterns(projectPath string, limit int, commandPatterns []string) ([]CommandRecord, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	var query string
 	var args []any
 	var filters []string
@@ -964,6 +997,8 @@ func (t *Tracker) GetDailySavings(projectPath string, days int) ([]struct {
 	Original int
 	Commands int
 }, error) {
+	projectPath = normalizeProjectPath(projectPath)
+
 	query := `
 		SELECT 
 			DATE(timestamp) as date,
@@ -1008,6 +1043,25 @@ func (t *Tracker) GetDailySavings(projectPath string, days int) ([]struct {
 	}
 
 	return results, nil
+}
+
+func normalizeProjectPath(projectPath string) string {
+	projectPath = strings.TrimSpace(projectPath)
+	if projectPath == "" {
+		return ""
+	}
+
+	if !filepath.IsAbs(projectPath) {
+		if absPath, err := filepath.Abs(projectPath); err == nil {
+			projectPath = absPath
+		}
+	}
+
+	if canonicalPath, err := filepath.EvalSymlinks(projectPath); err == nil && canonicalPath != "" {
+		return canonicalPath
+	}
+
+	return filepath.Clean(projectPath)
 }
 
 // RecordParseFailure records a parse failure event.

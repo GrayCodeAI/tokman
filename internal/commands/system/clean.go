@@ -9,7 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
-	"github.com/GrayCodeAI/tokman/internal/tracking"
+	"github.com/GrayCodeAI/tokman/internal/commands/shared"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var (
@@ -45,8 +46,9 @@ func runClean(cmd *cobra.Command, args []string) error {
 
 	// Clean tracking data
 	if !cleanTee && !cleanReversible || cleanAll {
-		tracker := tracking.GetGlobalTracker()
-		if tracker != nil {
+		tracker, err := shared.OpenTracker()
+		if err == nil {
+			defer tracker.Close()
 			if cleanAll {
 				removed, _ := tracker.CleanupWithRetention(0)
 				totalRemoved += int(removed)
@@ -72,55 +74,60 @@ func runClean(cmd *cobra.Command, args []string) error {
 
 	// Clean tee files
 	if cleanTee || cleanAll {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
-		}
-		if home != "" {
-			teeDir := filepath.Join(home, ".local", "share", "tokman", "tee")
-			if entries, err := os.ReadDir(teeDir); err == nil {
-				cleaned := 0
-				for _, e := range entries {
-					if !e.IsDir() {
-						if err := os.Remove(filepath.Join(teeDir, e.Name())); err != nil {
-							fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
-						} else {
-							cleaned++
-						}
+		teeDir := cleanTeeDir()
+		if entries, err := os.ReadDir(teeDir); err == nil {
+			cleaned := 0
+			for _, e := range entries {
+				if !e.IsDir() {
+					if err := os.Remove(filepath.Join(teeDir, e.Name())); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
+					} else {
+						cleaned++
 					}
 				}
-				fmt.Printf("  Removed %d tee files\n", cleaned)
-				totalRemoved += cleaned
 			}
+			fmt.Printf("  Removed %d tee files\n", cleaned)
+			totalRemoved += cleaned
 		}
 	}
 
 	// Clean reversible entries
 	if cleanReversible || cleanAll {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
-		}
-		if home != "" {
-			revDir := filepath.Join(home, ".local", "share", "tokman", "reversible")
-			if entries, err := os.ReadDir(revDir); err == nil {
-				cutoff := time.Now().AddDate(0, 0, -cleanDays)
-				removed := 0
-				for _, e := range entries {
-					if info, err := e.Info(); err == nil && info.ModTime().Before(cutoff) {
-						if err := os.Remove(filepath.Join(revDir, e.Name())); err != nil {
-							fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
-						} else {
-							removed++
-						}
+		revDir := cleanReversibleDir()
+		if entries, err := os.ReadDir(revDir); err == nil {
+			cutoff := time.Now().AddDate(0, 0, -cleanDays)
+			removed := 0
+			for _, e := range entries {
+				if cleanAll {
+					if err := os.Remove(filepath.Join(revDir, e.Name())); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
+					} else {
+						removed++
+					}
+					continue
+				}
+
+				if info, err := e.Info(); err == nil && info.ModTime().Before(cutoff) {
+					if err := os.Remove(filepath.Join(revDir, e.Name())); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: failed to remove %s: %v\n", e.Name(), err)
+					} else {
+						removed++
 					}
 				}
-				fmt.Printf("  Removed %d reversible entries\n", removed)
-				totalRemoved += removed
 			}
+			fmt.Printf("  Removed %d reversible entries\n", removed)
+			totalRemoved += removed
 		}
 	}
 
 	fmt.Printf("\nTotal items removed: %d\n", totalRemoved)
 	return nil
+}
+
+func cleanTeeDir() string {
+	return filepath.Join(config.DataPath(), "tee")
+}
+
+func cleanReversibleDir() string {
+	return filepath.Join(config.DataPath(), "reversible")
 }

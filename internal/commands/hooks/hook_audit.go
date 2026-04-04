@@ -182,11 +182,7 @@ func getAuditLogPath() string {
 	if dir := os.Getenv("TOKMAN_AUDIT_DIR"); dir != "" {
 		return filepath.Join(dir, "hook-audit.log")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	return filepath.Join(home, ".local", "share", "tokman", "hook-audit.log")
+	return filepath.Join(shared.GetDataPath(), "hook-audit.log")
 }
 
 func parseAuditLine(line string) *AuditEntry {

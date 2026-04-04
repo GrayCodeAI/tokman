@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -34,11 +35,7 @@ type StoredEntry struct {
 
 // NewReversibleStore creates a store in the tokman data directory.
 func NewReversibleStore() *ReversibleStore {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = os.TempDir()
-	}
-	baseDir := filepath.Join(home, ".local", "share", "tokman", "reversible")
+	baseDir := filepath.Join(reversibleDataPath(), "reversible")
 	if err := os.MkdirAll(baseDir, 0700); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to create directory: %v\n", err)
 	}
@@ -139,4 +136,25 @@ func (s *ReversibleStore) ListRecent(n int) ([]StoredEntry, error) {
 func (s *ReversibleStore) computeHash(content string) string {
 	h := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(h[:])
+}
+
+func reversibleDataPath() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "tokman")
+	}
+
+	if runtime.GOOS == "windows" {
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return filepath.Join(localAppData, "tokman")
+		}
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "tokman", "data")
+		}
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "share", "tokman")
+	}
+
+	return filepath.Join(os.TempDir(), "tokman-data")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GrayCodeAI/tokman/internal/commands/registry"
+	"github.com/GrayCodeAI/tokman/internal/config"
 )
 
 var undoCmd = &cobra.Command{
@@ -86,9 +87,5 @@ func runUndo(cmd *cobra.Command, args []string) error {
 }
 
 func getTeeDirFromHome() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(homeDir, ".local", "share", "tokman", "tee")
+	return filepath.Join(config.DataPath(), "tee")
 }
