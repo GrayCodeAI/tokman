@@ -335,7 +335,7 @@ TokMan runs a **31-layer compression pipeline** with stage gates, early-exit, an
 - **Early exit** — stop pipeline when budget already met
 - **Inter-layer feedback** — quality estimation between layers
 - **Result caching** — O(1) LRU with SHA-256 fingerprinting
-- **Parallel execution** — SIMD-accelerized where possible
+- **Parallel execution** — Auto-vectorized (compiler optimizations)
 
 ## HTTP Proxy Mode
 
@@ -563,7 +563,7 @@ port = 8080
 | Compression | 60–90% on common dev operations |
 | Tokenizer | BPE (tiktoken cl100k_base) |
 | Cache | O(1) LRU with fingerprinting |
-| SIMD | Go 1.26+ vectorized |
+| SIMD | Auto-vectorized (native SIMD planned) |
 | Pipeline | 31 layers, stage gates, early exit |
 
 ## vs Competitors
@@ -576,8 +576,8 @@ port = 8080
 | AI gateway | **Yes** | No | No | No | No | No |
 | Security (PII) | **Yes** | No | No | No | No | No |
 | Analytics TUI | **Yes** | `gain` only | No | Dashboard | Grafana | No |
-| SIMD acceleration | **Go 1.26+** | No | No | No | No | No |
-| WASM plugins | **Yes** | No | Lua | No | No | No |
+| SIMD acceleration | Auto-vectorized | No | No | No | No | No |
+| WASM plugins | Planned | No | Lua | No | No | No |
 | Agent support | **10+** | 10 | 8 | 10+ | 6+ | 6+ |
 
 ## Documentation

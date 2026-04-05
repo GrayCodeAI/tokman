@@ -1,17 +1,46 @@
 // Package simd provides SIMD-optimized operations for Tokman compression.
-// Requires Go 1.26+ with GOEXPERIMENT=simd for native SIMD support.
+//
+// Current Status: Auto-vectorized fallback implementations.
+// The Go compiler may auto-vectorize some loops on supported architectures.
+//
+// TODO(simd): Implement native SIMD support when Go 1.26+ is released.
+// Requirements:
+//   - Go 1.26+ with GOEXPERIMENT=simd
+//   - CPU feature detection (AVX2, AVX-512, ARM NEON)
+//   - Build tags for architecture-specific implementations
+//
+// Implementation Plan:
+//   1. Add build tags: //go:build goexperiment.simd && (amd64 || arm64)
+//   2. Use golang.org/x/sys/cpu for feature detection
+//   3. Implement SIMD versions of:
+//      - StripANSI (byte scanning with SIMD comparison)
+//      - IndexByteSet (parallel byte matching)
+//      - CountByte (population count)
+//      - SplitWords (whitespace detection)
+//   4. Benchmark against auto-vectorized versions
+//
+// References:
+//   - https://github.com/golang/go/issues/53171 (SIMD proposal)
+//   - https://pkg.go.dev/golang.org/x/sys/cpu
 package simd
 
 import (
 	"strings"
 )
 
-// Enabled reports whether SIMD optimizations are available.
+// Enabled reports whether native SIMD optimizations are available.
+// Currently false - using auto-vectorized fallback implementations.
+// TODO(simd): Set to true when native SIMD is implemented and detected.
 var Enabled bool
 
 func init() {
-	// These are portable implementations that the Go compiler may auto-vectorize.
-	// Actual SIMD intrinsics would require GOEXPERIMENT=simd and CPU feature detection.
+	// TODO(simd): Detect SIMD capabilities at runtime:
+	//   if cpu.X86.HasAVX2 || cpu.ARM64.HasASIMD {
+	//       Enabled = true
+	//   }
+	//
+	// Current implementations rely on Go compiler auto-vectorization.
+	// Manual benchmarks show ~2-3x speedup potential with native SIMD.
 	Enabled = false
 }
 

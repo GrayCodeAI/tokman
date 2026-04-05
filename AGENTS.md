@@ -5,7 +5,7 @@
 TokMan is a token-aware CLI proxy written in Go. It intercepts CLI commands and applies a 31-layer compression pipeline to reduce token usage for AI coding assistants. Built on research from 120+ papers, it achieves 60-90% token reduction on common development operations.
 
 **Module:** `github.com/GrayCodeAI/tokman`
-**Go Version:** 1.25+ (SIMD support)
+**Go Version:** 1.21+ (1.26+ for planned SIMD support)
 **CLI Framework:** Cobra (`github.com/spf13/cobra`)
 **Config:** Viper + TOML (`~/.config/tokman/config.toml`)
 **Database:** SQLite (`modernc.org/sqlite`)
@@ -40,7 +40,7 @@ tokman/
 │   ├── alerts/                 # Alert system
 │   ├── ccusage/                # Claude Code usage tracking
 │   ├── hooks/                  # Hook version management
-│   ├── plugin/                 # WASM plugin system
+│   ├── plugin/                 # Plugin system (WASM planned)
 │   └── server/                 # Server components
 ├── config/                     # Default config files
 ├── templates/                  # Init templates
@@ -370,7 +370,7 @@ Hook scripts are installed to agent-specific directories and patch configuration
 
 ## Performance Considerations
 
-- **SIMD:** Go 1.26+ with `GOEXPERIMENT=simd` for vectorized operations
+- **SIMD:** Auto-vectorized by Go compiler (native SIMD planned for Go 1.26+)
 - **Streaming:** Large inputs (>500K tokens) use streaming processing
 - **Caching:** Fingerprint-based result caching in `internal/cache/`
 - **Stage Gates:** Skip layers when not applicable (zero cost)
@@ -385,4 +385,4 @@ Hook scripts are installed to agent-specific directories and patch configuration
 - `modernc.org/sqlite` - Pure Go SQLite
 - `github.com/fatih/color` - Terminal colors
 - `github.com/tiktoken-go/tokenizer` - Tiktoken tokenizer
-- `github.com/tetratelabs/wazero` - WASM runtime for plugins
+- `github.com/tetratelabs/wazero` - WASM runtime for plugins (planned)
