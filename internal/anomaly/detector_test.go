@@ -69,9 +69,9 @@ func TestDetectTrendChange(t *testing.T) {
 func TestDetect_EmptyData(t *testing.T) {
 	d := NewDetector(2.0, time.Minute)
 
-	// Empty data returns nil
-	if got := d.DetectSuddenChange([]DataPoint{}); got != nil {
-		t.Errorf("DetectSuddenChange([]DataPoint{}) = %v, want nil", got)
+	// Empty data returns empty slice
+	if got := d.DetectSuddenChange([]DataPoint{}); len(got) != 0 {
+		t.Errorf("DetectSuddenChange([]DataPoint{}) = %v, want empty slice", got)
 	}
 
 	// Single point - no change to detect (loop starts at i=1)
